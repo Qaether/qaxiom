@@ -6,6 +6,10 @@
       "Type": "String",
       "Description": "Public Route 53 hosted zone ID for qaether.com"
     },
+    "AccessPointAlias": {
+      "Type": "String",
+      "Description": "S3 access point alias for the existing qaxiom.qaether.com bucket"
+    },
     "GitHubOwnerId": {
       "Type": "String",
       "Description": "Immutable numeric GitHub account ID for Qaether"
@@ -55,8 +59,9 @@
           "Origins": [
             {
               "Id": "qaxiom-private-s3",
-              "DomainName": "s3.ap-northeast-2.amazonaws.com",
-              "OriginPath": "/qaxiom.qaether.com",
+              "DomainName": {
+                "Fn::Sub": "${AccessPointAlias}.s3.ap-northeast-2.amazonaws.com"
+              },
               "OriginAccessControlId": { "Ref": "OriginAccessControl" },
               "S3OriginConfig": { "OriginAccessIdentity": "" }
             }

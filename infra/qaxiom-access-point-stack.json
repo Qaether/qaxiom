@@ -1,0 +1,71 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "S3 access point alias for the dotted Qaxiom bucket name; used as the CloudFront HTTPS origin",
+  "Parameters": {
+    "CloudFrontDistributionId": {
+      "Type": "String",
+      "Default": "",
+      "Description": "Set after the Qaxiom site stack creates its CloudFront distribution"
+    }
+  },
+  "Conditions": {
+    "HasCloudFrontDistribution": {
+      "Fn::Not": [
+        {
+          "Fn::Equals": [
+            { "Ref": "CloudFrontDistributionId" },
+            ""
+          ]
+        }
+      ]
+    }
+  },
+  "Resources": {
+    "AccessPoint": {
+      "Type": "AWS::S3::AccessPoint",
+      "Properties": {
+        "Name": "qaxiom-site-origin",
+        "Bucket": "qaxiom.qaether.com",
+        "BucketAccountId": { "Ref": "AWS::AccountId" },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "IgnorePublicAcls": true,
+          "BlockPublicPolicy": true,
+          "RestrictPublicBuckets": true
+        },
+        "Policy": {
+          "Fn::If": [
+            "HasCloudFrontDistribution",
+            {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Sid": "AllowOnlyQaxiomCloudFrontDistribution",
+                  "Effect": "Allow",
+                  "Principal": { "Service": "cloudfront.amazonaws.com" },
+                  "Action": "s3:GetObject",
+                  "Resource": {
+                    "Fn::Sub": "arn:aws:s3:ap-northeast-2:${AWS::AccountId}:accesspoint/qaxiom-site-origin/object/*"
+                  },
+                  "Condition": {
+                    "StringEquals": {
+                      "AWS:SourceArn": {
+                        "Fn::Sub": "arn:aws:cloudfront::${AWS::AccountId}:distribution/${CloudFrontDistributionId}"
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            { "Ref": "AWS::NoValue" }
+          ]
+        }
+      }
+    }
+  },
+  "Outputs": {
+    "AccessPointAlias": {
+      "Value": { "Fn::GetAtt": ["AccessPoint", "Alias"] }
+    }
+  }
+}
