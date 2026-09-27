@@ -1,0 +1,193 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Qaxiom static site: CloudFront, ACM, Route 53, private S3 origin, and GitHub OIDC deployment role",
+  "Parameters": {
+    "HostedZoneId": {
+      "Type": "String",
+      "Description": "Public Route 53 hosted zone ID for qaether.com"
+    },
+    "GitHubOwnerId": {
+      "Type": "String",
+      "Description": "Immutable numeric GitHub account ID for Qaether"
+    },
+    "GitHubRepoId": {
+      "Type": "String",
+      "Description": "Immutable numeric GitHub repository ID for Qaether/qaxiom"
+    }
+  },
+  "Resources": {
+    "Certificate": {
+      "Type": "AWS::CertificateManager::Certificate",
+      "Properties": {
+        "DomainName": "qaxiom.qaether.com",
+        "ValidationMethod": "DNS",
+        "DomainValidationOptions": [
+          {
+            "DomainName": "qaxiom.qaether.com",
+            "HostedZoneId": { "Ref": "HostedZoneId" }
+          }
+        ]
+      }
+    },
+    "OriginAccessControl": {
+      "Type": "AWS::CloudFront::OriginAccessControl",
+      "Properties": {
+        "OriginAccessControlConfig": {
+          "Name": "qaxiom-qaether-com",
+          "Description": "Signed access to the private Qaxiom S3 bucket",
+          "OriginAccessControlOriginType": "s3",
+          "SigningBehavior": "always",
+          "SigningProtocol": "sigv4"
+        }
+      }
+    },
+    "Distribution": {
+      "Type": "AWS::CloudFront::Distribution",
+      "Properties": {
+        "DistributionConfig": {
+          "Enabled": true,
+          "Comment": "qaxiom.qaether.com",
+          "Aliases": ["qaxiom.qaether.com"],
+          "DefaultRootObject": "index.html",
+          "HttpVersion": "http2and3",
+          "IPV6Enabled": true,
+          "PriceClass": "PriceClass_200",
+          "Origins": [
+            {
+              "Id": "qaxiom-private-s3",
+              "DomainName": "s3.ap-northeast-2.amazonaws.com",
+              "OriginPath": "/qaxiom.qaether.com",
+              "OriginAccessControlId": { "Ref": "OriginAccessControl" },
+              "S3OriginConfig": { "OriginAccessIdentity": "" }
+            }
+          ],
+          "DefaultCacheBehavior": {
+            "TargetOriginId": "qaxiom-private-s3",
+            "ViewerProtocolPolicy": "redirect-to-https",
+            "AllowedMethods": ["GET", "HEAD"],
+            "CachedMethods": ["GET", "HEAD"],
+            "Compress": true,
+            "CachePolicyId": "658327ea-f89d-4fab-a63d-7e88639e58f6"
+          },
+          "ViewerCertificate": {
+            "AcmCertificateArn": { "Ref": "Certificate" },
+            "SslSupportMethod": "sni-only",
+            "MinimumProtocolVersion": "TLSv1.2_2021"
+          }
+        }
+      }
+    },
+    "BucketPolicy": {
+      "Type": "AWS::S3::BucketPolicy",
+      "Properties": {
+        "Bucket": "qaxiom.qaether.com",
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "AllowOnlyQaxiomCloudFrontDistribution",
+              "Effect": "Allow",
+              "Principal": { "Service": "cloudfront.amazonaws.com" },
+              "Action": "s3:GetObject",
+              "Resource": "arn:aws:s3:::qaxiom.qaether.com/*",
+              "Condition": {
+                "StringEquals": {
+                  "AWS:SourceArn": {
+                    "Fn::Sub": "arn:aws:cloudfront::${AWS::AccountId}:distribution/${Distribution}"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "IPv4Alias": {
+      "Type": "AWS::Route53::RecordSet",
+      "Properties": {
+        "HostedZoneId": { "Ref": "HostedZoneId" },
+        "Name": "qaxiom.qaether.com.",
+        "Type": "A",
+        "AliasTarget": {
+          "DNSName": { "Fn::GetAtt": ["Distribution", "DomainName"] },
+          "HostedZoneId": "Z2FDTNDATAQYW2",
+          "EvaluateTargetHealth": false
+        }
+      }
+    },
+    "IPv6Alias": {
+      "Type": "AWS::Route53::RecordSet",
+      "Properties": {
+        "HostedZoneId": { "Ref": "HostedZoneId" },
+        "Name": "qaxiom.qaether.com.",
+        "Type": "AAAA",
+        "AliasTarget": {
+          "DNSName": { "Fn::GetAtt": ["Distribution", "DomainName"] },
+          "HostedZoneId": "Z2FDTNDATAQYW2",
+          "EvaluateTargetHealth": false
+        }
+      }
+    },
+    "GitHubDeployRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "RoleName": "QaxiomGitHubActionsDeploy",
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Federated": {
+                  "Fn::Sub": "arn:aws:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com"
+                }
+              },
+              "Action": "sts:AssumeRoleWithWebIdentity",
+              "Condition": {
+                "StringEquals": {
+                  "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
+                  "token.actions.githubusercontent.com:sub": {
+                    "Fn::Sub": "repo:Qaether@${GitHubOwnerId}/qaxiom@${GitHubRepoId}:ref:refs/heads/main"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "QaxiomSitePublish",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": ["s3:ListBucket", "s3:GetBucketLocation"],
+                  "Resource": "arn:aws:s3:::qaxiom.qaether.com"
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
+                  "Resource": "arn:aws:s3:::qaxiom.qaether.com/*"
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": "cloudfront:CreateInvalidation",
+                  "Resource": {
+                    "Fn::Sub": "arn:aws:cloudfront::${AWS::AccountId}:distribution/${Distribution}"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  },
+  "Outputs": {
+    "WebsiteURL": { "Value": "https://qaxiom.qaether.com/" },
+    "CloudFrontDistributionId": { "Value": { "Ref": "Distribution" } },
+    "CloudFrontDomainName": { "Value": { "Fn::GetAtt": ["Distribution", "DomainName"] } },
+    "GitHubDeployRoleArn": { "Value": { "Fn::GetAtt": ["GitHubDeployRole", "Arn"] } }
+  }
+}
