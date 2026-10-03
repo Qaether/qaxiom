@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Download, Edit3, Check, Plus } from 'lucide-react';
+import { Download, Edit3, Check, Plus, History } from 'lucide-react';
 import type { ChatSession, ResearchMode } from '../types';
 import { RESEARCH_MODES } from '../constants';
 import { sessionToMarkdown } from '../services/workspace';
@@ -10,6 +10,8 @@ interface ChatPanelHeaderProps {
   onNewSession: () => void;
   currentMode: ResearchMode;
   onModeChange: (mode: ResearchMode) => void;
+  isHistoryOpen?: boolean;
+  onToggleHistory?: () => void;
 }
 
 export const ChatPanelHeader: React.FC<ChatPanelHeaderProps> = ({
@@ -17,7 +19,9 @@ export const ChatPanelHeader: React.FC<ChatPanelHeaderProps> = ({
   onUpdateTitle,
   onNewSession,
   currentMode,
-  onModeChange
+  onModeChange,
+  isHistoryOpen = false,
+  onToggleHistory
 }) => {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleInput, setTitleInput] = useState(currentSession.title);
@@ -107,26 +111,41 @@ export const ChatPanelHeader: React.FC<ChatPanelHeaderProps> = ({
       </div>
 
       <div className="chat-panel-header-right">
+        {/* Chat History Toggle Button (Rotate Arrow) */}
+        {onToggleHistory && (
+          <button
+            type="button"
+            className={`chat-panel-action-btn chat-history-toggle-btn ${isHistoryOpen ? 'active' : ''}`}
+            onClick={onToggleHistory}
+            title="대화 기록 보기 (이전 대화 목록 열기/닫기)"
+            aria-label="대화 기록 보기"
+            aria-expanded={isHistoryOpen}
+          >
+            <History size={16} />
+          </button>
+        )}
+
         {/* Export Markdown Button */}
         <button
-          className="header-btn chat-export-btn"
+          type="button"
+          className="chat-panel-action-btn chat-export-btn"
           onClick={handleExportMarkdown}
-          title="내보내기"
-          aria-label="내보내기"
+          title={currentSession.messages.length === 0 ? "대화 내용 Markdown 내보내기 (대화 내역이 있을 때 가능)" : "대화 내용 Markdown 파일로 저장"}
+          aria-label="대화 내용 Markdown 내보내기"
           disabled={currentSession.messages.length === 0}
         >
-          <Download size={15} />
+          <Download size={16} />
         </button>
 
         {/* New Session Button */}
         <button
           type="button"
-          className="chat-panel-new-chat-btn"
+          className="chat-panel-action-btn chat-panel-new-chat-btn"
           onClick={onNewSession}
-          title="새 연구 대화 시작"
-          aria-label="새 연구 세션 시작"
+          title="새 연구 대화 시작 (새 대화 세션 생성)"
+          aria-label="새 대화 시작"
         >
-          <Plus size={15} />
+          <Plus size={16} />
         </button>
       </div>
     </div>

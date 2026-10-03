@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { FileText, Plus, Folder, Menu } from 'lucide-react';
+import { FileText, Plus, Folder, Menu, MessageSquare, Trash2, X, History } from 'lucide-react';
 import { Sidebar } from './components/Sidebar';
 import ProjectStart, { type OpenedProject } from './components/ProjectStart';
 import './components/ProjectStart.css';
@@ -130,6 +130,8 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
     } catch {}
     return 380;
   });
+
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
   const handleLeftResizerMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -287,6 +289,13 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
     const newSession = createNewSession(currentSession?.researchMode || settings.defaultMode, currentSession?.selectedModel || settings.defaultModel);
     setSessions(prev => [newSession, ...prev]);
     setCurrentSessionId(newSession.id);
+    setIsHistoryOpen(false);
+    setTimeout(() => {
+      const textarea = document.querySelector<HTMLTextAreaElement>('.chat-input-textarea');
+      if (textarea) {
+        textarea.focus();
+      }
+    }, 50);
   };
 
   // Select session
@@ -297,8 +306,8 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
   };
 
   // Delete session
-  const handleDeleteSession = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleDeleteSession = async (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     if (deletingSessionRef.current) return;
     if (isStreaming) { window.alert('응답 생성이 끝난 뒤 세션을 삭제해 주세요.'); return; }
     const target = sessions.find(session => session.id === id);
@@ -610,9 +619,6 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
       setOpenedProject(rememberedProject);
     }} />;
 
-  const activeDoc = theoryDocuments.find(d => d.id === theoryDocumentId);
-  const activeDocTitle = activeDoc ? activeDoc.title : (isTheoryOpen ? '새 연구 문서' : undefined);
-
   return (
     <div className="app-container">
       {/* 3-Pane VCS Workspace */}
@@ -621,11 +627,6 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
 
         {/* Pane 1: Left Explorer Sidebar */}
         <Sidebar
-          sessions={sessions}
-          currentSessionId={currentSessionId}
-          onSelectSession={id => { handleSelectSession(id); closeMobileSidebar(); }}
-          onNewSession={() => { handleNewSession(); closeMobileSidebar(); }}
-          onDeleteSession={handleDeleteSession}
           projectName={openedProject.name}
           documents={theoryDocuments}
           onOpenDocument={id => {
@@ -658,53 +659,6 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
 
         {/* Pane 2: Center Research Document Editor */}
         <main className="center-document-pane">
-          {/* Center Pane Header */}
-          <div className="center-document-header">
-            <div className="center-header-left">
-              <button
-                ref={mobileMenuButtonRef}
-                type="button"
-                id="mobile-menu-btn"
-                className="mobile-menu-btn"
-                onClick={() => setIsMobileSidebarOpen(true)}
-                aria-label="대화 메뉴 열기"
-                aria-expanded={isMobileSidebarOpen}
-                aria-controls="chat-sidebar"
-              >
-                <Menu size={18} />
-              </button>
-
-              <button
-                type="button"
-                className="header-project-chip"
-                onClick={() => { setRememberedProject(openedProject); setOpenedProject(null); }}
-                title="프로젝트 관리 / 전환 화면으로 이동"
-                aria-label={`현재 프로젝트: ${openedProject.name}. 클릭하여 프로젝트 관리 화면으로 이동`}
-              >
-                <Folder size={13} className="header-project-icon" />
-                <span className="header-project-name">{openedProject.name}</span>
-              </button>
-
-              <div className="center-header-doc-title" title={activeDocTitle || '연구 문서'}>
-                <FileText size={14} className="center-header-doc-icon" />
-                <span>{activeDoc ? `${activeDoc.title} (v${activeDoc.version})` : (isTheoryOpen ? '새 연구 문서' : '연구 문서')}</span>
-              </div>
-            </div>
-
-            <div className="center-header-right">
-              <button
-                type="button"
-                className="center-header-new-btn"
-                onClick={() => { setTheoryDocumentId(null); setIsTheoryOpen(true); }}
-                title="새 연구 문서 작성"
-                aria-label="새 문서 작성"
-              >
-                <Plus size={14} />
-                <span>새 문서</span>
-              </button>
-            </div>
-          </div>
-
           {/* Center Pane Content */}
           {isTheoryOpen || theoryDocumentId ? (
             <React.Suspense fallback={<div className="pane-loading" role="status">연구 문서 불러오는 중…</div>}>
@@ -715,28 +669,76 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
                 modelId={currentSession?.selectedModel || settings.defaultModel}
                 assistantDraft={currentSession?.messages.findLast(message => message.role === 'assistant' && message.status === 'complete')?.content}
                 embedded={true}
+                projectName={openedProject.name}
+                onChangeProject={() => { setRememberedProject(openedProject); setOpenedProject(null); }}
+                onOpenMobileMenu={() => setIsMobileSidebarOpen(true)}
+                onNewDocument={() => { setTheoryDocumentId(null); setIsTheoryOpen(true); }}
               />
             </React.Suspense>
           ) : (
-            <div className="center-empty-state">
-              <div className="center-empty-card">
-                <div className="center-empty-icon">
-                  <FileText size={40} />
+            <>
+              {/* Center Pane Header (When No Document Open) */}
+              <div className="center-document-header">
+                <div className="center-header-left">
+                  <button
+                    ref={mobileMenuButtonRef}
+                    type="button"
+                    id="mobile-menu-btn"
+                    className="mobile-menu-btn"
+                    onClick={() => setIsMobileSidebarOpen(true)}
+                    aria-label="대화 메뉴 열기"
+                    aria-expanded={isMobileSidebarOpen}
+                    aria-controls="chat-sidebar"
+                  >
+                    <Menu size={18} />
+                  </button>
+
+                  <button
+                    type="button"
+                    className="header-project-chip"
+                    onClick={() => { setRememberedProject(openedProject); setOpenedProject(null); }}
+                    title="프로젝트 관리 / 전환 화면으로 이동"
+                    aria-label={`현재 프로젝트: ${openedProject.name}. 클릭하여 프로젝트 관리 화면으로 이동`}
+                  >
+                    <Folder size={13} className="header-project-icon" />
+                    <span className="header-project-name">{openedProject.name}</span>
+                  </button>
                 </div>
-                <h3 className="center-empty-title">열려 있는 연구 문서가 없습니다</h3>
-                <p className="center-empty-desc">
-                  왼쪽 탐색기에서 정본 문서를 선택하거나, 새로운 연구 문서를 작성하여 가설과 수식을 체계적으로 정립하세요.
-                </p>
-                <button
-                  type="button"
-                  className="center-new-doc-btn"
-                  onClick={() => { setTheoryDocumentId(null); setIsTheoryOpen(true); }}
-                >
-                  <Plus size={16} />
-                  <span>새 문서 시작</span>
-                </button>
+
+                <div className="center-header-right">
+                  <button
+                    type="button"
+                    className="center-header-new-btn"
+                    onClick={() => { setTheoryDocumentId(null); setIsTheoryOpen(true); }}
+                    title="새 연구 문서 작성"
+                    aria-label="새 문서 작성"
+                  >
+                    <Plus size={14} />
+                    <span>새 문서</span>
+                  </button>
+                </div>
               </div>
-            </div>
+
+              <div className="center-empty-state">
+                <div className="center-empty-card">
+                  <div className="center-empty-icon">
+                    <FileText size={40} />
+                  </div>
+                  <h3 className="center-empty-title">열려 있는 연구 문서가 없습니다</h3>
+                  <p className="center-empty-desc">
+                    왼쪽 탐색기에서 정본 문서를 선택하거나, 새로운 연구 문서를 작성하여 가설과 수식을 체계적으로 정립하세요.
+                  </p>
+                  <button
+                    type="button"
+                    className="center-new-doc-btn"
+                    onClick={() => { setTheoryDocumentId(null); setIsTheoryOpen(true); }}
+                  >
+                    <Plus size={16} />
+                    <span>새 문서 시작</span>
+                  </button>
+                </div>
+              </div>
+            </>
           )}
         </main>
 
@@ -757,9 +759,14 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
             <ChatPanelHeader
               currentSession={currentSession}
               onUpdateTitle={handleUpdateTitle}
-              onNewSession={handleNewSession}
+              onNewSession={() => {
+                handleNewSession();
+                setIsHistoryOpen(false);
+              }}
               currentMode={currentSession.researchMode}
               onModeChange={handleModeChange}
+              isHistoryOpen={isHistoryOpen}
+              onToggleHistory={() => setIsHistoryOpen(prev => !prev)}
             />
           )}
 
@@ -791,47 +798,129 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
             </div>
           )}
 
-          <div className="chat-scroll-area">
-            {!currentSession || currentSession.messages.length === 0 ? (
-              <EmptyState
-                onSelectPrompt={handleSendMessage}
-                currentMode={currentSession?.researchMode || 'general'}
-              />
-            ) : (
-              <div className="messages-list">
-                <React.Suspense
-                  fallback={<div className="message-renderer-loading" role="status">대화 렌더러 불러오는 중…</div>}
-                >
-                  {currentSession.messages.map((message, index) => (
-                    <ChatMessage
-                      key={message.id}
-                      message={message}
-                      onOpenSource={setSourceEvidence}
-                      onRetry={
-                        index === currentSession.messages.length - 1
-                        && message.role === 'assistant'
-                        && (message.status === 'error' || message.status === 'stopped')
-                          ? () => handleRetryMessage(message.id)
-                          : undefined
-                      }
-                    />
-                  ))}
-                </React.Suspense>
-                <div ref={messagesEndRef} />
+          {isHistoryOpen ? (
+            <div className="chat-history-drawer" role="region" aria-label="대화 기록 목록">
+              <div className="chat-history-drawer-header">
+                <div className="chat-history-drawer-title">
+                  <History size={15} />
+                  <span>대화 기록 ({sessions.length})</span>
+                </div>
+                <div className="chat-history-drawer-actions">
+                  <button
+                    type="button"
+                    className="chat-history-drawer-new-btn"
+                    onClick={() => {
+                      handleNewSession();
+                      setIsHistoryOpen(false);
+                    }}
+                    title="새 대화 시작"
+                    aria-label="새 대화"
+                  >
+                    <Plus size={14} />
+                    <span>새 대화</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="chat-history-drawer-close-btn"
+                    onClick={() => setIsHistoryOpen(false)}
+                    title="닫기"
+                    aria-label="대화 기록 닫기"
+                  >
+                    <X size={15} />
+                  </button>
+                </div>
               </div>
-            )}
-          </div>
 
-          {/* Input Dock */}
-          <ChatInput
-            onSendMessage={handleSendMessage}
-            isStreaming={isStreaming}
-            onStopStreaming={handleStopStreaming}
-            currentMode={currentSession?.researchMode || 'general'}
-            selectedModel={currentSession?.selectedModel}
-            onModelChange={handleModelChange}
-            apiKeys={settings.apiKeys}
-          />
+              <div className="chat-history-drawer-list">
+                {sessions.length === 0 ? (
+                  <div className="chat-history-drawer-empty">저장된 연구 대화가 없습니다.</div>
+                ) : (
+                  sessions.map(session => (
+                    <div
+                      key={session.id}
+                      className={`chat-history-drawer-item ${currentSessionId === session.id ? 'active' : ''}`}
+                    >
+                      <button
+                        type="button"
+                        className="chat-history-drawer-item-select"
+                        onClick={() => {
+                          handleSelectSession(session.id);
+                          setIsHistoryOpen(false);
+                        }}
+                        aria-label={`${session.title || '새로운 연구 대화'} 선택`}
+                      >
+                        <MessageSquare size={14} className="chat-history-drawer-item-icon" />
+                        <div className="chat-history-drawer-item-text">
+                          <span className="chat-history-drawer-item-title">
+                            {session.title || '새로운 연구 대화'}
+                          </span>
+                          <span className="chat-history-drawer-item-meta">
+                            {session.messages.length}개 메시지 · {new Date(session.updatedAt).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        className="chat-history-drawer-item-delete"
+                        onClick={e => {
+                          e.stopPropagation();
+                          handleDeleteSession(session.id);
+                        }}
+                        title="대화 삭제"
+                        aria-label={`${session.title || '새로운 연구 대화'} 세션 삭제`}
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="chat-scroll-area">
+                {!currentSession || currentSession.messages.length === 0 ? (
+                  <EmptyState
+                    onSelectPrompt={handleSendMessage}
+                    currentMode={currentSession?.researchMode || 'general'}
+                  />
+                ) : (
+                  <div className="messages-list">
+                    <React.Suspense
+                      fallback={<div className="message-renderer-loading" role="status">대화 렌더러 불러오는 중…</div>}
+                    >
+                      {currentSession.messages.map((message, index) => (
+                        <ChatMessage
+                          key={message.id}
+                          message={message}
+                          onOpenSource={setSourceEvidence}
+                          onRetry={
+                            index === currentSession.messages.length - 1
+                            && message.role === 'assistant'
+                            && (message.status === 'error' || message.status === 'stopped')
+                              ? () => handleRetryMessage(message.id)
+                              : undefined
+                          }
+                        />
+                      ))}
+                    </React.Suspense>
+                    <div ref={messagesEndRef} />
+                  </div>
+                )}
+              </div>
+
+              {/* Input Dock */}
+              <ChatInput
+                onSendMessage={handleSendMessage}
+                isStreaming={isStreaming}
+                onStopStreaming={handleStopStreaming}
+                currentMode={currentSession?.researchMode || 'general'}
+                selectedModel={currentSession?.selectedModel}
+                onModelChange={handleModelChange}
+                apiKeys={settings.apiKeys}
+              />
+            </>
+          )}
         </aside>
       </div>
 

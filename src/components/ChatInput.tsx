@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Square, Sparkles, BookOpen, SearchCheck, Sigma, Bot } from 'lucide-react';
+import { Send, Square, Bot } from 'lucide-react';
 import type { ResearchMode } from '../types';
 import { AVAILABLE_MODELS } from '../constants';
 
@@ -55,52 +55,11 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     }
   };
 
-  const insertPromptChip = (prefix: string) => {
-    setInput(prev => (prev ? `${prev}\n${prefix}` : prefix));
-    textareaRef.current?.focus();
-  };
-
   const activeModelObj = AVAILABLE_MODELS.find(m => m.id === selectedModel);
   const hasKey = activeModelObj && apiKeys && Boolean((apiKeys[activeModelObj.provider] || '').trim());
 
   return (
     <div className="chat-input-container">
-      {/* Quick Prompt Chips */}
-      <div className="prompt-chips">
-        <button
-          type="button"
-          className="prompt-chip"
-          onClick={() => insertPromptChip('다음 수식의 유도 과정과 전제 조건을 엄밀하게 단계별로 증명해 줘:\n$$  $$')}
-        >
-          <Sigma size={12} />
-          <span>수식 유도 및 증명</span>
-        </button>
-        <button
-          type="button"
-          className="prompt-chip"
-          onClick={() => insertPromptChip('다음 연구 가설의 잠재적 취약점과 고려해야 할 대조군을 피어 리뷰어 관점에서 엄격히 검토해 줘:\n')}
-        >
-          <SearchCheck size={12} />
-          <span>연구 가설 비판 검토</span>
-        </button>
-        <button
-          type="button"
-          className="prompt-chip"
-          onClick={() => insertPromptChip('다음 학술 텍스트를 상위 저널(Nature/IEEE) 스타일에 맞게 영문 교정하고 Before/After로 비교해 줘:\n')}
-        >
-          <Sparkles size={12} />
-          <span>학술 논문 영문 교정</span>
-        </button>
-        <button
-          type="button"
-          className="prompt-chip"
-          onClick={() => insertPromptChip('다음 논문 정보의 정식 BibTeX 인용 코드를 생성해 줘:\n')}
-        >
-          <BookOpen size={12} />
-          <span>BibTeX 생성</span>
-        </button>
-      </div>
-
       {/* Input Box */}
       <form onSubmit={handleSubmit} className="input-form">
         <div className="input-wrapper">
