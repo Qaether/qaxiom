@@ -1,26 +1,119 @@
-# Qaxiom
+# Qaxiom — Research Intelligence AI
 
-Public source for [qaxiom.qaether.com](https://qaxiom.qaether.com/).
+> **Local-First & Zero-Backend 학술 연구 AI 플랫폼**
+> Qaxiom 운영 백엔드 없이 브라우저에서 LLM Provider(Gemini, Claude, OpenAI)를 직접 호출하는 BYOK 연구 도구입니다. 대화 기록은 현재 브라우저에 저장되며, 질문 내용은 사용자가 선택한 LLM 제공사로 전송됩니다.
 
-The site is served from the `site/` directory. Pushing to `main` runs the
-deployment workflow: GitHub Actions assumes a dedicated AWS role using OIDC,
-syncs `site/` to the private `qaxiom.qaether.com` S3 bucket, and invalidates
-the CloudFront cache. AWS access keys are not stored in GitHub.
+---
 
-The initial page is a placeholder. Replace or extend `site/` with the site you
-want to publish. Files removed from `site/` are also removed from the bucket
-on the next deployment.
+## 🌟 핵심 특징
 
-## Infrastructure
+1. **제로 백엔드 (Zero-Backend) & BYOK**:
+   - Qaxiom이 운영하는 애플리케이션 서버 없이 브라우저 ↔ LLM API 간 직접 TLS 통신.
+   - API 키와 대화 기록은 현재 브라우저 프로필에 저장됩니다. LLM에 전송한 내용에는 해당 제공사의 데이터 처리·보존 정책이 적용됩니다.
+2. **학술 특화 렌더링 & 도구**:
+   - **KaTeX**: 복잡한 수식 유도($...$, $$...$$) 및 LaTeX 블록 완벽 렌더링.
+   - **BibTeX 원클릭 복사**: 논문 인용 코드를 원클릭으로 복사하여 Overleaf/LaTeX에 즉시 적용.
+   - **학술 마크다운 내보내기**: 모든 연구 대화를 `.md` 파일로 즉시 저장.
+   - **작업공간 백업·복원**: API 키를 제외한 세션·메시지·문서·위키 데이터를 버전형 JSON으로 이전. 지원 브라우저에서는 선택한 폴더에 JSON 백업을 저장하거나 현재 연구 문서를 Markdown/manifest 폴더로 따로 내보낼 수 있습니다. 세션 삭제는 확인과 저장 성공 후 화면에 반영합니다.
+3. **5가지 연구 특화 모드 (Research Modes)**:
+   - 🔬 **일반 연구 보조**: 학술적이고 엄밀한 개념 설명 및 이론 전개.
+   - 🔍 **피어 리뷰어 (Reviewer #2)**: 연구 가설의 취약점, 대조군 누락, 논리적 비약 엄격 검토.
+   - 📝 **학술 논문 영문 교정**: Nature/IEEE 저널 스타일에 맞춘 교정 및 Before/After 비교.
+   - 📐 **수식 유도 및 증명**: 단계별 수학적 정리 및 보조정리 전개.
+   - 📚 **문헌 종합 & 연구 갭**: 최신 연구 동향 비교 및 미해결 연구 과제 도출.
+4. **버전형 연구 문서 (R1)**:
+   - Markdown 초안, 연구 목적·가정·정의·기호·범위를 버전별로 보존.
+   - 블록별 변경 비교와 이전 버전을 새 버전으로 복원.
+5. **원문 레퍼런스 RAG (R2 일부)**:
+   - Markdown/TXT 및 PDF 원본을 로컬에 저장하고 선택한 자료에서 BM25 검색.
+   - 사용 이력이 없는 등록 자료는 확인 후 삭제할 수 있습니다. 과거 답변·검토·관계·프로젝트 정책·임베딩에 연결된 자료는 근거 보존을 위해 삭제가 거부됩니다.
+   - 전송할 근거를 미리 보고 질문하며, 답변 인용에서 원문의 해당 구간 열기.
+   - PDF 페이지별 추출·원본 보기, 중단·재개 및 암호화/텍스트 없는 페이지 상태 구분.
+   - 검색 자료가 만들어지지 않은 PDF 원본은 확인 후 로컬에서 삭제할 수 있습니다. 연결된 근거나 처리 중인 원본은 보호합니다. OCR은 지원하지 않습니다.
+   - 부모 섹션/동일 PDF 페이지 문맥과 선택 정본의 연구 기준을 함께 미리 보고, 예산상 제외 구간을 기록.
+   - `npm run test:retrieval`로 60질의 합성 검색 기준선을 재검증 ([결과와 한계](docs/RETRIEVAL_EVALUATION.md)).
+   - 선택적 OpenAI 임베딩: 원문/질문을 각각 승인하고 세대/hash 캐시·Worker 코사인과 BM25/RRF로 검색. 전체 추출 구간을 검증한 뒤 별도 승인으로 활성화하며 새 색인 생성 중에도 기존 활성 세대를 보존. 이전 세대 재선택·범위/manifest 백업을 지원하고 실제 품질 평가는 잔여.
+6. **승인 관계와 Research Wiki (R5 초판)**:
+   - 연구 문서에서 주장 후보를 채택하고 의존성/정의/지지·상충 후보와 선택 원문을 미리보기·승인으로 연결.
+   - 원문 블록·레퍼런스 페이지, 역참조·수정 영향·증명 의존성 순환 후보·과거/철회 이력 탐색 및 Markdown 내보내기.
+   - 외부 대조의 양쪽 조건과 네 분류는 사용자 판단. 메모/자체 문서는 독립 외부 증거로 집계하지 않으며, 버전 변경·채택 철회 시 현재 그래프에서 제외.
+   - 내부 LLM 검토에서 승인 관계의 전제·정의를 선택적으로 포함. 목표/추가 전제를 미리보고 승인하며 실제 검사 범위와 구분. 그래프 변경 시 이전 요청/결과 승격 차단, 외부 자료는 이 경로로 보내지 않음.
+   - 레퍼런스 질문에서도 정본 목표 블록을 직접 선택해 승인 그래프 전제를 첨부. 자체 정본 [[G1]]/레퍼런스 [[R1]] 인용을 구분하고 전송 문맥을 답변·Markdown·백업에 보존. 추가 전제 첨부는 검사 완료가 아님.
+   - **정본 단독 질문**: 레퍼런스 없이 선택한 정본 목표·승인 전제만 미리보고 질문. 등록/선택된 레퍼런스는 첨부하지 않으며 답변에도 외부 원문 0개를 표시. 기존 대화는 함께 전송됨.
+   - **정본 목표 후보 검색**: 선택 정본에서 질문 용어로 BM25 후보를 찾고 승인된 전제·정의/순환 후보를 확인. 후보는 자동 선택하거나 전송하지 않으며 사용자가 목표를 선택한 뒤 최종 미리보기에서 승인.
+7. **향후 지원**:
+   - **정합성 검토 고도화**: 그래프 예산 분할·Patch 영향 재검사·자동 의미 검토·모델별 비용 예산·승인형 외부 대조 및 실제 품질 평가.
+   - **로컬 폴더(Obsidian) 동기화**: 현재는 명시적 폴더 선택 후 JSON 백업 또는 현재 연구 문서 Markdown을 1회 저장할 수 있으며, 외부 변경 감지·가져오기·양방향 동기화는 후속입니다.
 
-`infra/qaxiom-access-point-stack.json` creates an S3 access point in
-`ap-northeast-2`. Its alias avoids the TLS limitation of dotted bucket names.
-`infra/qaxiom-stack.json` defines the HTTPS certificate, private S3 access,
-CloudFront distribution, Route 53 records, and the GitHub deployment role.
-It is deployed as the `qaxiom-site` CloudFormation stack in `us-east-1`.
-The access point stack is updated with the CloudFront distribution ID after
-the site stack completes, restricting its read policy to that distribution.
-The S3 bucket already exists in `ap-northeast-2` and is not part of the stack.
+저장한 연구 문서는 **기본 구조 확인**과 **AI 내용·논리 검토**를 순서대로 사용할 수 있습니다. 기본 구조 확인은 인터넷 전송 없이 빈 연구 기준·끊어진 문단 연결·사용자가 작성한 기호 선언 형식만 살핍니다. AI 검토 전에는 보내는 연구 기준과 문단을 사람이 읽는 형태로 보여 주며 원시 요청 데이터는 접힌 기술 정보에서만 확인합니다. 원문 근거 Issue·수정 diff 승인·새 버전 재검사·사용자 해결 표시 및 검토 보고서 내보내기도 지원합니다. 확인이나 종료, 검사 범위 통과는 참이나 완전 정합성 보증이 아닙니다. 서비스 전체 남은 작업은 [완성 감사표](docs/SERVICE_COMPLETION_AUDIT.md)에 유지합니다.
 
-The workflow uses repository variables `AWS_DEPLOY_ROLE_ARN` and
-`CLOUDFRONT_DISTRIBUTION_ID`, populated from the stack outputs.
+연구 문서의 “기호 범위 · 증명 의존성 선언”에서 정본 JSON 템플릿을 추가하고 수정·저장하면 로컬 검사가 선언된 기호 충돌/범위 밖 사용/끊어진 ID/증명 의존 순환을 확인합니다. scope 빈 배열은 문서 전체이며 concept 연결의 순환은 허용합니다. 선언하지 않은 관계·의미·단위는 자동 검증하지 않습니다.
+
+---
+
+## 연구 문서 사용법
+
+사이드바의 **연구 문서**에서 직접 초안을 작성하거나 **최근 답변으로 초안 만들기**를 선택합니다. 제목·본문과 필요한 연구 기준을 입력하고 저장하면 정본 v1이 생성됩니다. 이후 저장은 새 버전을 만들며, 과거 버전과 비교하거나 그 내용을 새 버전으로 복원할 수 있습니다.
+
+저장한 문서에서는 편집과 검토가 먼저 보입니다. 프로젝트 이름·자료 허용 목록·외부 주장 기록은 **프로젝트 관리 · 자료 설정**, 기호·의존성 선언·관계/Wiki·과거 버전 비교는 **고급 문서 도구 · 관계와 버전 비교**를 펼쳐 사용합니다.
+
+제목과 본문을 입력한 뒤 **AI로 연구 기준 찾기**를 누르면 현재 모델에 보낼 문서를 먼저 확인합니다. 실행 결과에서 원문 문장과 함께 제안된 항목을 체크하고 **선택한 연구 기준 반영**을 누른 뒤 문서를 저장하세요. AI가 확인할 수 없는 항목은 직접 작성할 수 있습니다. 원문 인용이 있더라도 제안의 뜻과 적용 범위는 사용자가 확인해야 합니다.
+이 버튼은 연구 문서 편집창 상단에 항상 보이며, 제목·본문을 입력하기 전에는 비활성화됩니다.
+
+저장된 문서의 **문서 삭제**를 누르면 함께 지워질 버전·문단·검토 기록과 프로젝트 변경을 확인합니다. 과거 답변이나 파생 레퍼런스·외부 주장에 근거로 사용된 문서는 삭제할 수 없습니다. 삭제한 문서는 이전 JSON 백업이 있어야 복원할 수 있습니다.
+
+문서는 명시적으로 저장해야 합니다. 작업공간 JSON 백업 v22에는 문서의 전체 버전·연구 기준과 사용자가 지정한 정본 원문 블록 연결, 레퍼런스 원문·답변 근거, PDF 원본 바이트·추출 진행 상태, 검토 이력/캠페인과 전송 당시 승인 그래프, 임베딩 캐시·완성 manifest·활성 세대, 승인 관계/철회 이력, 사용자 채택 외부 주장 원장과 명시적 교차 프로젝트 후보 연결이 포함됩니다. 기존 v1–v21 백업도 가져올 수 있으며 v7 색인은 검증·사용자 승인 후 활성화해야 합니다. 백업은 100 MB 이하이며 가져오기는 현재 작업공간 전체를 교체하므로 먼저 백업하세요. API 키는 백업에 포함하지 않습니다.
+
+설정의 **폴더에 저장**은 지원 브라우저·보안 컨텍스트에서만 활성화됩니다. 폴더 선택을 취소하면 아무 파일도 만들지 않으며, 미지원 환경에서는 기존 **작업공간 백업** 다운로드를 사용하세요. 실제 OS 폴더 권한·외부 수정·양방향 동기화는 아직 검증되지 않았습니다.
+
+**연구 문서 Markdown 저장**은 현재 버전 원문과 출처 manifest만 새 하위 폴더에 내보냅니다. 과거 버전·연구 기준·원문 근거·검토 결과까지 복원하려면 별도로 JSON 작업공간 백업을 보관하세요.
+
+## 레퍼런스 검색 사용법
+
+사이드바의 **레퍼런스 검색**에서 UTF-8 `.md`/`.txt` 파일(각 2 MB 이하) 또는 PDF(20 MB·300쪽 이하)를 등록하고 검색할 자료를 선택합니다. 질문을 입력해 **원문 검색**한 다음 근거를 골라 **전송 내용 미리보기 → 이 근거로 질문 보내기**를 누릅니다. 추출·검색은 로컬에서 수행되고, 질문 전송 시 현재 대화와 선택 발췌·파일명·페이지 정보가 선택 모델의 제공사로 전송됩니다. PDF 원본 바이트는 제공사에 보내지 않습니다.
+
+답변 아래 근거 버튼을 누르면 추출 원문과 인용 구간이 표시되며 PDF는 해당 원본 페이지도 열립니다. PDF 처리 목록에서 추출을 중단·재개하거나 원본을 볼 수 있습니다. 텍스트 계층이 없는 페이지는 검색 범위에서 제외되며, 검색 가능한 텍스트/Markdown 또는 텍스트 계층이 있는 PDF를 사용해야 합니다. **OCR은 제품 비목표이며 지원하지 않습니다.** 암호화 PDF는 사용자가 암호를 해제한 사본을 등록해야 합니다. 다단 편집·표·수식의 추출 순서는 반드시 원본과 대조하세요.
+
+자체 문서는 해당 종류로 등록하세요. 저장 정본과 추출 텍스트가 같으면 자동 연결되지만 수정본의 계보는 아직 자동 판별하지 못합니다. 승인형 벡터 검색은 초판이며 실제 문헌의 검색 품질과 의미적 정합성은 검증되지 않았습니다. 인용 연결이 주장의 참을 보증하지는 않습니다. GitHub Actions와 배포는 계속 보류합니다.
+
+## 🚀 로컬 실행 방법
+
+```bash
+# 저장소 폴더에서 한 번에 실행 (의존성이 없으면 npm ci 수행)
+./run.sh
+
+# 또는 직접 실행
+# 1. 의존성 설치
+npm ci
+
+# 2. 로컬 개발 서버 실행
+npm run dev
+
+# 3. 브라우저에서 접속
+# http://localhost:5173/
+
+# 회귀 테스트
+npm test
+
+# 최초 1회 E2E 브라우저 설치 및 핵심 브라우저 테스트
+npx playwright install chromium
+npm run test:e2e
+```
+
+`.env.local`의 `OPENAI_API_KEY`는 현재 브라우저 앱에 자동 연결되지 않습니다. 실제 OpenAI 대화를 사용하려면 앱의 **설정 (API 키)**에서 사용자가 직접 키를 입력해야 합니다. 키를 `VITE_` 접두사 변수로 옮기면 클라이언트 번들에 노출될 수 있으므로 그렇게 하지 마세요. 실제 제공사 호출은 전송 내용과 비용을 확인한 뒤에만 진행하세요.
+
+## 📦 S3 / R2 배포용 정적 빌드
+
+```bash
+# 정적 파일 빌드 (dist/ 폴더 생성)
+npm run build
+```
+* 현재는 로컬 빌드 확인용입니다. GitHub Actions 적용과 실제 업로드·배포는 별도 요청 전까지 보류합니다.
+
+---
+
+## 🛠️ 기술 스택
+- **Frontend**: React 19, TypeScript, Vite
+- **Styling**: Vanilla CSS (Modern Dark Glassmorphism, Google Inter & JetBrains Mono)
+- **Math & Markdown**: KaTeX, react-markdown, remark-math, rehype-katex
+- **Storage**: API 키·설정은 LocalStorage, 대화·메시지는 IndexedDB/Dexie, File System Access API는 계획

@@ -1,0 +1,30 @@
+.reference-dialog { margin: auto; padding: 24px; width: min(960px, 94vw); max-height: 92vh; overflow: auto; background: #171c2b; color: #e2e8f0; border: 1px solid #475569; border-radius: 16px; }
+.reference-dialog::backdrop { background: #000b; }
+.reference-dialog header { display: flex; align-items: start; justify-content: space-between; gap: 16px; }
+.reference-dialog p { margin: 12px 0; color: #cbd5e1; }
+.reference-dialog fieldset { margin: 20px 0; padding: 16px; border: 1px solid #475569; border-radius: 8px; min-width: 0; }
+.reference-dialog label { display: block; margin: 10px 0; }
+.reference-dialog button, .reference-dialog select { padding: 8px 12px; color: inherit; background: #252b3d; border: 1px solid #64748b; border-radius: 8px; cursor: pointer; }
+.reference-dialog input, .reference-dialog select, .reference-dialog textarea { max-width: 100%; min-width: 0; }
+.reference-dialog input[type="file"] { width: 100%; }
+.reference-dialog button:disabled { opacity: .5; cursor: default; }
+.reference-dialog textarea { width: 100%; padding: 10px; resize: vertical; color: inherit; background: #111625; border: 1px solid #64748b; border-radius: 8px; font: inherit; }
+.reference-dialog .reference-choice { display: flex; gap: 10px; align-items: baseline; }
+.reference-dialog .reference-choice-row { display: flex; gap: 8px; align-items: baseline; justify-content: space-between; }
+.reference-dialog .reference-choice-row .reference-choice { min-width: 0; }
+.reference-dialog .reference-delete-btn { flex: none; }
+.reference-dialog pre { white-space: pre-wrap; overflow-wrap: anywhere; padding: 12px; background: #111625; line-height: 1.65; }
+.reference-dialog mark { background: #fde68a; color: #111827; }
+.reference-dialog :focus-visible { outline: 2px solid #a5b4fc; outline-offset: 3px; }
+.reference-dialog [role=alert] { color: #fda4af; }
+.reference-hit, .reference-preview { border-top: 1px solid #475569; padding: 16px 0; }
+.pdf-page-viewer canvas { max-width: 100%; height: auto; background: white; margin-top: 12px; }
+.pdf-page-actions { display: flex; gap: 12px; }
+.message-citations { margin: 12px 0; padding: 12px; border: 1px solid #475569; border-radius: 8px; }
+.message-citations button { display: block; margin: 8px 0; padding: 6px; color: #c7d2fe; background: transparent; border: 1px solid #475569; border-radius: 6px; cursor: pointer; text-align: left; }
+.message-citations p { margin: 8px 0; font-size: .85rem; }
+@media (max-width: 700px) {
+  .reference-dialog { padding: 14px; }
+  .reference-dialog .reference-choice-row, .pdf-page-actions { flex-wrap: wrap; }
+  .reference-dialog fieldset { padding: 12px; }
+}

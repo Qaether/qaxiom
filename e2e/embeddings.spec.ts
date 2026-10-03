@@ -1,0 +1,162 @@
+import { test, expect } from './fixtures/test';
+import { readFile } from 'node:fs/promises';
+
+test('requires separate source/query embedding approval, filters unselected sources and restores frozen hybrid evidence and vectors', async ({ page, browser }) => {
+  const requests: string[][] = []; let answerCalls = 0;
+  await page.route('https://api.openai.com/v1/embeddings', async route => {
+    const body = route.request().postDataJSON(); requests.push(body.input);
+    expect(body.model).toBe('text-embedding-3-small'); expect(body.dimensions).toBe(512);
+    expect(JSON.stringify(body)).not.toContain('UNSELECTED_PRIVATE_TEXT');
+    const data = body.input.map((_text: string, index: number) => ({ index, embedding: Array.from({ length: 512 }, (_, i) => i === 0 ? 1 : 0) }));
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ model: body.model, data, usage: { prompt_tokens: 7 } }) });
+  });
+  await page.route('https://generativelanguage.googleapis.com/**', async route => {
+    answerCalls++; const payload = route.request().postData()!;
+    expect(payload).toContain('hybrid-rrf-v1'); expect(payload).toContain('Photon has no rest mass');
+    expect(payload).not.toContain('UNSELECTED_PRIVATE_TEXT');
+    await route.fulfill({ status: 200, contentType: 'text/event-stream', body: `data: ${JSON.stringify({ candidates: [{ content: { parts: [{ text: '광자의 정지질량은 0이다. [[R1]]' }] } }] })}\n\n` });
+  });
+  await page.goto('/'); await page.getByLabel('Google Gemini API Key').fill('mock-chat-key');
+  await page.getByLabel('OpenAI API Key', { exact: true }).fill('mock-embedding-key');
+  await page.getByRole('button', { name: '설정 저장' }).click();
+  await page.locator('#header-model-select').selectOption('gemini-3.1-pro-preview');
+  await page.getByRole('button', { name: '레퍼런스 검색', exact: true }).click();
+  const library = page.getByRole('dialog', { name: '레퍼런스 검색', exact: true });
+  await library.getByLabel('레퍼런스 파일', { exact: true }).setInputFiles({ name: 'excluded.txt', mimeType: 'text/plain', buffer: Buffer.from('UNSELECTED_PRIVATE_TEXT') });
+  await expect(library.getByRole('checkbox', { name: /excluded.txt/ })).toBeChecked();
+  await library.getByRole('checkbox', { name: /excluded.txt/ }).uncheck();
+  await library.getByLabel('레퍼런스 파일', { exact: true }).setInputFiles({ name: 'photon.txt', mimeType: 'text/plain', buffer: Buffer.from('Photon has no rest mass.') });
+  await expect(library.getByRole('checkbox', { name: /photon.txt/ })).toBeChecked();
+  await library.getByLabel('레퍼런스에 질문').fill('광자의 질량');
+  const semantic = library.getByRole('region', { name: '의미 검색', exact: true });
+  await semantic.getByRole('button', { name: '임베딩 전송 미리보기', exact: true }).click();
+  await expect(semantic.getByRole('region', { name: '원문 임베딩 전송 미리보기' })).toContainText('Photon has no rest mass');
+  expect(requests).toEqual([]); expect(answerCalls).toBe(0);
+  await semantic.getByRole('button', { name: '이 원문으로 임베딩 생성 승인' }).click();
+  await expect(semantic.getByRole('status')).toContainText('승인한 색인 작업을 저장');
+  expect(requests).toEqual([['Photon has no rest mass.']]);
+  await semantic.getByRole('button', { name: '임베딩 전송 미리보기', exact: true }).click();
+  await expect(semantic).toContainText('캐시 1구간 · 이번 전송 0구간');
+  await expect(semantic.getByRole('button', { name: '이 원문으로 임베딩 생성 승인' })).toBeDisabled();
+  await semantic.getByRole('button', { name: '완성 세대 활성화 미리보기' }).click();
+  await expect(semantic.getByRole('region', { name: '색인 활성화 미리보기' })).toContainText('photon.txt');
+  expect(requests).toHaveLength(1);
+  await semantic.getByRole('button', { name: '이 완성 세대 활성화 승인' }).click();
+  await expect(semantic.getByRole('status')).toContainText('완성 세대를 활성화');
+  await semantic.getByRole('button', { name: '의미 검색 질문 전송 미리보기' }).click();
+  await expect(semantic.getByRole('region', { name: '질문 임베딩 전송 미리보기' })).toContainText('아래 질문만 1회 전송');
+  expect(requests).toHaveLength(1);
+  await semantic.getByRole('button', { name: '이 질문으로 의미 검색 승인' }).click();
+  await expect(library.getByRole('region', { name: '검색 근거' })).toContainText('Photon has no rest mass');
+  expect(requests).toEqual([['Photon has no rest mass.'], ['광자의 질량']]); expect(answerCalls).toBe(0);
+  await library.getByRole('button', { name: '전송 내용 미리보기', exact: true }).click();
+  await expect(library.getByRole('region', { name: '전송 미리보기', exact: true })).toContainText('검색 세대');
+  await library.getByRole('button', { name: '이 근거로 질문 보내기' }).click();
+  await expect(page.getByText('광자의 정지질량은 0이다.', { exact: false })).toBeVisible();
+  await expect(page.getByRole('region', { name: '답변 근거' })).toContainText('BM25 + 벡터 RRF');
+  expect(answerCalls).toBe(1);
+  await page.locator('#open-settings-btn').click(); const ready = page.waitForEvent('download');
+  await page.getByRole('button', { name: '작업공간 백업', exact: true }).click();
+  const backup = (await (await ready).path())!; const content = await readFile(backup, 'utf8');
+  expect(content).not.toContain('mock-embedding-key'); expect(JSON.parse(content).data.embeddingVectors).toHaveLength(1);
+  expect(JSON.parse(content).data.embeddingActivations).toHaveLength(1);
+  expect(JSON.parse(content).data.messages.find((m: { contextBundle?: unknown }) => m.contextBundle).contextBundle.hybrid.manifestHash).toBeTruthy();
+  const context = await browser.newContext();
+  try {
+    const restored = await context.newPage(); await restored.goto('/'); restored.once('dialog', dialog => dialog.accept());
+    await restored.getByLabel('Qaxiom 작업공간 백업 파일').setInputFiles(backup);
+    await expect(restored.getByRole('status').filter({ hasText: '작업공간을 복원했습니다' })).toBeVisible();
+    await restored.locator('.modal-close-btn').click();
+    await expect(restored.getByRole('region', { name: '답변 근거' })).toContainText('BM25 + 벡터 RRF');
+    await restored.getByRole('button', { name: '레퍼런스 검색', exact: true }).click();
+    const restoredLibrary = restored.getByRole('dialog', { name: '레퍼런스 검색', exact: true });
+    await restoredLibrary.getByRole('checkbox', { name: /photon.txt/ }).check();
+    await restoredLibrary.getByRole('button', { name: '임베딩 전송 미리보기', exact: true }).click();
+    await expect(restoredLibrary).toContainText('캐시 1구간 · 이번 전송 0구간');
+    await expect(restoredLibrary).toContainText('OpenAI API 키가 필요');
+    await expect(restoredLibrary).toContainText('전환 번호 1');
+  } finally { await context.close(); }
+});
+
+test('invalidates embedding previews on query/scope changes and records malformed responses without publishing vectors', async ({ page }) => {
+  let calls = 0;
+  await page.route('https://api.openai.com/v1/embeddings', async route => {
+    calls++; await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ model: 'text-embedding-3-small', data: [{ index: 0, embedding: [1] }] }) });
+  });
+  await page.goto('/'); await page.getByLabel('OpenAI API Key', { exact: true }).fill('mock-embedding-key');
+  await page.getByRole('button', { name: '설정 저장' }).click();
+  await page.getByRole('button', { name: '레퍼런스 검색', exact: true }).click();
+  const library = page.getByRole('dialog', { name: '레퍼런스 검색', exact: true });
+  await library.getByLabel('레퍼런스 파일', { exact: true }).setInputFiles({ name: 'paper.txt', mimeType: 'text/plain', buffer: Buffer.from('원문 임베딩 테스트') });
+  await library.getByRole('button', { name: '임베딩 전송 미리보기', exact: true }).click();
+  await expect(library.getByRole('region', { name: '원문 임베딩 전송 미리보기' })).toBeVisible();
+  await library.getByLabel('레퍼런스에 질문').fill('새 질문');
+  await expect(library.getByRole('region', { name: '원문 임베딩 전송 미리보기' })).toHaveCount(0); expect(calls).toBe(0);
+  await library.getByRole('button', { name: '임베딩 전송 미리보기', exact: true }).click();
+  await library.getByRole('button', { name: '이 원문으로 임베딩 생성 승인' }).click();
+  await expect(library.getByRole('alert')).toContainText('임베딩 차원'); expect(calls).toBe(1);
+  await library.getByRole('button', { name: '의미 검색 질문 전송 미리보기' }).click();
+  await expect(library.getByRole('alert')).toContainText('활성화'); expect(calls).toBe(1);
+  await library.getByRole('button', { name: '원문 검색', exact: true }).click();
+  await expect(library.getByRole('region', { name: '검색 근거' })).toHaveCount(0);
+});
+
+test('keeps the old active generation through a failed build, switches back explicitly and invalidates another tab query preview', async ({ page, context }) => {
+  let calls = 0, fail = false;
+  await page.route('https://api.openai.com/v1/embeddings', async route => {
+    calls++; const body = route.request().postDataJSON();
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ model: body.model,
+      data: body.input.map((_s: string, index: number) => ({ index, embedding: fail ? [1] : Array.from({ length: 512 }, (_, i) => i === 0 ? 1 : 0) })) }) });
+  });
+  await page.goto('/'); await page.getByLabel('OpenAI API Key', { exact: true }).fill('mock-generation-key');
+  await page.getByRole('button', { name: '설정 저장' }).click();
+  await page.getByRole('button', { name: '레퍼런스 검색', exact: true }).click();
+  const library = page.getByRole('dialog', { name: '레퍼런스 검색', exact: true });
+  const semantic = library.getByRole('region', { name: '의미 검색', exact: true });
+  await library.getByLabel('레퍼런스 파일', { exact: true }).setInputFiles({ name: 'generation.txt', mimeType: 'text/plain', buffer: Buffer.from('Frozen original evidence.') });
+  await library.getByLabel('레퍼런스에 질문').fill('evidence');
+  await semantic.getByRole('button', { name: '임베딩 전송 미리보기', exact: true }).click();
+  await semantic.getByRole('button', { name: '이 원문으로 임베딩 생성 승인' }).click();
+  await expect(semantic.getByRole('status')).toContainText('승인한 색인 작업을 저장');
+  const original = await semantic.getByLabel('작업할 색인 세대').inputValue();
+  await semantic.getByRole('button', { name: '완성 세대 활성화 미리보기' }).click();
+  await semantic.getByRole('button', { name: '이 완성 세대 활성화 승인' }).click();
+  await expect(semantic).toContainText('전환 번호 1');
+  await semantic.getByRole('button', { name: '새 로컬 색인 세대 만들기' }).click();
+  await expect(semantic.getByLabel('작업할 색인 세대')).not.toHaveValue(original);
+  const next = await semantic.getByLabel('작업할 색인 세대').inputValue();
+  await expect(semantic).toContainText(`활성 검색 세대: ${original}`);
+  fail = true;
+  await semantic.getByRole('button', { name: '임베딩 전송 미리보기', exact: true }).click();
+  await semantic.getByRole('button', { name: '이 원문으로 임베딩 생성 승인' }).click();
+  await expect(semantic.getByRole('alert')).toContainText('임베딩 차원');
+  await semantic.getByRole('button', { name: '완성 세대 활성화 미리보기' }).click();
+  await expect(semantic.getByRole('alert')).toContainText('전체 원문');
+  await expect(semantic).toContainText(`활성 검색 세대: ${original}`);
+  await semantic.getByRole('button', { name: '의미 검색 질문 전송 미리보기' }).click();
+  await expect(semantic.getByRole('region', { name: '질문 임베딩 전송 미리보기' })).toContainText(original);
+  expect(calls).toBe(2);
+  fail = false;
+  await semantic.getByRole('button', { name: '임베딩 전송 미리보기', exact: true }).click();
+  await semantic.getByRole('button', { name: '이 원문으로 임베딩 생성 승인' }).click();
+  await expect(semantic.getByRole('status')).toContainText('승인한 색인 작업을 저장');
+  await semantic.getByRole('button', { name: '완성 세대 활성화 미리보기' }).click();
+  await semantic.getByRole('button', { name: '이 완성 세대 활성화 승인' }).click();
+  await expect(semantic).toContainText(`활성 검색 세대: ${next}`);
+  await semantic.getByRole('button', { name: '의미 검색 질문 전송 미리보기' }).click();
+  await expect(semantic.getByRole('region', { name: '질문 임베딩 전송 미리보기' })).toContainText(next);
+  const tab = await context.newPage();
+  try {
+    await tab.goto('/'); await tab.getByRole('button', { name: '레퍼런스 검색', exact: true }).click();
+    const other = tab.getByRole('dialog', { name: '레퍼런스 검색', exact: true });
+    await other.getByRole('checkbox', { name: /generation.txt/ }).check();
+    await expect(other.getByLabel('작업할 색인 세대').locator('option')).toHaveCount(2);
+    await other.getByLabel('작업할 색인 세대').selectOption(original);
+    await other.getByRole('button', { name: '완성 세대 활성화 미리보기' }).click();
+    await other.getByRole('button', { name: '이 완성 세대 활성화 승인' }).click();
+    await expect(other).toContainText(`활성 검색 세대: ${original}`);
+    await expect(semantic.getByRole('region', { name: '질문 임베딩 전송 미리보기' })).toHaveCount(0);
+    await expect(semantic).toContainText('전환 번호 3');
+    expect(calls).toBe(3);
+  } finally { await tab.close(); }
+});
