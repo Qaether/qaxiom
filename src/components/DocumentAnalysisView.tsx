@@ -1,7 +1,7 @@
 import { lazy, Suspense, useState } from 'react';
 import type { AnalysisFinding, AnalysisRun } from '../services/theory/analysis';
 import type { TheorySnapshot } from '../services/theory/types';
-import { GitCompare, FileText, Check, X, Clock, AlertCircle, RefreshCw, Trash2, CheckCircle2 } from 'lucide-react';
+import { Check, X, Clock, AlertCircle, RefreshCw, Trash2, CheckCircle2, RotateCcw } from 'lucide-react';
 
 const MathJaxMarkdown = lazy(() => import('./MathJaxMarkdown'));
 
@@ -72,7 +72,6 @@ export default function DocumentAnalysisView({
   onDelete?: (run: AnalysisRun) => void;
   canApply: boolean;
 }) {
-  const [viewMode, setViewMode] = useState<'diff' | 'full'>('diff');
   const [filterMode, setFilterMode] = useState<'all' | 'pending' | 'completed'>('all');
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
 
@@ -87,7 +86,7 @@ export default function DocumentAnalysisView({
   const allCompleted = findings.length > 0 && pendingFindings.length === 0;
 
   const displayedFindings = filterMode === 'pending'
-    ? (pendingFindings.length > 0 ? pendingFindings : findings)
+    ? pendingFindings
     : filterMode === 'completed'
     ? completedFindings
     : findings;
@@ -129,29 +128,6 @@ export default function DocumentAnalysisView({
         </div>
 
         <div className="document-analysis-header-actions">
-          {/* 뷰 모드 토글: Diff 모아보기 vs 전체 문맥 보기 */}
-          {run?.status === 'complete' && findings.length > 0 && (
-            <div className="analysis-view-mode-toggle" role="tablist">
-              <button
-                type="button"
-                className={`analysis-mode-btn ${viewMode === 'diff' ? 'active' : ''}`}
-                onClick={() => setViewMode('diff')}
-                title="AI 지적과 수정 Diff만 모아서 신속 검토"
-              >
-                <GitCompare size={14} />
-                <span>Diff 모아보기 ({findings.length})</span>
-              </button>
-              <button
-                type="button"
-                className={`analysis-mode-btn ${viewMode === 'full' ? 'active' : ''}`}
-                onClick={() => setViewMode('full')}
-                title="전체 본문 문맥 안에서 지적 위치 확인"
-              >
-                <FileText size={14} />
-                <span>전체 문맥 보기</span>
-              </button>
-            </div>
-          )}
 
           {run?.status === 'running' ? (
             <button type="button" className="analysis-action-btn cancel" onClick={onCancel}>
@@ -276,114 +252,37 @@ export default function DocumentAnalysisView({
             </div>
           )}
 
-          {/* =========================================================================
-              모드 1: Diff 모아보기 피드 (Diff-Centric View - 기본값)
-              ========================================================================= */}
-          {viewMode === 'diff' && displayedFindings.length > 0 && (
-            <div className="document-analysis-diff-feed">
-              {displayedFindings.map((finding, index) => {
-                const block = snapshot.blocks.find(b => b.id === finding.blockId);
-                const isApplied = finding.decision === 'applied';
-                const isDismissed = finding.decision === 'dismissed';
-                const isLater = finding.decision === 'later';
-
-                return (
-                  <article
-                    id={`analysis-${finding.id}`}
-                    key={finding.id}
-                    className={`analysis-diff-card ${finding.decision}`}
-                  >
-                    <div className="analysis-diff-card-header">
-                      <div className="diff-card-meta">
-                        <span className="diff-card-badge">#{index + 1}</span>
-                        <strong>{finding.explanation}</strong>
-                      </div>
-                      <div className="analysis-card-actions">
-                        {finding.replacement ? (
-                          <button
-                            type="button"
-                            className={`card-apply-btn ${isApplied ? 'applied' : ''}`}
-                            disabled={!canApply || isApplied}
-                            onClick={() => onApply(finding)}
-                          >
-                            <Check size={14} />
-                            <span>{isApplied ? '적용 완료' : '편집 내용에 적용'}</span>
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            className={`card-apply-btn ${isApplied ? 'applied' : ''}`}
-                            onClick={() => onDecision(finding, isApplied ? 'open' : 'applied')}
-                            title="이 지적 및 조치 조건을 확인 완료로 처리"
-                          >
-                            <Check size={14} />
-                            <span>{isApplied ? '확인 완료' : '확인 완료'}</span>
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          className={`card-decision-btn ${isDismissed ? 'active' : ''}`}
-                          aria-pressed={isDismissed}
-                          onClick={() => onDecision(finding, isDismissed ? 'open' : 'dismissed')}
-                          title="지적 무시/기각"
-                        >
-                          <X size={14} />
-                          <span>기각</span>
-                        </button>
-                        <button
-                          type="button"
-                          className={`card-decision-btn ${isLater ? 'active' : ''}`}
-                          aria-pressed={isLater}
-                          onClick={() => onDecision(finding, isLater ? 'open' : 'later')}
-                          title="나중에 검토"
-                        >
-                          <Clock size={14} />
-                          <span>나중에</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="analysis-diff-card-body">
-                      <div className="diff-card-quote-box">
-                        <span className="quote-label">원문 인용:</span>
-                        <q>{finding.quote}</q>
-                      </div>
-
-                      <div className="diff-card-condition-box">
-                        <span className="condition-label">확인할 조건:</span>
-                        <span>{finding.resolution}</span>
-                      </div>
-
-                      {/* 원문과 수정안 Diff를 기본으로 즉시 표시 */}
-                      {finding.replacement && block ? (
-                        <SuggestionDiffViewer before={block.text} after={finding.replacement} />
-                      ) : (
-                        <p className="no-replacement-note">
-                          💡 텍스트 교체안 없이 확인 조건만 제시된 지적 사항입니다.
-                        </p>
-                      )}
-                    </div>
-                  </article>
-                );
-              })}
+          {/* 필터 선택 시 지적 사항 없음 안내 */}
+          {findings.length > 0 && displayedFindings.length === 0 && (
+            <div className="document-analysis-filter-empty" role="status">
+              <CheckCircle2 size={20} className="filter-empty-icon" />
+              <span>
+                {filterMode === 'pending'
+                  ? '검토가 필요한 미해결 지적 사항이 없습니다. (모든 의견 처리 완료)'
+                  : filterMode === 'completed'
+                  ? '아직 처리 완료(적용 또는 기각)된 지적 사항이 없습니다.'
+                  : '표시할 지적 사항이 없습니다.'}
+              </span>
             </div>
           )}
 
-          {/* =========================================================================
-              모드 2: 전체 문맥 보기 뷰 (Full Document Context View)
-              ========================================================================= */}
-          {viewMode === 'full' && (
-            <div className="document-analysis-blocks">
-              {snapshot.blocks.map(block => (
+          {/* 전체 문맥 보기 (Full Document Context View) */}
+          <div className="document-analysis-blocks">
+            {snapshot.blocks.map(block => {
+              const blockFindings = displayedFindings.filter(item => item.blockId === block.id);
+              return (
                 <section key={block.id} className="document-analysis-block">
                   <div className="document-analysis-original">
                     <Suspense fallback={<pre>{block.text}</pre>}>
                       <MathJaxMarkdown content={block.text} />
                     </Suspense>
                   </div>
-                  {findings
-                    .filter(item => item.blockId === block.id)
-                    .map(finding => (
+                  {blockFindings.map(finding => {
+                    const isApplied = finding.decision === 'applied';
+                    const isDismissed = finding.decision === 'dismissed';
+                    const isLater = finding.decision === 'later';
+
+                    return (
                       <article
                         id={`analysis-${finding.id}`}
                         key={finding.id}
@@ -394,42 +293,84 @@ export default function DocumentAnalysisView({
                           <p><strong>AI 검토</strong> · 원문: <q>{finding.quote}</q></p>
                           <p>{finding.explanation}</p>
                           <p>확인할 조건: {finding.resolution}</p>
-                          {finding.replacement && (
-                            <div className="inline-diff-box">
-                              <SuggestionDiffViewer before={block.text} after={finding.replacement} />
+                          {isApplied || isDismissed ? (
+                            <div className={`analysis-status-badge ${finding.decision}`}>
+                              <span className="status-text">
+                                {isDismissed
+                                  ? '🚫 기각 처리된 지적 사항입니다.'
+                                  : `✓ ${finding.replacement ? '편집 내용에 적용되었습니다.' : '확인 완료 처리되었습니다.'}`}
+                              </span>
                               <button
                                 type="button"
-                                className="inline-apply-btn"
-                                disabled={!canApply || finding.decision === 'applied'}
-                                onClick={() => onApply(finding)}
+                                className="status-revert-btn"
+                                onClick={() => onDecision(finding, 'open')}
+                                title="이 결정을 취소하고 다시 검토"
                               >
-                                {finding.decision === 'applied' ? '적용 완료' : '편집 내용에 적용'}
+                                <RotateCcw size={13} />
+                                <span>다시 검토</span>
                               </button>
                             </div>
+                          ) : (
+                            <>
+                              {finding.replacement ? (
+                                <div className="inline-diff-box">
+                                  <SuggestionDiffViewer before={block.text} after={finding.replacement} />
+                                  <button
+                                    type="button"
+                                    className="inline-apply-btn"
+                                    disabled={!canApply}
+                                    onClick={() => onApply(finding)}
+                                  >
+                                    <Check size={14} />
+                                    <span>편집 내용에 적용</span>
+                                  </button>
+                                </div>
+                              ) : (
+                                <p className="no-replacement-note">
+                                  💡 텍스트 교체안 없이 확인 조건만 제시된 지적 사항입니다.
+                                </p>
+                              )}
+                              <div className="document-analysis-decisions">
+                                {!finding.replacement && (
+                                  <button
+                                    type="button"
+                                    className="card-apply-btn"
+                                    onClick={() => onDecision(finding, 'applied')}
+                                  >
+                                    <Check size={14} />
+                                    <span>확인 완료</span>
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  className="card-decision-btn"
+                                  onClick={() => onDecision(finding, 'dismissed')}
+                                  title="지적 무시/기각"
+                                >
+                                  <X size={14} />
+                                  <span>기각</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  className={`card-decision-btn ${isLater ? 'active' : ''}`}
+                                  aria-pressed={isLater}
+                                  onClick={() => onDecision(finding, isLater ? 'open' : 'later')}
+                                  title="나중에 검토"
+                                >
+                                  <Clock size={14} />
+                                  <span>나중에</span>
+                                </button>
+                              </div>
+                            </>
                           )}
-                          <div className="document-analysis-decisions">
-                            <button
-                              type="button"
-                              aria-pressed={finding.decision === 'later'}
-                              onClick={() => onDecision(finding, 'later')}
-                            >
-                              나중에 검토
-                            </button>
-                            <button
-                              type="button"
-                              aria-pressed={finding.decision === 'dismissed'}
-                              onClick={() => onDecision(finding, 'dismissed')}
-                            >
-                              기각
-                            </button>
-                          </div>
                         </div>
                       </article>
-                    ))}
+                    );
+                  })}
                 </section>
-              ))}
-            </div>
-          )}
+              );
+            })}
+          </div>
         </>
       )}
     </section>

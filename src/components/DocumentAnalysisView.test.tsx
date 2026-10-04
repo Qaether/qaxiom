@@ -84,7 +84,7 @@ const mockRun: AnalysisRun = {
 };
 
 describe('DocumentAnalysisView', () => {
-  it('defaults to diff-centric view mode and renders diff side-by-side', () => {
+  it('renders full document context view and findings', () => {
     render(
       <DocumentAnalysisView
         snapshot={mockSnapshot}
@@ -97,8 +97,6 @@ describe('DocumentAnalysisView', () => {
       />
     );
 
-    // Diff 모아보기가 기본 활성화되어 있는지 확인
-    expect(screen.getByText(/Diff 모아보기/)).toBeDefined();
     expect(screen.getByText(/진공 정의의 모순 범위를 명확히 한정해야 합니다/)).toBeDefined();
 
     // 1-클릭 결정 버튼 노출 확인
