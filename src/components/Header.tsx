@@ -67,14 +67,14 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Center: Current active document title or workspace status */}
       <div className="header-center">
         {activeDocumentTitle ? (
-          <div className="active-doc-badge" title={`현재 연구 문서: ${activeDocumentTitle}`}>
+          <div className="active-doc-badge" title={`현재 연구노트: ${activeDocumentTitle}`}>
             <FileText size={13} className="active-doc-icon" />
             <span className="active-doc-title">{activeDocumentTitle}</span>
           </div>
         ) : (
-          <div className="active-doc-badge empty" title="연구 문서 작업 공간">
+          <div className="active-doc-badge empty" title="연구노트 작업 공간">
             <FileText size={13} className="active-doc-icon" />
-            <span className="active-doc-title">연구 문서 작업공간</span>
+            <span className="active-doc-title">연구노트 작업공간</span>
           </div>
         )}
       </div>

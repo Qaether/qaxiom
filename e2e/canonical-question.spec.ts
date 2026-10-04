@@ -13,8 +13,8 @@ test('asks with canonical context only, excludes selected references and restore
   });
   await page.goto('/'); await page.getByLabel('Google Gemini API Key').fill('canonical-question-fake');
   await page.getByRole('button', { name: '설정 저장' }).click(); await page.locator('#header-model-select').selectOption('gemini-3.1-pro-preview');
-  await page.getByRole('button', { name: '연구 문서', exact: true }).click();
-  const editor = page.getByRole('dialog', { name: '연구 문서', exact: true });
+  await page.getByRole('button', { name: '연구노트', exact: true }).click();
+  const editor = page.getByRole('dialog', { name: '연구노트', exact: true });
   await editor.getByLabel('문서 제목', { exact: true }).fill('정본 단독 연구');
   await editor.getByLabel('문서 본문 (Markdown)').fill('# 가정\n\nA > 0.\n\n# PRIVATE unselected heading');
   await editor.getByRole('button', { name: '정본 문서 만들기' }).click(); await expect(editor.getByRole('status')).toContainText('v1 저장 완료');

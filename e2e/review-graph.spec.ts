@@ -17,8 +17,8 @@ test('previews approved premises separately, sends only frozen selected graph an
   await page.goto('/'); await page.getByLabel('Google Gemini API Key').fill('graph-test-key');
   await page.getByRole('button', { name: '설정 저장' }).click();
   await page.locator('#header-model-select').selectOption('gemini-3.1-pro-preview');
-  await page.getByRole('button', { name: '연구 문서', exact: true }).click();
-  const editor = page.getByRole('dialog', { name: '연구 문서', exact: true });
+  await page.getByRole('button', { name: '연구노트', exact: true }).click();
+  const editor = page.getByRole('dialog', { name: '연구노트', exact: true });
   await editor.getByLabel('문서 제목', { exact: true }).fill('전제 확장 검토');
   await editor.getByLabel('문서 본문 (Markdown)').fill('# 가정\n\nA > 0.\n\n# 결과\n\nB > A.');
   await editor.getByRole('button', { name: '정본 문서 만들기' }).click();
@@ -81,8 +81,8 @@ test('previews approved premises separately, sends only frozen selected graph an
   const report = await readFile((await (await download).path())!, 'utf8');
   expect(report).toContain('premiseBlockIds'); expect(report).not.toContain('graph-test-key');
   expect(calls).toBe(1);
-  await page.reload(); await page.getByRole('button', { name: '연구 문서', exact: true }).click();
-  const reopened = page.getByRole('dialog', { name: '연구 문서', exact: true });
+  await page.reload(); await page.getByRole('button', { name: '연구노트', exact: true }).click();
+  const reopened = page.getByRole('dialog', { name: '연구노트', exact: true });
   await reopened.getByRole('button', { name: '전제 확장 검토 · v1' }).click();
   await expect(reopened).toContainText('전송 당시 승인 그래프');
   await expect(reopened).toContainText('승인 그래프 전제 포함');

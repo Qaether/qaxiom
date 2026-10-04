@@ -12,16 +12,18 @@ test('previews dependency impact before patch approval, nominates only successor
       expect(input.blocks).toHaveLength(3); expect(prompt).not.toContain('U mentions revised.');
       expect(input.omittedBlockIds).toHaveLength(1); expect(block.quote).toContain('A revised.');
     }
-    const result = calls === 1 ? { checkedBlockIds: input.blocks.map((b: { id: string }) => b.id), limitations: [], claims: [],
-      issues: [{ kind: 'argument', severity: 'warning', blockIds: [block.id], quotes: ['A original.'], explanation: 'A 수정 후보', resolution: '연결된 결과도 재검사', patch: { blockId: block.id, replacement: 'A revised.\n\n', introducedAssumptions: '' } }] }
+    const result = calls === 1 ? {
+      checkedBlockIds: input.blocks.map((b: { id: string }) => b.id), limitations: [], claims: [],
+      issues: [{ kind: 'argument', severity: 'warning', blockIds: [block.id], quotes: ['A original.'], explanation: 'A 수정 후보', resolution: '연결된 결과도 재검사', patch: { blockId: block.id, replacement: 'A revised.\n\n', introducedAssumptions: '' } }]
+    }
       : { checkedBlockIds: input.blocks.map((b: { id: string }) => b.id), limitations: [], claims: [], issues: [] };
     await route.fulfill({ status: 200, contentType: 'text/event-stream', body: `data: ${JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(result) }] } }] })}\n\n` });
   });
   await page.goto('/'); await page.getByLabel('Google Gemini API Key').fill('impact-fake-key');
   await page.getByRole('button', { name: '설정 저장' }).click();
   await page.locator('#header-model-select').selectOption('gemini-3.1-pro-preview');
-  await page.getByRole('button', { name: '연구 문서', exact: true }).click();
-  const editor = page.getByRole('dialog', { name: '연구 문서', exact: true });
+  await page.getByRole('button', { name: '연구노트', exact: true }).click();
+  const editor = page.getByRole('dialog', { name: '연구노트', exact: true });
   await editor.getByLabel('문서 제목', { exact: true }).fill('의존 영향 재검사');
   await editor.getByLabel('문서 본문 (Markdown)').fill('A original.\n\nB needs A.\n\nC needs B.\n\nU mentions revised.');
   await editor.getByRole('button', { name: '정본 문서 만들기' }).click();
@@ -80,7 +82,7 @@ test('previews dependency impact before patch approval, nominates only successor
   await expect(review).toContainText('판단 자료 부족');
   await expect(review.getByRole('button', { name: '재검사 결과 확인 · Issue 해결 표시' })).toHaveCount(0);
   expect(calls).toBe(2);
-  await page.reload(); await page.getByRole('button', { name: '연구 문서', exact: true }).click();
+  await page.reload(); await page.getByRole('button', { name: '연구노트', exact: true }).click();
   await editor.getByRole('button', { name: '의존 영향 재검사 · v2' }).click();
   await impact.getByRole('button', { name: '현재 버전의 수정 영향 재검사 범위 선택' }).click();
   await expect(impact).toContainText('현재 버전 재검사 후보 3블록 · 실제 검사 3/3');

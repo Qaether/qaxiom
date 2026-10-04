@@ -2,8 +2,10 @@ import { expect, test } from './fixtures/test';
 
 test('one click saves the whole document, shows anchored inline findings, and stages a diff', async ({ page }) => {
   await page.addInitScript(() => {
-    Object.defineProperty(window, 'showDirectoryPicker', { configurable: true,
-      value: async () => ({ name: 'research-folder' }) });
+    Object.defineProperty(window, 'showDirectoryPicker', {
+      configurable: true,
+      value: async () => ({ name: 'research-folder' })
+    });
     localStorage.setItem('qaxiom_user_settings_v1', JSON.stringify({
       apiKeys: { gemini: 'e2e-key' }, defaultModel: 'gemini-3.8-flash'
     }));
@@ -17,17 +19,23 @@ test('one click saves the whole document, shows anchored inline findings, and st
     sentMarkdown = input.markdown;
     const block = input.blocks.find((item: { startOffset: number; endOffset: number }) =>
       input.markdown.slice(item.startOffset, item.endOffset).includes('질량은 양수다.'));
-    const result = { checkedBlockIds: input.blocks.map((item: { id: string }) => item.id), limitations: [],
-      findings: [{ blockId: block.id, quote: '질량은 양수다.', explanation: '측정 범위가 명시되지 않았습니다.',
-        resolution: '범위를 명시하세요.', replacement: '관찰 범위에서 질량은 양수다.\n' }] };
-    await route.fulfill({ status: 200, contentType: 'text/event-stream',
-      body: `data: ${JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(result) }] } }] })}\n\n` });
+    const result = {
+      checkedBlockIds: input.blocks.map((item: { id: string }) => item.id), limitations: [],
+      findings: [{
+        blockId: block.id, quote: '질량은 양수다.', explanation: '측정 범위가 명시되지 않았습니다.',
+        resolution: '범위를 명시하세요.', replacement: '관찰 범위에서 질량은 양수다.\n'
+      }]
+    };
+    await route.fulfill({
+      status: 200, contentType: 'text/event-stream',
+      body: `data: ${JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(result) }] } }] })}\n\n`
+    });
   });
   await page.goto('/');
   await page.getByLabel('프로젝트 이름').fill('검토 UX');
   await page.getByRole('button', { name: '로컬 폴더 지정' }).click();
   await page.getByRole('button', { name: '채팅 화면 열기' }).click();
-  await page.getByRole('button', { name: '새 연구 문서' }).click();
+  await page.getByRole('button', { name: '새 연구노트' }).click();
   const editor = page.locator('dialog.theory-workspace');
   await editor.getByLabel('문서 제목', { exact: true }).fill('질량 가설');
   const longParagraph = '긴문서내용'.repeat(4000);

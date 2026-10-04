@@ -141,8 +141,8 @@ test('creates, exports, and restores a workspace without API keys', async ({ pag
   expect(markdown).toContain('검증할 질문');
   expect(markdown).toContain('검증된 답변');
 
-  await page.getByRole('button', { name: '연구 문서', exact: true }).click();
-  const theory = page.getByRole('dialog', { name: '연구 문서', exact: true });
+  await page.getByRole('button', { name: '연구노트', exact: true }).click();
+  const theory = page.getByRole('dialog', { name: '연구노트', exact: true });
   await theory.getByRole('button', { name: '최근 답변으로 초안 만들기' }).click();
   await expect(theory.getByLabel('문서 본문 (Markdown)')).toHaveValue('검증된 답변');
   await theory.getByLabel('문서 제목', { exact: true }).fill('대화에서 만든 정본');
@@ -160,22 +160,28 @@ test('creates, exports, and restores a workspace without API keys', async ({ pag
       async getDirectoryHandle(folder: string, options?: { create?: boolean }) {
         if (!options?.create) throw new DOMException('missing', 'NotFoundError');
         state.theoryExport = { folder, files: {} };
-        return { async getFileHandle(name: string) {
-          let content = '';
-          return { async createWritable() { return {
-            async write(value: string) { content = value; },
-            async close() { state.theoryExport!.files[name] = content; },
-            async abort() { content = ''; }
-          }; } };
-        } };
+        return {
+          async getFileHandle(name: string) {
+            let content = '';
+            return {
+              async createWritable() {
+                return {
+                  async write(value: string) { content = value; },
+                  async close() { state.theoryExport!.files[name] = content; },
+                  async abort() { content = ''; }
+                };
+              }
+            };
+          }
+        };
       },
       async getFileHandle() { throw new Error('not used'); },
       async removeEntry() { state.theoryExport = undefined; }
     });
   });
   await page.locator('#open-settings-btn').click();
-  await page.getByRole('button', { name: '연구 문서 Markdown 저장' }).click();
-  await expect(page.getByRole('status')).toContainText('현재 연구 문서 1개를 Markdown으로 저장했습니다');
+  await page.getByRole('button', { name: '연구노트 Markdown 저장' }).click();
+  await expect(page.getByRole('status')).toContainText('현재 연구노트 1개를 Markdown으로 저장했습니다');
   const theoryExport = await page.evaluate(() => (window as unknown as { theoryExport?: { folder: string; files: Record<string, string> } }).theoryExport);
   expect(theoryExport?.folder).toMatch(/^qaxiom-documents-/);
   const markdownFile = Object.keys(theoryExport!.files).find(name => name.endsWith('.md'))!;
@@ -212,11 +218,15 @@ test('saves a fresh workspace backup to an explicitly selected browser folder', 
       async getFileHandle(name: string, options?: { create?: boolean }) {
         if (!options?.create) throw new DOMException('missing', 'NotFoundError');
         let json = '';
-        return { async createWritable() { return {
-          async write(value: string) { json = value; },
-          async close() { state.savedWorkspace = { name, json }; },
-          async abort() { json = ''; }
-        }; } };
+        return {
+          async createWritable() {
+            return {
+              async write(value: string) { json = value; },
+              async close() { state.savedWorkspace = { name, json }; },
+              async abort() { json = ''; }
+            };
+          }
+        };
       }
     });
     localStorage.setItem('qaxiom_user_settings_v1', JSON.stringify({ apiKeys: { gemini: 'folder-test-secret' } }));

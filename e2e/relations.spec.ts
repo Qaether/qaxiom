@@ -8,8 +8,8 @@ test('approves selected reference relations, explores originals/backlinks, expor
   await library.getByLabel('레퍼런스 파일', { exact: true }).setInputFiles({ name: 'external.txt', mimeType: 'text/plain', buffer: Buffer.from('Independent observation: B is positive when A is positive.') });
   await expect(library.getByRole('checkbox', { name: /external.txt/ })).toBeChecked();
   await library.getByRole('button', { name: '닫기', exact: true }).click();
-  await page.getByRole('button', { name: '연구 문서', exact: true }).click();
-  const editor = page.getByRole('dialog', { name: '연구 문서', exact: true });
+  await page.getByRole('button', { name: '연구노트', exact: true }).click();
+  const editor = page.getByRole('dialog', { name: '연구노트', exact: true });
   await editor.getByLabel('문서 제목', { exact: true }).fill('승인형 관계 연구');
   await editor.getByLabel('문서 본문 (Markdown)').fill('# 가정\n\nA is positive.\n\n# 결과\n\nB is positive.');
   await editor.getByRole('button', { name: '정본 문서 만들기' }).click();
@@ -69,8 +69,8 @@ test('approves selected reference relations, explores originals/backlinks, expor
     const restored = await context.newPage(); await restored.goto('/'); restored.once('dialog', dialog => dialog.accept());
     await restored.getByLabel('Qaxiom 작업공간 백업 파일').setInputFiles(backup);
     await expect(restored.getByRole('status').filter({ hasText: '작업공간을 복원했습니다' })).toBeVisible();
-    await restored.locator('.modal-close-btn').click(); await restored.getByRole('button', { name: '연구 문서', exact: true }).click();
-    const restoredEditor = restored.getByRole('dialog', { name: '연구 문서', exact: true });
+    await restored.locator('.modal-close-btn').click(); await restored.getByRole('button', { name: '연구노트', exact: true }).click();
+    const restoredEditor = restored.getByRole('dialog', { name: '연구노트', exact: true });
     await restoredEditor.getByRole('button', { name: '승인형 관계 연구 · v1' }).click();
     await restoredEditor.locator('details[aria-label="고급 문서 도구"] > summary').click();
     await expect(restoredEditor.getByRole('region', { name: '승인 관계 이력' })).toContainText('사용자 철회');
@@ -80,8 +80,8 @@ test('approves selected reference relations, explores originals/backlinks, expor
 
 test('shows approved proof cycles and backlinks, invalidates dirty previews and keeps prior-version relations stale', async ({ page }) => {
   await page.goto('/'); await page.locator('.modal-close-btn').click();
-  await page.getByRole('button', { name: '연구 문서', exact: true }).click();
-  const editor = page.getByRole('dialog', { name: '연구 문서', exact: true });
+  await page.getByRole('button', { name: '연구노트', exact: true }).click();
+  const editor = page.getByRole('dialog', { name: '연구노트', exact: true });
   await editor.getByLabel('문서 제목', { exact: true }).fill('순환 관계');
   await editor.getByLabel('문서 본문 (Markdown)').fill('# 가정\n\nA > 0.\n\n# 결과\n\nB > A.');
   await editor.getByRole('button', { name: '정본 문서 만들기' }).click();

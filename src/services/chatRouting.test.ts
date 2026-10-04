@@ -30,6 +30,6 @@ describe('provider-local chat routing', () => {
     expect(await classifyChatRoute('이거 어떻게 생각해?', 'openai', 'key')).toBe('research');
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ choices: [{ message: { content: 'maybe' } }] }) })));
     expect(await classifyChatRoute('이거 어떻게 생각해?', 'openai', 'key')).toBe('research');
-    expect(await classifyChatRoute('연구 문서 분석해 줘', 'openai', '')).toBe('research');
+    expect(await classifyChatRoute('연구 노트 분석해 줘', 'openai', '')).toBe('research');
   });
 });

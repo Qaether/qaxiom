@@ -215,11 +215,11 @@ function parseDocumentChatContext(value: unknown, theory: TheoryData): DocumentC
     || value.versionId !== null && typeof value.versionId !== 'string'
     || !isRecord(contract)
     || Object.keys(EMPTY_CONTRACT).some(key => typeof contract[key] !== 'string')) {
-    throw new Error('대화의 기준 연구문서 문맥 형식이 올바르지 않습니다.');
+    throw new Error('대화의 기준 연구노트 문맥 형식이 올바르지 않습니다.');
   }
   if (!theory.theoryDocuments.some(document => document.id === value.documentId)
     || value.versionId && !theory.documentVersions.some(version => version.id === value.versionId && version.documentId === value.documentId)) {
-    throw new Error('대화의 기준 연구문서 또는 버전 참조가 올바르지 않습니다.');
+    throw new Error('대화의 기준 연구노트 또는 버전 참조가 올바르지 않습니다.');
   }
   return value as unknown as DocumentChatContext;
 }
@@ -338,11 +338,11 @@ export function parseWorkspaceBundle(value: unknown): WorkspaceBundle {
   const sessionIds = new Set(sessions.map(record => record.id));
   const theoryIds = new Set(theory.theoryDocuments.map(record => record.id));
   if (sessions.some(record => record.documentId !== null && !theoryIds.has(record.documentId))) {
-    throw new Error('대화 세션의 기준 연구문서가 존재하지 않습니다.');
+    throw new Error('대화 세션의 기준 연구노트가 존재하지 않습니다.');
   }
   const sessionDocuments = new Map(sessions.map(record => [record.id, record.documentId]));
   if (messages.some(record => record.documentContext && record.documentContext.documentId !== sessionDocuments.get(record.sessionId))) {
-    throw new Error('대화 메시지의 기준 연구문서가 세션과 다릅니다.');
+    throw new Error('대화 메시지의 기준 연구노트가 세션과 다릅니다.');
   }
   const documentIds = new Set(documents.map(record => record.id));
   if (messages.some(record => !sessionIds.has(record.sessionId))) {

@@ -1,8 +1,8 @@
 import React, { useEffect, useRef } from 'react';
-import { 
-  Plus, 
-  BookMarked, 
-  ShieldCheck, 
+import {
+  Plus,
+  BookMarked,
+  ShieldCheck,
   Cpu,
   X,
   Folder,
@@ -124,15 +124,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="sidebar-actions">
           <button id="new-theory-btn" className="new-chat-button" onClick={onOpenTheory}>
             <Plus size={18} />
-            <span>새 연구 문서</span>
+            <span>새 연구노트</span>
           </button>
         </div>
 
-        {/* Research Documents moved right below 새 연구 문서 */}
+        {/* Research Documents moved right below 새 연구노트 */}
         <div className="sidebar-section sidebar-documents">
-          <div className="section-label"><BookMarked size={13} /><span>연구 문서 ({documents.length})</span></div>
+          <div className="section-label"><BookMarked size={13} /><span>연구노트 ({documents.length})</span></div>
           <div className="session-list">
-            {!documents.length && <p className="empty-sessions">아직 만든 연구 문서가 없습니다.</p>}
+            {!documents.length && <p className="empty-sessions">아직 만든 연구노트가 없습니다.</p>}
             {documents.map(document => (
               <div className="sidebar-document-row" key={document.id}>
                 <button

@@ -117,7 +117,7 @@ export async function writeTheoryDocumentsToDirectory(
     if (!version || version.documentId !== document.id || !project) throw new Error('문서의 현재 버전 또는 프로젝트가 올바르지 않아 내보내기를 중단했습니다.');
     return { document, version, project, file: `${safePart(version.title)}-${safePart(document.id)}-v${version.number}.md` };
   });
-  if (!entries.length) throw new Error('폴더로 내보낼 연구 문서가 없습니다.');
+  if (!entries.length) throw new Error('폴더로 내보낼 연구노트가 없습니다.');
   if (new Set(entries.map(entry => entry.file)).size !== entries.length) throw new Error('내보낼 문서 파일명이 중복됩니다.');
 
   const now = options.now ?? new Date();
@@ -140,9 +140,11 @@ export async function writeTheoryDocumentsToDirectory(
     const manifest = {
       format: 'qaxiom-theory-markdown-export', version: 1, exportedAt: now.toISOString(),
       scope: 'current-theory-versions-only',
-      documents: entries.map(entry => ({ file: entry.file, documentId: entry.document.id, projectId: entry.project.id,
+      documents: entries.map(entry => ({
+        file: entry.file, documentId: entry.document.id, projectId: entry.project.id,
         projectTitle: entry.project.title, versionId: entry.version.id, versionNumber: entry.version.number,
-        markdownHash: entry.version.contentHash }))
+        markdownHash: entry.version.contentHash
+      }))
     };
     await writeNewFile(directory, 'manifest.json', JSON.stringify(manifest, null, 2));
   } catch (error) {

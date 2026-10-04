@@ -58,19 +58,19 @@ function createInitialAppState(initialSessions: ChatSession[] = []): InitialAppS
 
   const sessions = loaded.length > 0
     ? loaded.map(session => {
-        const selectedModel = resolveModelId(session.selectedModel);
-        const currentModel = AVAILABLE_MODELS.find(model => model.id === selectedModel);
-        const hasKey = currentModel
-          && Boolean((settings.apiKeys[currentModel.provider as keyof typeof settings.apiKeys] || '').trim());
+      const selectedModel = resolveModelId(session.selectedModel);
+      const currentModel = AVAILABLE_MODELS.find(model => model.id === selectedModel);
+      const hasKey = currentModel
+        && Boolean((settings.apiKeys[currentModel.provider as keyof typeof settings.apiKeys] || '').trim());
 
-        return !hasKey && firstActiveModel
-          ? { ...session, selectedModel: firstActiveModel.id }
-          : { ...session, selectedModel };
-      })
+      return !hasKey && firstActiveModel
+        ? { ...session, selectedModel: firstActiveModel.id }
+        : { ...session, selectedModel };
+    })
     : [createNewSession(
-        settings.defaultMode,
-        firstActiveModel?.id || settings.defaultModel
-      )];
+      settings.defaultMode,
+      firstActiveModel?.id || settings.defaultModel
+    )];
 
   return {
     sessions,
@@ -122,7 +122,7 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
         const val = parseInt(saved, 10);
         if (!isNaN(val) && val >= 180 && val <= 480) return val;
       }
-    } catch {}
+    } catch { }
     return 260;
   });
 
@@ -133,7 +133,7 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
         const val = parseInt(saved, 10);
         if (!isNaN(val) && val >= 280 && val <= 650) return val;
       }
-    } catch {}
+    } catch { }
     return 380;
   });
 
@@ -187,7 +187,7 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
       const finalWidth = Math.max(180, Math.min(480, upEvent.clientX));
       try {
         localStorage.setItem('qaxiom_sidebar_width', String(finalWidth));
-      } catch {}
+      } catch { }
     };
 
     window.addEventListener('mousemove', handleMouseMove);
@@ -210,7 +210,7 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
       const finalWidth = Math.max(280, Math.min(650, window.innerWidth - upEvent.clientX));
       try {
         localStorage.setItem('qaxiom_chat_width', String(finalWidth));
-      } catch {}
+      } catch { }
     };
 
     window.addEventListener('mousemove', handleMouseMove);
@@ -293,14 +293,14 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
           let lastId: string | null = null;
           try {
             lastId = localStorage.getItem('qaxiom_last_open_document_id');
-          } catch {}
+          } catch { }
           const target = (lastId && docs.find(d => d.id === lastId)) || docs[0];
           return target.id;
         });
         setIsTheoryOpen(true);
       }
     }).catch(() => {
-      if (active) setPersistenceError('연구 문서 목록을 읽지 못했습니다.');
+      if (active) setPersistenceError('연구노트 목록을 읽지 못했습니다.');
     });
     return () => { active = false; };
   }, [openedProject, isTheoryOpen]);
@@ -449,7 +449,7 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
       try {
         if (nextId) localStorage.setItem('qaxiom_last_open_document_id', nextId);
         else localStorage.removeItem('qaxiom_last_open_document_id');
-      } catch {}
+      } catch { }
       setPendingDeleteDocumentId(null);
       setPersistenceError(null);
       requestAnimationFrame(() => {
@@ -570,17 +570,17 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
     let documentContext;
     try {
       if (route === 'research') {
-        if (documentDraft?.documentId !== theoryDocumentId) throw new Error('기준 연구문서를 불러오는 중입니다. 잠시 후 다시 질문해 주세요.');
+        if (documentDraft?.documentId !== theoryDocumentId) throw new Error('기준 연구노트를 불러오는 중입니다. 잠시 후 다시 질문해 주세요.');
         const prior = priorAnswer?.documentContext;
-        if (prior && prior.documentId !== theoryDocumentId) throw new Error('재시도할 답변의 기준 연구문서가 현재 문서와 다릅니다.');
+        if (prior && prior.documentId !== theoryDocumentId) throw new Error('재시도할 답변의 기준 연구노트가 현재 노트와 다릅니다.');
         documentContext = prior ?? await captureDocumentContext(theoryDocumentId, documentDraft);
         await verifyDocumentContext(documentContext);
         if (contextBundle?.assembly?.research && contextBundle.assembly.research.documentId !== theoryDocumentId)
-          throw new Error('선택한 검색 문맥의 연구문서가 현재 문서와 다릅니다.');
+          throw new Error('선택한 검색 문맥의 연구노트가 현재 노트와 다릅니다.');
         withDocumentContext(contextBundle ? withReferenceContext(updatedMessages, contextBundle) : updatedMessages, documentContext);
       }
     } catch (cause) {
-      window.alert(cause instanceof Error ? cause.message : '연구문서 문맥을 확인하지 못했습니다.');
+      window.alert(cause instanceof Error ? cause.message : '연구노트 문맥을 확인하지 못했습니다.');
       return;
     }
     if (documentContext) assistantMessage.documentContext = documentContext;
@@ -590,12 +590,12 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
       prev.map(s =>
         s.id === currentSession.id
           ? {
-              ...s,
-              title: sessionTitle,
-              selectedModel: model.id,
-              updatedAt: Date.now(),
-              messages: [...updatedMessages, assistantMessage]
-            }
+            ...s,
+            title: sessionTitle,
+            selectedModel: model.id,
+            updatedAt: Date.now(),
+            messages: [...updatedMessages, assistantMessage]
+          }
           : s
       )
     );
@@ -724,7 +724,7 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
 
   const handleExportTheoryToFolder = async (): Promise<{ folderName: string; documentCount: number }> => {
     if (deletingSessionRef.current) throw new Error('세션 삭제 저장이 끝난 뒤 내보내 주세요.');
-    if (isStreaming) throw new Error('응답 생성이 끝난 뒤 연구 문서를 내보내 주세요.');
+    if (isStreaming) throw new Error('응답 생성이 끝난 뒤 연구노트를 내보내 주세요.');
     const directory = await chooseWorkspaceDirectory();
     await saveSessions(sessions);
     const bundle = await createWorkspaceBundle();
@@ -801,7 +801,7 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
             setIsTheoryOpen(true);
             try {
               localStorage.setItem('qaxiom_last_open_document_id', id);
-            } catch {}
+            } catch { }
             closeMobileSidebar();
           }}
           onDeleteDocument={requestDeleteDocument}
@@ -829,7 +829,7 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
         <main className="center-document-pane">
           {/* Center Pane Content */}
           {isTheoryOpen || theoryDocumentId ? (
-            <React.Suspense fallback={<div className="pane-loading" role="status">연구 문서 불러오는 중…</div>}>
+            <React.Suspense fallback={<div className="pane-loading" role="status">연구노트 불러오는 중…</div>}>
               <TheoryWorkspace
                 key={newDocumentToken}
                 onClose={() => { setIsTheoryOpen(false); setTheoryDocumentId(null); }}
@@ -893,9 +893,9 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
                   <div className="center-empty-icon">
                     <FileText size={40} />
                   </div>
-                  <h3 className="center-empty-title">열려 있는 연구 문서가 없습니다</h3>
+                  <h3 className="center-empty-title">열려 있는 연구노트가 없습니다</h3>
                   <p className="center-empty-desc">
-                    왼쪽 탐색기에서 정본 문서를 선택하거나, 새로운 연구 문서를 작성하여 가설과 수식을 체계적으로 정립하세요.
+                    왼쪽 탐색기에서 정본 문서를 선택하거나, 새로운 연구노트를 작성하여 가설과 수식을 체계적으로 정립하세요.
                   </p>
                   <button
                     type="button"
@@ -1065,8 +1065,8 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
                           onOpenSource={setSourceEvidence}
                           onRetry={
                             index === currentSession.messages.length - 1
-                            && message.role === 'assistant'
-                            && (message.status === 'error' || message.status === 'stopped')
+                              && message.role === 'assistant'
+                              && (message.status === 'error' || message.status === 'stopped')
                               ? () => handleRetryMessage(message.id)
                               : undefined
                           }
@@ -1167,7 +1167,7 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
               }
             }}
           >
-            <h3 id="document-delete-title">연구 문서를 삭제할까요?</h3>
+            <h3 id="document-delete-title">연구노트를 삭제할까요?</h3>
             <p id="document-delete-description">
               “{documentDeletePreview?.title ?? theoryDocuments.find(row => row.id === pendingDeleteDocumentId)?.title ?? '선택한 문서'}”
               {documentDeletePreview && <>의 버전 {documentDeletePreview.versionCount}개, 문단 {documentDeletePreview.blockCount}개, 검토 기록 {documentDeletePreview.reviewCount}개를 삭제합니다.

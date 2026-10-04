@@ -18,7 +18,7 @@ test('opens project setup before chat and enters document work from the primary 
   await expect(page.locator('.header-project-chip').getByText('새 물리 이론', { exact: true })).toBeVisible();
   await expect(page.locator('.center-document-header .header-project-label')).toHaveJSProperty('tagName', 'DIV');
   await expect(page.getByText('LLM Research Wiki')).toHaveCount(0);
-  await expect(page.getByRole('button', { name: '새 연구 문서' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '새 연구 노트' })).toBeVisible();
   await expect(page.getByRole('button', { name: '새 대화' })).toBeVisible();
   await expect(page.getByRole('button', { name: '레퍼런스 검색' })).toBeVisible();
 
@@ -41,9 +41,9 @@ test('opens project setup before chat and enters document work from the primary 
   await expect(page.locator('.chat-title-toggle-btn')).toHaveAttribute('data-tooltip', '제목 변경');
   await expect(page.locator('.chat-panel-header-right > :first-child')).toHaveClass(/chat-title-toggle-btn/);
 
-  await page.getByRole('button', { name: '새 연구 문서' }).click();
+  await page.getByRole('button', { name: '새 연구 노트' }).click();
   const editor = page.locator('dialog.theory-workspace');
-  await expect(editor).toHaveAccessibleName('새 연구 문서');
+  await expect(editor).toHaveAccessibleName('새 연구 노트');
   await expect(editor.getByLabel('연구 작업 모드')).toHaveCount(0);
   await expect(editor.getByRole('heading', { name: '1. 문서 작성' })).toBeVisible();
   await expect(editor.getByRole('navigation', { name: '정본 문서 목록' })).toHaveCount(0);
@@ -85,13 +85,13 @@ test('opens project setup before chat and enters document work from the primary 
   await editor.getByRole('button', { name: '창 닫기' }).click();
   await expect(editor.getByRole('button', { name: '프로젝트 자료·문서 관리' })).toHaveCount(0);
   await expect(editor.getByRole('button', { name: '문서 삭제' })).toHaveCount(0);
-  await expect(editor.getByRole('button', { name: '새 연구 문서' })).toHaveCount(0);
+  await expect(editor.getByRole('button', { name: '새 연구노트' })).toHaveCount(0);
   await expect(editor.getByRole('button', { name: '닫기', exact: true })).toHaveCount(0);
   await expect(editor.locator('.theory-btn-close')).toHaveCount(0);
   await expect(page.getByRole('button', { name: '새 가설 v1' })).toBeVisible();
   await editor.getByLabel('문서 본문 (Markdown)').fill('아직 저장하지 않은 수정');
   await page.getByRole('button', { name: '새 가설 문서 삭제' }).click();
-  const deleteDialog = page.getByRole('dialog', { name: '연구 문서를 삭제할까요?' });
+  const deleteDialog = page.getByRole('dialog', { name: '연구노트를 삭제할까요?' });
   await expect(deleteDialog.getByRole('alert')).toContainText('저장되지 않은 변경사항');
   await expect(deleteDialog.getByRole('button', { name: '문서 삭제' })).toBeDisabled();
   await deleteDialog.getByRole('button', { name: '취소' }).click();
@@ -103,7 +103,7 @@ test('opens project setup before chat and enters document work from the primary 
   await page.getByRole('button', { name: '새 가설 문서 삭제' }).click();
   await deleteDialog.getByRole('button', { name: '문서 삭제' }).click();
   await expect(page.getByRole('button', { name: '새 가설 v1' })).toHaveCount(0);
-  await expect(page.getByText('아직 만든 연구 문서가 없습니다.')).toBeVisible();
+  await expect(page.getByText('아직 만든 연구노트가 없습니다.')).toBeVisible();
   await page.reload();
   await expect(page.locator('main.project-start[role="status"]')).toHaveCount(0);
   const projectSetup = page.getByRole('heading', { level: 1, name: 'Projects' });

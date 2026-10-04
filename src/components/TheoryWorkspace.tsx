@@ -5,7 +5,7 @@ import { createTheory, loadTheory, restoreTheoryVersion, saveTheoryVersion } fro
 import { EMPTY_CONTRACT, type ContractAnchors, type DocumentBlock, type ResearchContract, type TheorySnapshot } from '../services/theory/types';
 import './TheoryWorkspace.css';
 import DocumentAnalysisView from './DocumentAnalysisView';
-import { applyAnalysisSuggestion, parseDocumentAnalysis, prepareDocumentAnalysis, prepareChunkedDocumentAnalysis, parseChunkedDocumentAnalysis, setAnalysisDecision, type AnalysisFinding, type AnalysisRun } from '../services/theory/analysis';
+import { applyAnalysisSuggestion, deleteAnalysisRun, parseDocumentAnalysis, prepareDocumentAnalysis, prepareChunkedDocumentAnalysis, parseChunkedDocumentAnalysis, setAnalysisDecision, type AnalysisFinding, type AnalysisRun } from '../services/theory/analysis';
 import { sendChatMessage } from '../services/llm';
 import ContractSuggestionAssistant from './ContractSuggestionAssistant';
 import type { UserSettings } from '../types';
@@ -192,13 +192,15 @@ export default function TheoryWorkspace({
   };
   const dirty = snapshot
     ? title !== snapshot.version.title || markdown !== snapshot.version.markdown
-      || JSON.stringify(contract) !== JSON.stringify(snapshot.version.contract)
-      || JSON.stringify(contractAnchors) !== JSON.stringify(snapshot.version.contractAnchors)
+    || JSON.stringify(contract) !== JSON.stringify(snapshot.version.contract)
+    || JSON.stringify(contractAnchors) !== JSON.stringify(snapshot.version.contractAnchors)
     : Boolean(title || markdown || Object.values(contract).some(Boolean) || Object.keys(contractAnchors).length);
 
   useEffect(() => {
-    onContextChange?.({ documentId: snapshot?.document.id ?? null, versionId: snapshot?.version.id ?? null,
-      title, markdown, contract, dirty });
+    onContextChange?.({
+      documentId: snapshot?.document.id ?? null, versionId: snapshot?.version.id ?? null,
+      title, markdown, contract, dirty
+    });
   }, [snapshot, title, markdown, contract, dirty, onContextChange]);
 
   useEffect(() => {
@@ -270,7 +272,7 @@ export default function TheoryWorkspace({
     if (!analysisRun || !snapshot || analysisRun.versionId === snapshot.version.id) return;
     let active = true;
     void Promise.all([qaxiomDatabase.document_versions.get(analysisRun.versionId),
-      qaxiomDatabase.document_blocks.where('versionId').equals(analysisRun.versionId).sortBy('position')])
+    qaxiomDatabase.document_blocks.where('versionId').equals(analysisRun.versionId).sortBy('position')])
       .then(([version, blocks]) => {
         if (active && version?.documentId === snapshot.document.id) setHistoricalAnalysisSnapshot({ ...snapshot, version, blocks });
       }).catch(() => { if (active) setError('이전 분석의 문서 버전을 읽지 못했습니다.'); });
@@ -283,8 +285,10 @@ export default function TheoryWorkspace({
     finally { setBusy(false); }
   };
   const persistDraft = async () => {
-    const input = { title, markdown, contract,
-      ...(snapshot && JSON.stringify(contractAnchors) === JSON.stringify(snapshot.version.contractAnchors) ? {} : { contractAnchors }) };
+    const input = {
+      title, markdown, contract,
+      ...(snapshot && JSON.stringify(contractAnchors) === JSON.stringify(snapshot.version.contractAnchors) ? {} : { contractAnchors })
+    };
     const saved = snapshot
       ? await saveTheoryVersion(snapshot.document.id, snapshot.version.id, input)
       : await createTheory(input);
@@ -306,9 +310,11 @@ export default function TheoryWorkspace({
       const target = dirty || !snapshot ? await persistDraft() : snapshot;
       if (dirty || !snapshot) setStatus(`v${target.version.number} 자동 저장 후 전체 문서를 분석합니다.`);
 
-      activeRun = { id: crypto.randomUUID(), documentId: target.document.id, versionId: target.version.id,
+      activeRun = {
+        id: crypto.randomUUID(), documentId: target.document.id, versionId: target.version.id,
         versionHash: target.version.contentHash, modelId: targetModelId, createdAt: Date.now(), status: 'running', findings: [],
-        limitations: [], checkedBlockIds: [], error: '' };
+        limitations: [], checkedBlockIds: [], error: ''
+      };
       await qaxiomDatabase.analysis_runs.add(activeRun);
       setAnalysisRun(activeRun); setEditorTab('analysis');
       setAnalysisHistory(previous => [activeRun!, ...previous]);
@@ -325,8 +331,10 @@ export default function TheoryWorkspace({
 
           let response = ''; let failure: Error | null = null;
           await sendChatMessage([{ id: crypto.randomUUID(), role: 'user', content: chunk.requestPrompt, timestamp: Date.now() }], targetModelId,
-            'document_analysis', settings, { onChunk: c => { response += c; if (response.length > 2_000_000) { failure = new Error('분석 응답이 너무 깁니다.'); abort.abort(); } },
-              onError: cause => { failure = cause; }, onFinish: () => {} }, abort.signal);
+            'document_analysis', settings, {
+              onChunk: c => { response += c; if (response.length > 2_000_000) { failure = new Error('분석 응답이 너무 깁니다.'); abort.abort(); } },
+            onError: cause => { failure = cause; }, onFinish: () => { }
+          }, abort.signal);
 
           if (failure) throw failure;
           if (abort.signal.aborted) throw new Error('분석을 취소했습니다.');
@@ -347,8 +355,10 @@ export default function TheoryWorkspace({
         const request = await prepareDocumentAnalysis(target, { focusInstruction: overrideInstruction });
         let response = ''; let failure: Error | null = null;
         await sendChatMessage([{ id: crypto.randomUUID(), role: 'user', content: request, timestamp: Date.now() }], targetModelId,
-          'document_analysis', settings, { onChunk: chunk => { response += chunk; if (response.length > 2_000_000) { failure = new Error('분석 응답이 너무 깁니다.'); abort.abort(); } },
-            onError: cause => { failure = cause; }, onFinish: () => {} }, abort.signal);
+          'document_analysis', settings, {
+            onChunk: chunk => { response += chunk; if (response.length > 2_000_000) { failure = new Error('분석 응답이 너무 깁니다.'); abort.abort(); } },
+          onError: cause => { failure = cause; }, onFinish: () => { }
+        }, abort.signal);
         if (failure) throw failure;
         if (abort.signal.aborted) throw new Error('분석을 취소했습니다.');
         const completed = parseDocumentAnalysis(response, target, targetModelId);
@@ -385,6 +395,17 @@ export default function TheoryWorkspace({
       setEditorTab('write');
       setStatus('수정안을 편집 내용에 반영했습니다. 확인 후 문서를 저장하세요.');
     } catch (cause) { setError(cause instanceof Error ? cause.message : '수정안을 적용하지 못했습니다.'); }
+  };
+  const handleDeleteAnalysis = async (targetRun: AnalysisRun) => {
+    try {
+      await deleteAnalysisRun(targetRun.id);
+      const nextHistory = analysisHistory.filter(item => item.id !== targetRun.id);
+      setAnalysisHistory(nextHistory);
+      if (analysisRun?.id === targetRun.id) {
+        setAnalysisRun(nextHistory[0] ?? null);
+      }
+      setStatus('분석 결과를 삭제했습니다.');
+    } catch (cause) { setError(cause instanceof Error ? cause.message : '분석 결과를 삭제하지 못했습니다.'); }
   };
   const comparison = snapshot?.history.find(version => version.id === comparisonId);
   const changes = snapshot && comparison ? compareBlocks(comparisonBlocks, snapshot.blocks).filter(change => change.change !== 'unchanged') : [];
@@ -448,12 +469,12 @@ export default function TheoryWorkspace({
                 <Check size={14} />
               </button>
               <h2 id="theory-heading" className="sr-only">
-                {title.trim() || (snapshot ? snapshot.version.title : '새 연구 문서')}
+                {title.trim() || (snapshot ? snapshot.version.title : '새 연구노트')}
               </h2>
             </form>
           ) : (
             <div className="title-display theory-title-display">
-              <h2 id="theory-heading" aria-label={title || '연구 문서'}>
+              <h2 id="theory-heading" aria-label={title || '연구노트'}>
                 <button
                   ref={titleButtonRef}
                   type="button"
@@ -462,10 +483,10 @@ export default function TheoryWorkspace({
                     setTitleDraft(title);
                     setIsEditingTitle(true);
                   }}
-                  aria-label={`${title || '연구 문서'} 제목 수정`}
+                  aria-label={`${title || '연구노트'} 제목 수정`}
                   data-tooltip="문서 제목 수정"
                 >
-                  <span>{title || '연구 문서'}</span>
+                  <span>{title || '연구노트'}</span>
                   <span className="theory-title-edit-affordance" aria-hidden="true">
                     <Edit3 size={14} strokeWidth={2.4} />
                   </span>
@@ -617,6 +638,33 @@ export default function TheoryWorkspace({
           />
           {editorTab === 'preview' && (
             <div className="theory-markdown-preview-pane vcs-preview-pane">
+              {analysisRun && analysisRun.findings.length > 0 && (
+                <div className="theory-preview-analysis-link-bar">
+                  <div className="preview-analysis-header">
+                    <Sparkles size={14} className="preview-analysis-icon" />
+                    <span>이 버전의 AI 검토 의견 {analysisRun.findings.length}건:</span>
+                  </div>
+                  <div className="preview-analysis-chips">
+                    {analysisRun.findings.map((f, i) => (
+                      <button
+                        key={f.id}
+                        type="button"
+                        className={`preview-finding-chip ${f.decision}`}
+                        onClick={() => {
+                          setEditorTab('analysis');
+                          setTimeout(() => {
+                            const el = document.getElementById(`analysis-${f.id}`);
+                            el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                          }, 100);
+                        }}
+                        title={`#${i + 1}: ${f.explanation} (클릭하여 분석 피드로 이동)`}
+                      >
+                        <span>#{i + 1} {f.explanation}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="theory-preview-content">
                 {markdown.trim() ? (
                   previewMathRenderer === 'mathjax' ? (
@@ -640,15 +688,18 @@ export default function TheoryWorkspace({
           {editorTab === 'analysis' && snapshot && <div className="theory-markdown-preview-pane vcs-preview-pane">
             {dirty && <p className="document-analysis-warning">현재 편집 내용은 분석 대상 버전과 다릅니다. 저장 후 AI 분석을 다시 실행하세요.</p>}
             {analysisRun && analysisRun.versionId !== snapshot.version.id && <p className="document-analysis-warning">이전 버전의 분석 결과가 있습니다. 현재 v{snapshot.version.number} 문서를 다시 분석하세요.</p>}
-            {analysisHistory.length > 1 && <label className="document-analysis-history">분석 기록
-              <select value={analysisRun?.id ?? ''} disabled={analysisBusy} onChange={event => setAnalysisRun(analysisHistory.find(item => item.id === event.target.value) ?? null)}>
-                {analysisHistory.map(item => <option key={item.id} value={item.id}>{snapshot.history.find(version => version.id === item.versionId)?.number ?? '?'}버전 · {new Date(item.createdAt).toLocaleString()} · {item.status === 'complete' ? '완료' : item.status === 'running' ? '진행 중' : '중단/실패'}</option>)}
-              </select>
-            </label>}
-            <DocumentAnalysisView snapshot={analysisViewSnapshot ?? snapshot} run={analysisRun?.versionId === (analysisViewSnapshot ?? snapshot).version.id ? analysisRun : null}
-              onDecision={(finding, decision) => { void decideAnalysisFinding(finding, decision); }} onApply={applyFinding}
+            <DocumentAnalysisView
+              snapshot={analysisViewSnapshot ?? snapshot}
+              run={analysisRun?.versionId === (analysisViewSnapshot ?? snapshot).version.id ? analysisRun : null}
+              history={analysisHistory}
+              onSelectHistory={run => setAnalysisRun(run)}
+              onDecision={(finding, decision) => { void decideAnalysisFinding(finding, decision); }}
+              onApply={applyFinding}
               canApply={(analysisViewSnapshot ?? snapshot).version.id === snapshot.version.id && !dirty}
-              onRetry={() => void startAnalysis()} onCancel={() => analysisAbort.current?.abort()} />
+              onRetry={() => void startAnalysis()}
+              onCancel={() => analysisAbort.current?.abort()}
+              onDelete={run => void handleDeleteAnalysis(run)}
+            />
           </div>}
         </div>
 
@@ -1080,8 +1131,8 @@ export default function TheoryWorkspace({
                       {isOverLimit && isChunkingEnabled
                         ? '분할 정합성 분석 시작'
                         : isOverLimit
-                        ? '용량 초과 (분할 또는 모델 변경 필요)'
-                        : '정합성 분석 시작'}
+                          ? '용량 초과 (분할 또는 모델 변경 필요)'
+                          : '정합성 분석 시작'}
                     </span>
                   </button>
                 );

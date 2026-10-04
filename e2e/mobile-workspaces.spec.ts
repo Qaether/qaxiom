@@ -8,8 +8,8 @@ test('keeps theory authoring and reference controls usable at 320px', async ({ p
   await page.goto('/');
 
   await page.getByRole('button', { name: '대화 메뉴 열기' }).click();
-  await page.getByRole('dialog', { name: '대화 메뉴' }).getByRole('button', { name: '연구 문서' }).click();
-  const theory = page.getByRole('dialog', { name: '연구 문서', exact: true });
+  await page.getByRole('dialog', { name: '대화 메뉴' }).getByRole('button', { name: '연구노트' }).click();
+  const theory = page.getByRole('dialog', { name: '연구노트', exact: true });
   await expect(theory).toBeVisible();
   await theory.getByLabel('문서 제목', { exact: true }).fill('좁은 화면 연구');
   await theory.getByLabel('문서 본문 (Markdown)').fill('# 가정\n\n모든 값은 양수다.');

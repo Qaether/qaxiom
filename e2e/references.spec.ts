@@ -10,8 +10,8 @@ test('previews mandatory research criteria, parent expansion and every budget om
   await page.goto('/');
   await page.getByLabel('Google Gemini API Key').fill('assembly-e2e-key');
   await page.getByRole('button', { name: '설정 저장' }).click();
-  await page.getByRole('button', { name: '연구 문서', exact: true }).click();
-  const editor = page.getByRole('dialog', { name: '연구 문서', exact: true });
+  await page.getByRole('button', { name: '연구노트', exact: true }).click();
+  const editor = page.getByRole('dialog', { name: '연구노트', exact: true });
   await editor.getByLabel('문서 제목', { exact: true }).fill('필수 전제 연구');
   await editor.getByLabel('문서 본문 (Markdown)').fill('CANONICAL_BODY_NOT_SENT');
   await editor.locator('summary').click();

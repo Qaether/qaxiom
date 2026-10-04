@@ -19,7 +19,7 @@ test('previews only a selected external text span for document review', async ({
   });
   await expect(library.getByRole('status')).toContainText('로컬에 저장');
   await library.getByRole('button', { name: '닫기' }).click();
-  await page.getByRole('button', { name: '새 연구 문서' }).click();
+  await page.getByRole('button', { name: '새 연구노트' }).click();
   const editor = page.locator('dialog.theory-workspace');
   await editor.getByLabel('문서 제목', { exact: true }).fill('질량 가설');
   await editor.getByLabel('문서 본문 (Markdown)').fill('질량은 양수다.');

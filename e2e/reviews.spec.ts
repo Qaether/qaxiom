@@ -9,10 +9,14 @@ test('reviews grounded issues, approves a patch, rechecks its new version and re
     const prompt = request.contents.at(-1).parts[0].text as string;
     const data = JSON.parse(prompt.split('원문이다:\n')[1]);
     const block = data.blocks.at(-1);
-    const output = calls === 1 ? { checkedBlockIds: data.blocks.map((block: { id: string }) => block.id), limitations: [],
-      claims: [{ blockId: block.id, quote: '모든 실수', kind: 'theorem' }], issues: [{ kind: 'scope', severity: 'critical', blockIds: [block.id], quotes: ['모든 실수'],
+    const output = calls === 1 ? {
+      checkedBlockIds: data.blocks.map((block: { id: string }) => block.id), limitations: [],
+      claims: [{ blockId: block.id, quote: '모든 실수', kind: 'theorem' }], issues: [{
+        kind: 'scope', severity: 'critical', blockIds: [block.id], quotes: ['모든 실수'],
         explanation: '양수 범위를 벗어난 일반화입니다.', resolution: 'x > 0으로 제한하세요.',
-        patch: { blockId: block.id, replacement: 'x > 0인 실수의 log(x)는 정의된다.\n', introducedAssumptions: '실수 로그의 정의역은 양수다.' } }] }
+        patch: { blockId: block.id, replacement: 'x > 0인 실수의 log(x)는 정의된다.\n', introducedAssumptions: '실수 로그의 정의역은 양수다.' }
+      }]
+    }
       : { checkedBlockIds: data.blocks.map((block: { id: string }) => block.id), limitations: [], claims: [], issues: [] };
     expect(data.contract.scope).toBe('양수 실수');
     if (calls === 2) { expect(prompt).toContain('승인한 수정의 새 가정'); expect(block.quote).toContain('x > 0인 실수'); }
@@ -21,8 +25,8 @@ test('reviews grounded issues, approves a patch, rechecks its new version and re
   await page.goto('/');
   await page.getByLabel('Google Gemini API Key').fill('review-test-key');
   await page.getByRole('button', { name: '설정 저장' }).click();
-  await page.getByRole('button', { name: '연구 문서', exact: true }).click();
-  const editor = page.getByRole('dialog', { name: '연구 문서', exact: true });
+  await page.getByRole('button', { name: '연구노트', exact: true }).click();
+  const editor = page.getByRole('dialog', { name: '연구노트', exact: true });
   await editor.getByLabel('문서 제목', { exact: true }).fill('검토 반복 이론');
   await editor.getByLabel('문서 본문 (Markdown)').fill('# 가정\n\nx > 0\n\n# 정리\n\n모든 실수의 log(x)는 정의된다.\n');
   await editor.locator('summary').click();
@@ -89,8 +93,8 @@ test('reviews grounded issues, approves a patch, rechecks its new version and re
     await restored.getByLabel('Qaxiom 작업공간 백업 파일').setInputFiles(backup);
     await expect(restored.getByRole('status').filter({ hasText: '작업공간을 복원했습니다' })).toBeVisible();
     await restored.locator('.modal-close-btn').click();
-    await restored.getByRole('button', { name: '연구 문서', exact: true }).click();
-    const restoredEditor = restored.getByRole('dialog', { name: '연구 문서', exact: true });
+    await restored.getByRole('button', { name: '연구노트', exact: true }).click();
+    const restoredEditor = restored.getByRole('dialog', { name: '연구노트', exact: true });
     await restoredEditor.getByRole('button', { name: '검토 반복 이론 · v2' }).click();
     await expect(restoredEditor.getByRole('region', { name: '문서 검토', exact: true })).toContainText('확인한 범위에서 구조 문제 없음');
     await expect(restoredEditor).toContainText('적용됨 — 사용자 해결 확인');
@@ -107,14 +111,18 @@ test('blocks repeated issues until a recorded confirmation and preserves explici
     calls++;
     const prompt = route.request().postDataJSON().contents.at(-1).parts[0].text as string;
     const data = JSON.parse(prompt.split('원문이다:\n')[1]); const block = data.blocks[0];
-    const output = { checkedBlockIds: [block.id], limitations: [], claims: [], issues: [{ kind: 'scope', severity: 'warning',
-      blockIds: [block.id], quotes: ['연구 가정'], explanation: '조건을 명시해야 합니다.', resolution: '범위를 확인하세요.', patch: null }] };
+    const output = {
+      checkedBlockIds: [block.id], limitations: [], claims: [], issues: [{
+        kind: 'scope', severity: 'warning',
+        blockIds: [block.id], quotes: ['연구 가정'], explanation: '조건을 명시해야 합니다.', resolution: '범위를 확인하세요.', patch: null
+      }]
+    };
     await route.fulfill({ status: 200, contentType: 'text/event-stream', body: `data: ${JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(output) }] } }] })}\n\n` });
   });
   await page.goto('/'); await page.getByLabel('Google Gemini API Key').fill('review-test-key');
   await page.getByRole('button', { name: '설정 저장' }).click();
-  await page.getByRole('button', { name: '연구 문서', exact: true }).click();
-  const editor = page.getByRole('dialog', { name: '연구 문서', exact: true });
+  await page.getByRole('button', { name: '연구노트', exact: true }).click();
+  const editor = page.getByRole('dialog', { name: '연구노트', exact: true });
   await editor.getByLabel('문서 제목', { exact: true }).fill('반복 Issue 종료');
   await editor.getByLabel('문서 본문 (Markdown)').fill('연구 가정의 범위를 정리한다.');
   await editor.getByRole('button', { name: '정본 문서 만들기' }).click();
@@ -127,7 +135,7 @@ test('blocks repeated issues until a recorded confirmation and preserves explici
   }
   await expect(review.getByRole('region', { name: '검토 중단 사유' })).toContainText('동일 근거의 Issue 반복 후보');
   await expect(review.getByRole('button', { name: '검토 전송 미리보기', exact: true })).toBeDisabled();
-  await page.reload(); await page.getByRole('button', { name: '연구 문서', exact: true }).click();
+  await page.reload(); await page.getByRole('button', { name: '연구노트', exact: true }).click();
   await editor.getByRole('button', { name: '반복 Issue 종료 · v1' }).click();
   await review.locator('.theory-review-advanced > summary').click();
   await expect(review).toContainText('동일 근거의 Issue 반복 후보'); expect(calls).toBe(2);
@@ -140,7 +148,7 @@ test('blocks repeated issues until a recorded confirmation and preserves explici
   await review.getByLabel('재개 또는 종료 사유', { exact: true }).fill('범위 문제는 미해결로 남기고 이번 검토를 종료한다.');
   await review.getByRole('button', { name: '이번 검토 종료 · 판정은 유지' }).click();
   await expect(review.getByRole('region', { name: '종료된 검토' })).toContainText('정합성 통과가 아닙니다');
-  await page.reload(); await page.getByRole('button', { name: '연구 문서', exact: true }).click();
+  await page.reload(); await page.getByRole('button', { name: '연구노트', exact: true }).click();
   await editor.getByRole('button', { name: '반복 Issue 종료 · v1' }).click();
   await review.locator('.theory-review-advanced > summary').click();
   await expect(review.getByRole('region', { name: '종료된 검토' })).toBeVisible();
@@ -164,8 +172,8 @@ test('persists a split review plan and resumes the next unchecked chunk after re
   });
   await page.goto('/'); await page.getByLabel('Google Gemini API Key').fill('review-test-key');
   await page.getByRole('button', { name: '설정 저장' }).click();
-  await page.getByRole('button', { name: '연구 문서', exact: true }).click();
-  const editor = page.getByRole('dialog', { name: '연구 문서', exact: true });
+  await page.getByRole('button', { name: '연구노트', exact: true }).click();
+  const editor = page.getByRole('dialog', { name: '연구노트', exact: true });
   await editor.getByLabel('문서 제목', { exact: true }).fill('긴 문서 재개');
   await editor.getByLabel('문서 본문 (Markdown)').fill(['가'.repeat(8000), '나'.repeat(8000), '다'.repeat(8000)].join('\n\n'));
   await editor.locator('summary').click();
@@ -179,7 +187,7 @@ test('persists a split review plan and resumes the next unchecked chunk after re
   await review.getByRole('button', { name: '검토 전송 미리보기', exact: true }).click(); expect(calls).toBe(0);
   await review.getByRole('button', { name: '이 범위로 LLM 검토 실행' }).click();
   await expect(review).toContainText('남은 2구간'); await expect(review).toContainText('사용 1/3회');
-  await page.reload(); await page.getByRole('button', { name: '연구 문서', exact: true }).click();
+  await page.reload(); await page.getByRole('button', { name: '연구노트', exact: true }).click();
   await editor.getByRole('button', { name: '긴 문서 재개 · v1' }).click();
   await review.locator('.theory-review-advanced > summary').click();
   await expect(review).toContainText('남은 2구간'); await expect(review).toContainText('사용 1/3회'); expect(calls).toBe(1);
@@ -192,12 +200,14 @@ test('persists a split review plan and resumes the next unchecked chunk after re
 });
 
 test('retains a malformed model response as failure without claims, patches or a pass verdict', async ({ page }) => {
-  await page.route('https://generativelanguage.googleapis.com/**', route => route.fulfill({ status: 200, contentType: 'text/event-stream',
-    body: `data: ${JSON.stringify({ candidates: [{ content: { parts: [{ text: '{"claims":[],"issues":[]}' }] } }] })}\n\n` }));
+  await page.route('https://generativelanguage.googleapis.com/**', route => route.fulfill({
+    status: 200, contentType: 'text/event-stream',
+    body: `data: ${JSON.stringify({ candidates: [{ content: { parts: [{ text: '{"claims":[],"issues":[]}' }] } }] })}\n\n`
+  }));
   await page.goto('/'); await page.getByLabel('Google Gemini API Key').fill('review-test-key');
   await page.getByRole('button', { name: '설정 저장' }).click();
-  await page.getByRole('button', { name: '연구 문서', exact: true }).click();
-  const editor = page.getByRole('dialog', { name: '연구 문서', exact: true });
+  await page.getByRole('button', { name: '연구노트', exact: true }).click();
+  const editor = page.getByRole('dialog', { name: '연구노트', exact: true });
   await editor.getByLabel('문서 제목', { exact: true }).fill('실패 기록');
   await editor.getByLabel('문서 본문 (Markdown)').fill('검토 원문');
   await editor.getByRole('button', { name: '정본 문서 만들기' }).click();
@@ -215,15 +225,15 @@ test('retains a malformed model response as failure without claims, patches or a
 });
 
 test('stops an in-flight review and persists uninspected scope without a pass verdict', async ({ page }) => {
-  let release: () => void = () => {};
+  let release: () => void = () => { };
   await page.route('https://generativelanguage.googleapis.com/**', async route => {
     await new Promise<void>(resolve => { release = resolve; });
-    await route.fulfill({ status: 200, body: '' }).catch(() => {});
+    await route.fulfill({ status: 200, body: '' }).catch(() => { });
   });
   await page.goto('/'); await page.getByLabel('Google Gemini API Key').fill('review-test-key');
   await page.getByRole('button', { name: '설정 저장' }).click();
-  await page.getByRole('button', { name: '연구 문서', exact: true }).click();
-  const editor = page.getByRole('dialog', { name: '연구 문서', exact: true });
+  await page.getByRole('button', { name: '연구노트', exact: true }).click();
+  const editor = page.getByRole('dialog', { name: '연구노트', exact: true });
   await editor.getByLabel('문서 제목', { exact: true }).fill('중단 기록');
   await editor.getByLabel('문서 본문 (Markdown)').fill('아직 검사하지 않은 원문');
   await editor.getByRole('button', { name: '정본 문서 만들기' }).click();
@@ -239,8 +249,8 @@ test('stops an in-flight review and persists uninspected scope without a pass ve
   release();
   await expect(review).toContainText('문단 0/1개 확인 · 확인하지 않은 문단 1개');
   await page.reload();
-  await page.getByRole('button', { name: '연구 문서', exact: true }).click();
-  const reopened = page.getByRole('dialog', { name: '연구 문서', exact: true });
+  await page.getByRole('button', { name: '연구노트', exact: true }).click();
+  const reopened = page.getByRole('dialog', { name: '연구노트', exact: true });
   await reopened.getByRole('button', { name: '중단 기록 · v1' }).click();
   await expect(reopened.getByRole('region', { name: '문서 검토', exact: true })).toContainText('검사 중단 · 판단 자료 부족');
 });

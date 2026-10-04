@@ -7,17 +7,21 @@ test('saves a document and starts AI analysis through the primary flow', async (
     const prompt = route.request().postDataJSON().contents.at(-1).parts[0].text as string;
     const input = JSON.parse(prompt.split('원문이다:\n')[1]);
     const block = input.blocks.find((item: { quote: string }) => item.quote.includes('질량은 양수다.'));
-    const result = { checkedBlockIds: input.blocks.map((item: { id: string }) => item.id), limitations: [],
-      claims: [{ blockId: block.id, quote: '질량은 양수다.', kind: 'assumption' }], issues: [] };
-    await route.fulfill({ status: 200, contentType: 'text/event-stream',
-      body: `data: ${JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(result) }] } }] })}\n\n` });
+    const result = {
+      checkedBlockIds: input.blocks.map((item: { id: string }) => item.id), limitations: [],
+      claims: [{ blockId: block.id, quote: '질량은 양수다.', kind: 'assumption' }], issues: []
+    };
+    await route.fulfill({
+      status: 200, contentType: 'text/event-stream',
+      body: `data: ${JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(result) }] } }] })}\n\n`
+    });
   });
   await page.goto('/');
   await page.getByLabel('Google Gemini API Key').fill('analysis-fake-key');
   await page.getByRole('button', { name: '설정 저장' }).click();
   await page.locator('#header-model-select').selectOption('gemini-3.1-pro-preview');
-  await page.getByRole('button', { name: '연구 문서', exact: true }).click();
-  const editor = page.getByRole('dialog', { name: '연구 문서', exact: true });
+  await page.getByRole('button', { name: '연구노트', exact: true }).click();
+  const editor = page.getByRole('dialog', { name: '연구노트', exact: true });
   await editor.getByLabel('문서 제목', { exact: true }).fill('간단한 연구');
   await editor.getByLabel('문서 본문 (Markdown)').fill('# 가정\n\n질량은 양수다.');
   const saveBox = await editor.getByRole('button', { name: '정본 문서 만들기' }).boundingBox();
@@ -46,15 +50,17 @@ test('plans a long document into explicitly confirmed AI analysis segments', asy
     expect(data.blocks).toHaveLength(1);
     checked.push(data.blocks[0].id);
     const result = { checkedBlockIds: [data.blocks[0].id], limitations: [], claims: [], issues: [] };
-    await route.fulfill({ status: 200, contentType: 'text/event-stream',
-      body: `data: ${JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(result) }] } }] })}\n\n` });
+    await route.fulfill({
+      status: 200, contentType: 'text/event-stream',
+      body: `data: ${JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(result) }] } }] })}\n\n`
+    });
   });
   await page.goto('/');
   await page.getByLabel('Google Gemini API Key').fill('analysis-fake-key');
   await page.getByRole('button', { name: '설정 저장' }).click();
   await page.locator('#header-model-select').selectOption('gemini-3.1-pro-preview');
-  await page.getByRole('button', { name: '연구 문서', exact: true }).click();
-  const editor = page.getByRole('dialog', { name: '연구 문서', exact: true });
+  await page.getByRole('button', { name: '연구노트', exact: true }).click();
+  const editor = page.getByRole('dialog', { name: '연구노트', exact: true });
   await editor.getByLabel('문서 제목', { exact: true }).fill('긴 연구');
   await editor.getByLabel('문서 본문 (Markdown)').fill(['가'.repeat(8000), '나'.repeat(8000), '다'.repeat(8000)].join('\n\n'));
   await editor.getByRole('button', { name: '정본 문서 만들기' }).click();
@@ -77,8 +83,8 @@ test('plans a long document into explicitly confirmed AI analysis segments', asy
 
 test('confirms and deletes a reviewed research document without leaving its versions in the workspace', async ({ page }) => {
   await page.goto('/'); await page.locator('.modal-close-btn').click();
-  await page.getByRole('button', { name: '연구 문서', exact: true }).click();
-  const editor = page.getByRole('dialog', { name: '연구 문서', exact: true });
+  await page.getByRole('button', { name: '연구노트', exact: true }).click();
+  const editor = page.getByRole('dialog', { name: '연구노트', exact: true });
   await editor.getByLabel('문서 제목', { exact: true }).fill('삭제할 실험 문서');
   await editor.getByLabel('문서 본문 (Markdown)').fill('# 가정\n\nA > 0');
   await editor.getByRole('button', { name: '정본 문서 만들기' }).click();
@@ -98,8 +104,8 @@ test('confirms and deletes a reviewed research document without leaving its vers
   await expect(editor.getByRole('status')).toContainText('문서를 삭제했습니다');
   await expect(editor.getByRole('button', { name: '삭제할 실험 문서 · v2' })).toHaveCount(0);
   await editor.getByRole('button', { name: '닫기', exact: true }).click();
-  await page.reload(); await page.locator('.modal-close-btn').click(); await page.getByRole('button', { name: '연구 문서', exact: true }).click();
-  await expect(page.getByRole('dialog', { name: '연구 문서' })).toContainText('저장된 문서가 없습니다.');
+  await page.reload(); await page.locator('.modal-close-btn').click(); await page.getByRole('button', { name: '연구노트', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: '연구노트' })).toContainText('저장된 문서가 없습니다.');
 });
 
 test('suggests grounded research criteria after explicit preview and saves only checked fields', async ({ page }) => {
@@ -109,20 +115,24 @@ test('suggests grounded research criteria after explicit preview and saves only 
     const prompt = route.request().postDataJSON().contents.at(-1).parts[0].text as string;
     expect(prompt).toContain('질량은 양수다.');
     expect(prompt).toContain('중력 모형');
-    const answer = JSON.stringify({ criteria: {
-      purpose: { text: '중력 모형을 연구한다.', quote: '중력 모형' },
-      assumptions: { text: '질량이 양수라고 가정한다.', quote: '질량은 양수다.' },
-      scope: { text: '모든 좌표계에 적용한다.', quote: '원문에 없는 범위' }
-    } });
-    await route.fulfill({ status: 200, contentType: 'text/event-stream',
-      body: `data: ${JSON.stringify({ candidates: [{ content: { parts: [{ text: answer }] } }] })}\n\n` });
+    const answer = JSON.stringify({
+      criteria: {
+        purpose: { text: '중력 모형을 연구한다.', quote: '중력 모형' },
+        assumptions: { text: '질량이 양수라고 가정한다.', quote: '질량은 양수다.' },
+        scope: { text: '모든 좌표계에 적용한다.', quote: '원문에 없는 범위' }
+      }
+    });
+    await route.fulfill({
+      status: 200, contentType: 'text/event-stream',
+      body: `data: ${JSON.stringify({ candidates: [{ content: { parts: [{ text: answer }] } }] })}\n\n`
+    });
   });
   await page.goto('/');
   await page.getByLabel('Google Gemini API Key').fill('criteria-fake-key');
   await page.getByRole('button', { name: '설정 저장' }).click();
   await page.locator('#header-model-select').selectOption('gemini-3.1-pro-preview');
-  await page.getByRole('button', { name: '연구 문서', exact: true }).click();
-  const editor = page.getByRole('dialog', { name: '연구 문서', exact: true });
+  await page.getByRole('button', { name: '연구노트', exact: true }).click();
+  const editor = page.getByRole('dialog', { name: '연구노트', exact: true });
   const assistant = editor.getByRole('region', { name: 'AI 연구 기준 제안' });
   await expect(assistant.getByRole('button', { name: 'AI로 연구 기준 찾기' })).toBeVisible();
   await expect(assistant.getByRole('button', { name: 'AI로 연구 기준 찾기' })).toBeDisabled();
@@ -153,8 +163,8 @@ test('suggests grounded research criteria after explicit preview and saves only 
   await expect(editor.getByRole('status')).toContainText('v1 저장 완료');
   await editor.getByRole('button', { name: '닫기', exact: true }).click();
   await page.reload();
-  await page.getByRole('button', { name: '연구 문서', exact: true }).click();
-  const reopened = page.getByRole('dialog', { name: '연구 문서', exact: true });
+  await page.getByRole('button', { name: '연구노트', exact: true }).click();
+  const reopened = page.getByRole('dialog', { name: '연구노트', exact: true });
   await reopened.getByRole('button', { name: '중력 모형 · v1' }).click();
   await reopened.locator('.theory-contract summary').click();
   await expect(reopened.getByLabel('가정·공리', { exact: true })).toHaveValue('질량이 양수라고 가정한다.');
@@ -166,18 +176,22 @@ test('reviews every part of a long document before suggesting criteria', async (
   await page.route('https://generativelanguage.googleapis.com/**', async route => {
     const prompt = route.request().postDataJSON().contents.at(-1).parts[0].text as string;
     prompts.push(prompt);
-    const answer = JSON.stringify({ criteria: prompt.includes('적용 범위는 마지막 장이다.')
-      ? { scope: { text: '마지막 장에 적용한다.', quote: '적용 범위는 마지막 장이다.' } }
-      : { assumptions: { text: '질량이 양수다.', quote: '질량은 양수다.' } } });
-    await route.fulfill({ status: 200, contentType: 'text/event-stream',
-      body: `data: ${JSON.stringify({ candidates: [{ content: { parts: [{ text: answer }] } }] })}\n\n` });
+    const answer = JSON.stringify({
+      criteria: prompt.includes('적용 범위는 마지막 장이다.')
+        ? { scope: { text: '마지막 장에 적용한다.', quote: '적용 범위는 마지막 장이다.' } }
+        : { assumptions: { text: '질량이 양수다.', quote: '질량은 양수다.' } }
+    });
+    await route.fulfill({
+      status: 200, contentType: 'text/event-stream',
+      body: `data: ${JSON.stringify({ candidates: [{ content: { parts: [{ text: answer }] } }] })}\n\n`
+    });
   });
   await page.goto('/');
   await page.getByLabel('Google Gemini API Key').fill('criteria-fake-key');
   await page.getByRole('button', { name: '설정 저장' }).click();
   await page.locator('#header-model-select').selectOption('gemini-3.1-pro-preview');
-  await page.getByRole('button', { name: '연구 문서', exact: true }).click();
-  const editor = page.getByRole('dialog', { name: '연구 문서', exact: true });
+  await page.getByRole('button', { name: '연구노트', exact: true }).click();
+  const editor = page.getByRole('dialog', { name: '연구노트', exact: true });
   const assistant = editor.getByRole('region', { name: 'AI 연구 기준 제안' });
   await editor.getByLabel('문서 제목', { exact: true }).fill('긴 중력 모형');
   await editor.getByLabel('문서 본문 (Markdown)').fill(`질량은 양수다.\n${'중간 전개를 기록한다.\n'.repeat(4000)}적용 범위는 마지막 장이다.`);
@@ -197,8 +211,8 @@ test('reviews every part of a long document before suggesting criteria', async (
 test('links a declared research criterion to an immutable canonical block and retains it after reload', async ({ page }) => {
   await page.goto('/');
   await page.locator('.modal-close-btn').click();
-  await page.getByRole('button', { name: '연구 문서', exact: true }).click();
-  const editor = page.getByRole('dialog', { name: '연구 문서', exact: true });
+  await page.getByRole('button', { name: '연구노트', exact: true }).click();
+  const editor = page.getByRole('dialog', { name: '연구노트', exact: true });
   await editor.getByLabel('문서 제목', { exact: true }).fill('근거 연결');
   await editor.getByLabel('문서 본문 (Markdown)').fill('# 가정\n\nx > 0.\n\n# 결과\n\ny > x.');
   await editor.locator('.theory-contract summary').click();
@@ -218,8 +232,8 @@ test('links a declared research criterion to an immutable canonical block and re
   await editor.getByRole('button', { name: '닫기', exact: true }).click();
   await page.reload();
   await page.locator('.modal-close-btn').click();
-  await page.getByRole('button', { name: '연구 문서', exact: true }).click();
-  const reopened = page.getByRole('dialog', { name: '연구 문서', exact: true });
+  await page.getByRole('button', { name: '연구노트', exact: true }).click();
+  const reopened = page.getByRole('dialog', { name: '연구노트', exact: true });
   await reopened.getByRole('button', { name: '근거 연결 · v2' }).click();
   await reopened.locator('.theory-contract summary').click();
   await expect(reopened.getByRole('combobox', { name: '근거 블록: 가정·공리' })).toHaveValue(blockId);
@@ -233,8 +247,8 @@ test('versions a theory, compares and restores it, and transfers its history to 
   await page.goto('/');
   await expect(page.getByRole('heading', { name: '연구 AI 환경 설정 (BYOK)' })).toBeVisible();
   await page.locator('.modal-close-btn').click();
-  await page.getByRole('button', { name: '연구 문서', exact: true }).click();
-  const editor = page.getByRole('dialog', { name: '연구 문서', exact: true });
+  await page.getByRole('button', { name: '연구노트', exact: true }).click();
+  const editor = page.getByRole('dialog', { name: '연구노트', exact: true });
   await expect(editor).toBeVisible();
   await editor.getByLabel('문서 제목', { exact: true }).fill('조건부 이론');
   const first = '# 가정\n\nA > 0\n\n# 결과\n\nA는 양수다.';
@@ -284,8 +298,8 @@ test('versions a theory, compares and restores it, and transfers its history to 
     await restored.reload();
     await expect(restored.getByRole('heading', { name: '연구 AI 환경 설정 (BYOK)' })).toBeVisible();
     await restored.locator('.modal-close-btn').click();
-    await restored.getByRole('button', { name: '연구 문서', exact: true }).click();
-    const restoredEditor = restored.getByRole('dialog', { name: '연구 문서', exact: true });
+    await restored.getByRole('button', { name: '연구노트', exact: true }).click();
+    const restoredEditor = restored.getByRole('dialog', { name: '연구노트', exact: true });
     await restoredEditor.getByRole('button', { name: '조건부 이론 · v3' }).click();
     await expect(restoredEditor.getByLabel('문서 본문 (Markdown)')).toHaveValue(first);
     await restoredEditor.locator('.theory-contract summary').click();

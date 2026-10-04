@@ -14,8 +14,8 @@ test('approves graph premises in RAG, blocks stale previews, cites canonical ori
   });
   await page.goto('/'); await page.getByLabel('Google Gemini API Key').fill('answer-graph-fake');
   await page.getByRole('button', { name: '설정 저장' }).click(); await page.locator('#header-model-select').selectOption('gemini-3.1-pro-preview');
-  await page.getByRole('button', { name: '연구 문서', exact: true }).click();
-  const editor = page.getByRole('dialog', { name: '연구 문서', exact: true });
+  await page.getByRole('button', { name: '연구노트', exact: true }).click();
+  const editor = page.getByRole('dialog', { name: '연구노트', exact: true });
   await editor.getByLabel('문서 제목', { exact: true }).fill('답변 그래프 연구');
   await editor.getByLabel('문서 본문 (Markdown)').fill('# 가정\n\nA > 0.\n\n# 결과\n\nB > A. needle.\n\n# PRIVATE unselected heading');
   await editor.getByRole('button', { name: '정본 문서 만들기' }).click();
@@ -46,7 +46,7 @@ test('approves graph premises in RAG, blocks stale previews, cites canonical ori
   const candidates = library.getByRole('region', { name: '정본 목표 후보', exact: true });
   const target = library.getByRole('checkbox', { name: /그래프 목표 블록 4/ }); await expect(target).not.toBeChecked();
   let releaseWorker!: () => void; const heldWorker = new Promise<void>(resolve => { releaseWorker = resolve; }); let workerRequests = 0;
-  await page.route('**/canonical.worker.ts*', async route => { if (++workerRequests === 1) await heldWorker; await route.continue().catch(() => {}); });
+  await page.route('**/canonical.worker.ts*', async route => { if (++workerRequests === 1) await heldWorker; await route.continue().catch(() => { }); });
   await candidates.getByRole('button', { name: '질문으로 정본 목표 후보 찾기' }).click();
   await candidates.getByRole('button', { name: '정본 후보 검색 중단' }).click(); await expect(candidates.getByRole('alert')).toContainText('중단'); releaseWorker();
   await candidates.getByRole('button', { name: '질문으로 정본 목표 후보 찾기' }).click();
@@ -62,8 +62,8 @@ test('approves graph premises in RAG, blocks stale previews, cites canonical ori
   const preview = library.getByRole('region', { name: '전송 미리보기', exact: true });
   await expect(preview).toContainText('그래프 목표 1블록 · 추가 전제 1블록'); await expect(preview).not.toContainText('PRIVATE'); expect(calls).toBe(0);
   // Another tab revokes an anchor after the preview. The stale request must stay local.
-  const other = await page.context().newPage(); await other.goto('/'); await other.getByRole('button', { name: '연구 문서', exact: true }).click();
-  const otherEditor = other.getByRole('dialog', { name: '연구 문서', exact: true });
+  const other = await page.context().newPage(); await other.goto('/'); await other.getByRole('button', { name: '연구노트', exact: true }).click();
+  const otherEditor = other.getByRole('dialog', { name: '연구노트', exact: true });
   await otherEditor.getByRole('button', { name: '답변 그래프 연구 · v1' }).click();
   await otherEditor.locator('summary').filter({ hasText: '주장 후보' }).click();
   const otherClaims = otherEditor.getByRole('combobox', { name: /^주장 채택 상태/ }); await otherClaims.nth(0).selectOption('rejected');

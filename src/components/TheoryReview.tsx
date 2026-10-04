@@ -90,14 +90,14 @@ export default function TheoryReview({ snapshot, settings, modelId, dirty, onSav
     void ensureCampaign(snapshot.document.id).then(value => { if (active) setCampaign(value); })
       .catch(() => { if (active) setError('검토 예산을 읽지 못했습니다.'); });
     void qaxiomDatabase.review_campaigns.where('documentId').equals(snapshot.document.id).toArray()
-      .then(value => { if (active) setCampaignHistory(value); }).catch(() => {});
+      .then(value => { if (active) setCampaignHistory(value); }).catch(() => { });
     const timer = window.setInterval(() => {
       setNow(Date.now());
       void getCampaign(snapshot.document.id).then(async value => {
         if (active && value) setCampaign(value);
         const updated = await qaxiomDatabase.review_runs.where('documentId').equals(snapshot.document.id).reverse().sortBy('createdAt');
         if (active) setRuns(updated);
-      }).catch(() => {});
+      }).catch(() => { });
     }, 2000);
     return () => { active = false; window.clearInterval(timer); controller.current?.abort(); };
   }, [snapshot.document.id]);
@@ -122,7 +122,7 @@ export default function TheoryReview({ snapshot, settings, modelId, dirty, onSav
     try {
       await sendChatMessage([{ id: crypto.randomUUID(), role: 'user', content: preview, timestamp: Date.now() }], modelId, 'peer_review', settings, {
         onChunk: chunk => { text += chunk; if (text.length > 100000) { failure = new Error('검토 응답 크기 한도 초과'); abort.abort(); } },
-        onError: error => { failure = error; }, onFinish: () => {}
+        onError: error => { failure = error; }, onFinish: () => { }
       }, abort.signal);
       if (failure) throw failure;
       if (abort.signal.aborted) throw new Error('검토가 중단되었거나 120초 시간 예산을 넘었습니다.');
@@ -161,7 +161,7 @@ export default function TheoryReview({ snapshot, settings, modelId, dirty, onSav
     {dirty && <p className="theory-review-warning" role="status">저장하지 않은 수정이 있습니다. 새 버전으로 저장한 뒤 분석하세요.</p>}
     {error && <p role="alert">{error}</p>}
     <div className="theory-review-primary">
-      <div><strong>연구 문서 전체 분석</strong><p>저장한 문서와 연구 기준을 한 번에 확인합니다. 대화·레퍼런스·PDF 원본은 보내지 않습니다.</p></div>
+      <div><strong>연구노트 전체 분석</strong><p>저장한 문서와 연구 기준을 한 번에 확인합니다. 대화·레퍼런스·PDF 원본은 보내지 않습니다.</p></div>
       <button type="button" disabled={busy || dirty || !campaign || !!runningAttempt || !!campaign.closure || !!stop || usedRequests >= requestBudget || !snapshot.blocks.length}
         onClick={() => void prepareSimpleReview()}>전송 내용 확인</button>
     </div>
@@ -177,61 +177,61 @@ export default function TheoryReview({ snapshot, settings, modelId, dirty, onSav
         await recoverExpiredAttempt(campaign.id, { document: snapshot.document, version, blocks, history: snapshot.history }); await refresh();
       })}>만료된 실행 종료 · 재개 준비</button>}
       <fieldset disabled={busy || dirty || !campaign || !!runningAttempt || !!campaign.closure}>
-      <legend>전송할 문단과 추가 문맥</legend>
-      <p>선택한 문단과 연구 기준 전체만 보냅니다. 미선택 문단은 미검사로 남습니다.</p>
-      <label><input type="checkbox" checked={includeGraph} onChange={event => { setIncludeGraph(event.target.checked); setPreview(''); setGraphPreview(null); }} />승인 관계의 전제·정의도 포함</label>
-      {includeGraph && <p>선택한 문단에 연결된 승인 전제를 추가합니다. 추가 문맥도 전송 범위에 표시하며 외부 레퍼런스는 포함하지 않습니다.</p>}
-      <label>최대 검토 요청 횟수<input aria-label="최대 검토 요청 횟수" type="number" min={1} max={100} value={requestBudget} onChange={event => {
-        const value = Number(event.target.value); setPreview('');
-        if (campaign) void execute(async () => { setCampaign(await changeCampaignBudget(campaign.id, value)); });
-      }} /></label>
-      <p>사용 {usedRequests}/{requestBudget}회 · 요청별 최대 120초 · 저장된 사용 시간 {Math.ceil((campaign ? spentTime(campaign) : 0) / 1000)}/{requestBudget * 120}초. 실패도 회차를 사용합니다. 토큰 비용 추정은 제공하지 않습니다.</p>
-      <div className="theory-review-block-list">{snapshot.blocks.map(block => <label className="reference-choice" key={block.id}>
-        <input type="checkbox" checked={selected.includes(block.id)} onChange={event => {
-          setPreview(''); setGraphPreview(null); setSelected(previous => event.target.checked ? [...previous, block.id] : previous.filter(id => id !== block.id));
-        }} /><span>문단 {block.position + 1} · {blockKindLabels[block.kind]} · {block.text.slice(0, 100)}</span>
-      </label>)}</div>
-      <button type="button" disabled={!selectedCurrent.length || usedRequests >= requestBudget || !!stop} onClick={() => void execute(async () => {
-        setPreview(''); setGraphPreview(null);
-        const prepared = includeGraph ? await prepareGraphReview(snapshot, selectedCurrent) : null;
-        setGraphPreview(prepared); setPreviewVersion(snapshot.version.id); setPreviewModel(modelId);
-        setPreview(prepared?.request ?? prepareReviewRequest(snapshot, selectedCurrent));
-      })}>검토 전송 미리보기</button>
+        <legend>전송할 문단과 추가 문맥</legend>
+        <p>선택한 문단과 연구 기준 전체만 보냅니다. 미선택 문단은 미검사로 남습니다.</p>
+        <label><input type="checkbox" checked={includeGraph} onChange={event => { setIncludeGraph(event.target.checked); setPreview(''); setGraphPreview(null); }} />승인 관계의 전제·정의도 포함</label>
+        {includeGraph && <p>선택한 문단에 연결된 승인 전제를 추가합니다. 추가 문맥도 전송 범위에 표시하며 외부 레퍼런스는 포함하지 않습니다.</p>}
+        <label>최대 검토 요청 횟수<input aria-label="최대 검토 요청 횟수" type="number" min={1} max={100} value={requestBudget} onChange={event => {
+          const value = Number(event.target.value); setPreview('');
+          if (campaign) void execute(async () => { setCampaign(await changeCampaignBudget(campaign.id, value)); });
+        }} /></label>
+        <p>사용 {usedRequests}/{requestBudget}회 · 요청별 최대 120초 · 저장된 사용 시간 {Math.ceil((campaign ? spentTime(campaign) : 0) / 1000)}/{requestBudget * 120}초. 실패도 회차를 사용합니다. 토큰 비용 추정은 제공하지 않습니다.</p>
+        <div className="theory-review-block-list">{snapshot.blocks.map(block => <label className="reference-choice" key={block.id}>
+          <input type="checkbox" checked={selected.includes(block.id)} onChange={event => {
+            setPreview(''); setGraphPreview(null); setSelected(previous => event.target.checked ? [...previous, block.id] : previous.filter(id => id !== block.id));
+          }} /><span>문단 {block.position + 1} · {blockKindLabels[block.kind]} · {block.text.slice(0, 100)}</span>
+        </label>)}</div>
+        <button type="button" disabled={!selectedCurrent.length || usedRequests >= requestBudget || !!stop} onClick={() => void execute(async () => {
+          setPreview(''); setGraphPreview(null);
+          const prepared = includeGraph ? await prepareGraphReview(snapshot, selectedCurrent) : null;
+          setGraphPreview(prepared); setPreviewVersion(snapshot.version.id); setPreviewModel(modelId);
+          setPreview(prepared?.request ?? prepareReviewRequest(snapshot, selectedCurrent));
+        })}>검토 전송 미리보기</button>
       </fieldset>
     </details>
     {(usedRequests > 0 || !!stop || !!campaign?.closure || campaignHistory.some(item => item.id !== campaign?.id)) && <details className="theory-review-advanced"><summary>검토 회차 관리</summary>
-    {stop && !campaign?.closure && <section aria-label="검토 중단 사유">
-      <h4>추가 요청 전 확인 필요</h4>
-      {stop.reasons.map(reason => <p key={reason}>{STOP_LABELS[reason]}</p>)}
-      <p>반복/재발은 같은 종류·블록 ID·정규화한 원문 인용의 일치 후보입니다. 의미적 동일성이나 실제 재발을 확정하지 않습니다. 확인은 Issue 해결 표시가 아닙니다.</p>
-      <label>재개 또는 종료 사유<textarea value={decisionNote} maxLength={2000} onChange={event => setDecisionNote(event.target.value)} /></label>
-      <button type="button" disabled={busy || !!runningAttempt || !decisionNote.trim()} onClick={() => void execute(async () => {
-        if (campaign) await confirmCampaignResume(campaign.id, stop.runId, decisionNote);
-        setDecisionNote(''); setPreview(''); await refresh();
-      })}>중단 사유 확인 · 수동 재개 허용</button>
-    </section>}
-    {campaign?.closure ? <section aria-label="종료된 검토">
-      <p>이번 검토 종료 · 버전 {campaign.closure.versionId} · {campaign.closure.note}. 종료는 사용자 판단이며 정합성 통과가 아닙니다.</p>
-      <button type="button" disabled={busy || dirty} onClick={() => {
-        if (!window.confirm('이전 사용 기록을 보존하고 새 검토 예산(3회)을 시작할까요? 자동 전송은 하지 않습니다.')) return;
-        void execute(async () => { await startNewCampaign(campaign.id); setPreview(''); setDecisionNote(''); await refresh(); });
-      }}>새 검토 시작 · 이전 기록 보존</button>
-    </section> : campaign && <section aria-label="검토 종료">
-      {!stop && <label>재개 또는 종료 사유<textarea value={decisionNote} maxLength={2000} onChange={event => setDecisionNote(event.target.value)} /></label>}
-      <p>검사 범위·미검사·미해결 Issue를 확인한 뒤 종료 사유를 기록하세요. 미해결 상태로 종료할 수 있으며 통과 판정으로 바뀌지 않습니다.</p>
-      <button type="button" disabled={busy || dirty || !!runningAttempt || !decisionNote.trim()} onClick={() => void execute(async () => {
-        await closeCampaign(campaign.id, snapshot, decisionNote); setDecisionNote(''); setPreview(''); await refresh();
-      })}>이번 검토 종료 · 판정은 유지</button>
-    </section>}
-    {!!campaignHistory.filter(item => item.id !== campaign?.id).length && <details><summary>이전 검토 회차 기록</summary>
-      {campaignHistory.filter(item => item.id !== campaign?.id).map(item => <p key={item.id}>검토 {item.id} · 사용 {item.attempts.length}/{item.maxRequests}회 · {item.closure?.note ?? '과거 기록'}</p>)}
-    </details>}
-    {!!campaign?.confirmations?.length && <details><summary>중단 사유 확인 기록</summary>
-      {campaign.confirmations.map((item, index) => <div key={index}>
-        <p>검토 {item.runId} · {new Date(item.createdAt).toLocaleString()} · {item.reasons.map(reason => STOP_LABELS[reason]).join(', ')}</p>
-        <p>{item.note} · Issue 해결/정합성 통과 표시가 아님</p>
-      </div>)}
-    </details>}
+      {stop && !campaign?.closure && <section aria-label="검토 중단 사유">
+        <h4>추가 요청 전 확인 필요</h4>
+        {stop.reasons.map(reason => <p key={reason}>{STOP_LABELS[reason]}</p>)}
+        <p>반복/재발은 같은 종류·블록 ID·정규화한 원문 인용의 일치 후보입니다. 의미적 동일성이나 실제 재발을 확정하지 않습니다. 확인은 Issue 해결 표시가 아닙니다.</p>
+        <label>재개 또는 종료 사유<textarea value={decisionNote} maxLength={2000} onChange={event => setDecisionNote(event.target.value)} /></label>
+        <button type="button" disabled={busy || !!runningAttempt || !decisionNote.trim()} onClick={() => void execute(async () => {
+          if (campaign) await confirmCampaignResume(campaign.id, stop.runId, decisionNote);
+          setDecisionNote(''); setPreview(''); await refresh();
+        })}>중단 사유 확인 · 수동 재개 허용</button>
+      </section>}
+      {campaign?.closure ? <section aria-label="종료된 검토">
+        <p>이번 검토 종료 · 버전 {campaign.closure.versionId} · {campaign.closure.note}. 종료는 사용자 판단이며 정합성 통과가 아닙니다.</p>
+        <button type="button" disabled={busy || dirty} onClick={() => {
+          if (!window.confirm('이전 사용 기록을 보존하고 새 검토 예산(3회)을 시작할까요? 자동 전송은 하지 않습니다.')) return;
+          void execute(async () => { await startNewCampaign(campaign.id); setPreview(''); setDecisionNote(''); await refresh(); });
+        }}>새 검토 시작 · 이전 기록 보존</button>
+      </section> : campaign && <section aria-label="검토 종료">
+        {!stop && <label>재개 또는 종료 사유<textarea value={decisionNote} maxLength={2000} onChange={event => setDecisionNote(event.target.value)} /></label>}
+        <p>검사 범위·미검사·미해결 Issue를 확인한 뒤 종료 사유를 기록하세요. 미해결 상태로 종료할 수 있으며 통과 판정으로 바뀌지 않습니다.</p>
+        <button type="button" disabled={busy || dirty || !!runningAttempt || !decisionNote.trim()} onClick={() => void execute(async () => {
+          await closeCampaign(campaign.id, snapshot, decisionNote); setDecisionNote(''); setPreview(''); await refresh();
+        })}>이번 검토 종료 · 판정은 유지</button>
+      </section>}
+      {!!campaignHistory.filter(item => item.id !== campaign?.id).length && <details><summary>이전 검토 회차 기록</summary>
+        {campaignHistory.filter(item => item.id !== campaign?.id).map(item => <p key={item.id}>검토 {item.id} · 사용 {item.attempts.length}/{item.maxRequests}회 · {item.closure?.note ?? '과거 기록'}</p>)}
+      </details>}
+      {!!campaign?.confirmations?.length && <details><summary>중단 사유 확인 기록</summary>
+        {campaign.confirmations.map((item, index) => <div key={index}>
+          <p>검토 {item.runId} · {new Date(item.createdAt).toLocaleString()} · {item.reasons.map(reason => STOP_LABELS[reason]).join(', ')}</p>
+          <p>{item.note} · Issue 해결/정합성 통과 표시가 아님</p>
+        </div>)}
+      </details>}
     </details>}
     <details className="theory-review-advanced theory-review-local"><summary>로컬 구조 확인 · 인터넷 전송 없음</summary>
       <p>연구 기준의 빈 항목, 문단 연결과 기호 선언 형식만 확인합니다. 글의 의미나 이론의 옳고 그름은 판단하지 않습니다.</p>
@@ -278,66 +278,68 @@ export default function TheoryReview({ snapshot, settings, modelId, dirty, onSav
       const reviewName = isLocalChecker(run.checker) ? '기본 구조 확인'
         : run.checker === 'external-v1' ? `AI 외부 원문 대조 · ${run.modelId}` : `AI 내용·논리 검토 · ${run.modelId}`;
       return <article key={run.id} aria-label={`검토 결과 ${run.id}`} className="theory-review-result">
-      <h4>{reviewName}</h4>
-      <p className="theory-review-summary"><strong>{statusLabels[run.status]}</strong> · {outcomeLabels[run.outcome]} · {version ? `v${version.number}` : '저장된 과거 버전'}</p>
-      <button type="button" disabled={busy} onClick={() => void execute(async () => {
-        const version = await qaxiomDatabase.document_versions.get(run.versionId);
-        if (!version) throw new Error('검토 원문 버전이 없습니다.');
-        const blocks = await qaxiomDatabase.document_blocks.where('versionId').equals(version.id).sortBy('position');
-        const url = URL.createObjectURL(new Blob([reviewToMarkdown(run, version, blocks)], { type: 'text/markdown;charset=utf-8' }));
-        const anchor = document.createElement('a'); anchor.href = url; anchor.download = `qaxiom-review-${run.id}.md`; anchor.click();
-        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-      })}>검토 보고서 내보내기</button>
-      <p>문단 {run.checkedBlockIds.length}/{run.checkedBlockIds.length + run.uncheckedBlockIds.length}개 확인 · 확인하지 않은 문단 {run.uncheckedBlockIds.length}개 {!current && '· 이전 버전의 결과'}</p>
-      {run.external && <section aria-label="외부 대조 결과"><p>외부 쌍 실제 대조 {run.external.checkedPairIds.length}/{run.external.context.pairs.length}. 내부 논증 검사 수에는 합산하지 않습니다. 분류는 모델 제안이며 관계 승인·증명이 아닙니다.</p>
-        {run.external.assessments.map(a => {
-          const pair = run.external!.context.pairs.find(p => p.id === a.pairId), evidence = run.external!.context.evidence.find(e => e.citationId === pair?.citationId);
-          return <div key={a.pairId}><p>{a.label} · {a.explanation}</p><p>이론 조건: {a.theoryConditions} / 원문 조건: {a.referenceConditions}</p><pre>{a.theoryQuote}</pre><pre>{a.referenceQuote}</pre>
-            {evidence && <button type="button" onClick={() => setExternalOriginal(evidence)}>대조 원문 확인: {evidence.name}</button>}
-            <ExternalRelationApproval run={run} pairId={a.pairId} snapshot={snapshot} runs={runs} disabled={busy || dirty || !!runningAttempt} onChanged={refresh} /></div>;
-        })}
-        <p>전송 당시의 원문·조건·누락 범위는 내보낸 검토 보고서에 보존됩니다.</p></section>}
-      {run.graph && <p>승인 관계를 포함해 목표 {run.graph.targetBlockIds.length}개 문단과 추가 전제 {run.graph.premiseBlockIds.length}개 문단을 전송했습니다. 추가 전제는 검사 완료 수에 포함하지 않습니다.</p>}
-      {run.error && <p>{run.error}</p>}
-      {!!run.limitations.length && <details className="theory-review-limitations"><summary>이 검사로 확인하지 않은 것</summary>
-        {run.limitations.map((limitation, index) => <p key={index}>{limitation}</p>)}</details>}
-      {!!missingCriteria.length && <section className="theory-review-notice" aria-label="작성하지 않은 연구 기준">
-        <strong>연구 기준 {missingCriteria.length}개가 비어 있습니다.</strong>
-        <p>미작성 항목: {emptyCriteria.length ? emptyCriteria.join(', ') : '검토 당시 일부 연구 기준'}. 이 항목들은 선택 사항이며, AI 검토에서 적용 범위를 더 분명히 하고 싶을 때 채우면 됩니다.</p>
-      </section>}
-      <details open={run.checker === 'llm-v1'}><summary>문서에서 찾은 주장 후보 {run.claims.length}개</summary>
-        <p>제목과 문단 표현을 기준으로 자동 분류한 후보입니다. 내용을 이해하거나 참이라고 판정한 결과가 아닙니다.</p>
-        {run.claims.map(claim => {
-          const block = current ? snapshot.blocks.find(item => item.id === claim.blockId) : null;
-          return <div key={claim.id}><p>{claimKindLabels[claim.kind]} · {claim.origin === 'model' ? 'AI가 제안' : '문서 구조에서 추정'}{block ? ` · 문단 ${block.position + 1}` : ''}</p><pre>{claim.statement}</pre>
-          <select aria-label={`주장 채택 상태 ${claim.id}`} value={claim.acceptance} disabled={busy} onChange={event => void execute(async () => {
-            await setClaimAcceptance(run.id, claim.id, event.target.value as typeof claim.acceptance); await refresh();
-          })}><option value="proposed">제안</option><option value="accepted">채택</option><option value="rejected">기각</option></select>
-        </div>; })}
-      </details>
-      {otherIssues.map(issue => <div className="theory-change theory-review-issue" key={issue.id}><strong>{severityLabels[issue.severity]} · {issueKindLabels[issue.kind]}</strong>
-        <p>{issue.resolvedByRunId ? `재검사 후 사용자 해결 표시 · ${issue.resolvedByRunId}` : '미해결'}</p>
-        <p>{issue.explanation}</p><p>해결 조건: {issue.resolution}</p>
-        {!issue.resolvedByRunId && run.versionId !== snapshot.version.id && runs.some(recheck => recheck.versionId === snapshot.version.id && checkerCovers(run.checker, recheck.checker) && recheck.outcome === 'scope_passed' && !recheck.uncheckedBlockIds.length) &&
-          <button type="button" disabled={busy || dirty} onClick={() => {
-            if (!window.confirm('후속 버전의 전체 범위 재검사 결과와 해결 조건을 확인했습니까? 이 표시는 사용자의 해결 판단이며 이론의 참을 보증하지 않습니다.')) return;
-            const recheck = runs.find(recheck => recheck.versionId === snapshot.version.id && checkerCovers(run.checker, recheck.checker) && recheck.outcome === 'scope_passed' && !recheck.uncheckedBlockIds.length)!;
-            void execute(async () => { await resolveReviewIssue(run.id, issue.id, recheck.id); await refresh(); });
-          }}>재검사 결과 확인 · Issue 해결 표시</button>}
-        {issue.quotes.map((quote, index) => {
-          const block = current ? snapshot.blocks.find(item => item.id === issue.blockIds[index]) : null;
-          return <pre key={index}>{block ? `문단 ${block.position + 1}: ` : ''}{quote}</pre>;
-        })}
-        {run.patches.filter(patch => patch.issueIds.includes(issue.id)).map(patch => <div key={patch.id}>
-          <p>새 가정: {patch.introducedAssumptions || '선언 없음 (숨은 새 가정이 없는지는 사용자 확인 필요)'}</p>
-          <details><summary>수정 제안의 기술 정보</summary><p>변경 전 원문 hash: {patch.beforeHash}</p></details>
-          <div className="theory-diff"><pre>{snapshot.version.id === run.versionId ? snapshot.blocks.find(block => block.id === patch.blockId)?.text : '이전 버전의 원문'}</pre><pre>{patch.replacement}</pre></div>
-          <PatchImpact run={run} patch={patch} snapshot={snapshot} runs={runs} disabled={busy || dirty} onApply={impact => {
-            void execute(async () => { const saved = await applyTheoryPatch(run.id, patch.id, qaxiomDatabase, impact); setPreview(''); setGraphPreview(null); setSelected(saved.blocks.map(block => block.id)); onSaved(saved); await refresh(); });
-          }} onSelect={blockIds => { setSelected(blockIds); setPreview(''); setGraphPreview(null); setIncludeGraph(false); }} />
+        <h4>{reviewName}</h4>
+        <p className="theory-review-summary"><strong>{statusLabels[run.status]}</strong> · {outcomeLabels[run.outcome]} · {version ? `v${version.number}` : '저장된 과거 버전'}</p>
+        <button type="button" disabled={busy} onClick={() => void execute(async () => {
+          const version = await qaxiomDatabase.document_versions.get(run.versionId);
+          if (!version) throw new Error('검토 원문 버전이 없습니다.');
+          const blocks = await qaxiomDatabase.document_blocks.where('versionId').equals(version.id).sortBy('position');
+          const url = URL.createObjectURL(new Blob([reviewToMarkdown(run, version, blocks)], { type: 'text/markdown;charset=utf-8' }));
+          const anchor = document.createElement('a'); anchor.href = url; anchor.download = `qaxiom-review-${run.id}.md`; anchor.click();
+          window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+        })}>검토 보고서 내보내기</button>
+        <p>문단 {run.checkedBlockIds.length}/{run.checkedBlockIds.length + run.uncheckedBlockIds.length}개 확인 · 확인하지 않은 문단 {run.uncheckedBlockIds.length}개 {!current && '· 이전 버전의 결과'}</p>
+        {run.external && <section aria-label="외부 대조 결과"><p>외부 쌍 실제 대조 {run.external.checkedPairIds.length}/{run.external.context.pairs.length}. 내부 논증 검사 수에는 합산하지 않습니다. 분류는 모델 제안이며 관계 승인·증명이 아닙니다.</p>
+          {run.external.assessments.map(a => {
+            const pair = run.external!.context.pairs.find(p => p.id === a.pairId), evidence = run.external!.context.evidence.find(e => e.citationId === pair?.citationId);
+            return <div key={a.pairId}><p>{a.label} · {a.explanation}</p><p>이론 조건: {a.theoryConditions} / 원문 조건: {a.referenceConditions}</p><pre>{a.theoryQuote}</pre><pre>{a.referenceQuote}</pre>
+              {evidence && <button type="button" onClick={() => setExternalOriginal(evidence)}>대조 원문 확인: {evidence.name}</button>}
+              <ExternalRelationApproval run={run} pairId={a.pairId} snapshot={snapshot} runs={runs} disabled={busy || dirty || !!runningAttempt} onChanged={refresh} /></div>;
+          })}
+          <p>전송 당시의 원문·조건·누락 범위는 내보낸 검토 보고서에 보존됩니다.</p></section>}
+        {run.graph && <p>승인 관계를 포함해 목표 {run.graph.targetBlockIds.length}개 문단과 추가 전제 {run.graph.premiseBlockIds.length}개 문단을 전송했습니다. 추가 전제는 검사 완료 수에 포함하지 않습니다.</p>}
+        {run.error && <p>{run.error}</p>}
+        {!!run.limitations.length && <details className="theory-review-limitations"><summary>이 검사로 확인하지 않은 것</summary>
+          {run.limitations.map((limitation, index) => <p key={index}>{limitation}</p>)}</details>}
+        {!!missingCriteria.length && <section className="theory-review-notice" aria-label="작성하지 않은 연구 기준">
+          <strong>연구 기준 {missingCriteria.length}개가 비어 있습니다.</strong>
+          <p>미작성 항목: {emptyCriteria.length ? emptyCriteria.join(', ') : '검토 당시 일부 연구 기준'}. 이 항목들은 선택 사항이며, AI 검토에서 적용 범위를 더 분명히 하고 싶을 때 채우면 됩니다.</p>
+        </section>}
+        <details open={run.checker === 'llm-v1'}><summary>문서에서 찾은 주장 후보 {run.claims.length}개</summary>
+          <p>제목과 문단 표현을 기준으로 자동 분류한 후보입니다. 내용을 이해하거나 참이라고 판정한 결과가 아닙니다.</p>
+          {run.claims.map(claim => {
+            const block = current ? snapshot.blocks.find(item => item.id === claim.blockId) : null;
+            return <div key={claim.id}><p>{claimKindLabels[claim.kind]} · {claim.origin === 'model' ? 'AI가 제안' : '문서 구조에서 추정'}{block ? ` · 문단 ${block.position + 1}` : ''}</p><pre>{claim.statement}</pre>
+              <select aria-label={`주장 채택 상태 ${claim.id}`} value={claim.acceptance} disabled={busy} onChange={event => void execute(async () => {
+                await setClaimAcceptance(run.id, claim.id, event.target.value as typeof claim.acceptance); await refresh();
+              })}><option value="proposed">제안</option><option value="accepted">채택</option><option value="rejected">기각</option></select>
+            </div>;
+          })}
+        </details>
+        {otherIssues.map(issue => <div className="theory-change theory-review-issue" key={issue.id}><strong>{severityLabels[issue.severity]} · {issueKindLabels[issue.kind]}</strong>
+          <p>{issue.resolvedByRunId ? `재검사 후 사용자 해결 표시 · ${issue.resolvedByRunId}` : '미해결'}</p>
+          <p>{issue.explanation}</p><p>해결 조건: {issue.resolution}</p>
+          {!issue.resolvedByRunId && run.versionId !== snapshot.version.id && runs.some(recheck => recheck.versionId === snapshot.version.id && checkerCovers(run.checker, recheck.checker) && recheck.outcome === 'scope_passed' && !recheck.uncheckedBlockIds.length) &&
+            <button type="button" disabled={busy || dirty} onClick={() => {
+              if (!window.confirm('후속 버전의 전체 범위 재검사 결과와 해결 조건을 확인했습니까? 이 표시는 사용자의 해결 판단이며 이론의 참을 보증하지 않습니다.')) return;
+              const recheck = runs.find(recheck => recheck.versionId === snapshot.version.id && checkerCovers(run.checker, recheck.checker) && recheck.outcome === 'scope_passed' && !recheck.uncheckedBlockIds.length)!;
+              void execute(async () => { await resolveReviewIssue(run.id, issue.id, recheck.id); await refresh(); });
+            }}>재검사 결과 확인 · Issue 해결 표시</button>}
+          {issue.quotes.map((quote, index) => {
+            const block = current ? snapshot.blocks.find(item => item.id === issue.blockIds[index]) : null;
+            return <pre key={index}>{block ? `문단 ${block.position + 1}: ` : ''}{quote}</pre>;
+          })}
+          {run.patches.filter(patch => patch.issueIds.includes(issue.id)).map(patch => <div key={patch.id}>
+            <p>새 가정: {patch.introducedAssumptions || '선언 없음 (숨은 새 가정이 없는지는 사용자 확인 필요)'}</p>
+            <details><summary>수정 제안의 기술 정보</summary><p>변경 전 원문 hash: {patch.beforeHash}</p></details>
+            <div className="theory-diff"><pre>{snapshot.version.id === run.versionId ? snapshot.blocks.find(block => block.id === patch.blockId)?.text : '이전 버전의 원문'}</pre><pre>{patch.replacement}</pre></div>
+            <PatchImpact run={run} patch={patch} snapshot={snapshot} runs={runs} disabled={busy || dirty} onApply={impact => {
+              void execute(async () => { const saved = await applyTheoryPatch(run.id, patch.id, qaxiomDatabase, impact); setPreview(''); setGraphPreview(null); setSelected(saved.blocks.map(block => block.id)); onSaved(saved); await refresh(); });
+            }} onSelect={blockIds => { setSelected(blockIds); setPreview(''); setGraphPreview(null); setIncludeGraph(false); }} />
+          </div>)}
         </div>)}
-      </div>)}
-    </article>; })}
+      </article>;
+    })}
     {externalOriginal && <ReferenceSource evidence={externalOriginal} onClose={() => setExternalOriginal(null)} />}
   </section>;
 }

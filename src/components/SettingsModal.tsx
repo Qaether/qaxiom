@@ -106,9 +106,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     setWorkspaceStatus(null);
     try {
       const result = await onExportTheoryToFolder();
-      setWorkspaceStatus(`선택한 폴더의 ${result.folderName}에 현재 연구 문서 ${result.documentCount}개를 Markdown으로 저장했습니다. 전체 버전·근거는 별도 작업공간 JSON 백업에 보존됩니다.`);
+      setWorkspaceStatus(`선택한 폴더의 ${result.folderName}에 현재 연구노트 ${result.documentCount}개를 Markdown으로 저장했습니다. 전체 버전·근거는 별도 작업공간 JSON 백업에 보존됩니다.`);
     } catch (error) {
-      setWorkspaceStatus(error instanceof Error ? error.message : '연구 문서를 폴더에 저장하지 못했습니다.');
+      setWorkspaceStatus(error instanceof Error ? error.message : '연구노트를 폴더에 저장하지 못했습니다.');
     } finally {
       setIsWorkspaceBusy(false);
     }
@@ -309,7 +309,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <p className="input-hint">
               세션, 메시지, 문서와 위키 데이터를 버전형 JSON으로 저장합니다. API 키와 설정은 포함하지 않습니다.
               복원하면 현재 작업공간 데이터가 교체됩니다.
-              폴더 저장은 지원 브라우저의 보안 컨텍스트에서만 가능하며, 매번 새 이름의 백업을 만듭니다. 연구 문서 Markdown 저장은 현재 버전만 내보내므로 전체 복원에는 JSON 백업이 필요합니다.
+              폴더 저장은 지원 브라우저의 보안 컨텍스트에서만 가능하며, 매번 새 이름의 백업을 만듭니다. 연구노트 Markdown 저장은 현재 버전만 내보내므로 전체 복원에는 JSON 백업이 필요합니다.
             </p>
             <div className="workspace-transfer-actions">
               <button
@@ -336,10 +336,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 className="workspace-transfer-btn"
                 disabled={isWorkspaceBusy || !workspaceDirectoryPicker()}
                 onClick={() => void handleTheoryFolderExport()}
-                title={workspaceDirectoryPicker() ? '현재 연구 문서 버전을 Markdown 폴더로 내보내기' : '이 브라우저에서는 폴더 저장을 지원하지 않습니다.'}
+                title={workspaceDirectoryPicker() ? '현재 연구노트 버전을 Markdown 폴더로 내보내기' : '이 브라우저에서는 폴더 저장을 지원하지 않습니다.'}
               >
                 <Download size={15} />
-                연구 문서 Markdown 저장
+                연구노트 Markdown 저장
               </button>
               <button
                 type="button"
