@@ -268,7 +268,10 @@ export default function DocumentAnalysisView({
 
           {/* 전체 문맥 보기 (Full Document Context View) */}
           <div className="document-analysis-blocks">
-            {snapshot.blocks.map(block => {
+            {(filterMode === 'all'
+              ? snapshot.blocks
+              : snapshot.blocks.filter(block => displayedFindings.some(item => item.blockId === block.id))
+            ).map(block => {
               const blockFindings = displayedFindings.filter(item => item.blockId === block.id);
               return (
                 <section key={block.id} className="document-analysis-block">
