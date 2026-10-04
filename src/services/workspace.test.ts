@@ -91,12 +91,29 @@ async function seedWorkspace(database: QaxiomDatabase): Promise<void> {
 }
 
 describe('versioned workspace bundles', () => {
+  it('round-trips a document-linked session and its pinned request snapshot', async () => {
+    const snapshot = await createTheory({ title: '정본', markdown: '# 전제\n\nA', contract: { ...EMPTY_CONTRACT } }, source);
+    const { captureDocumentContext } = await import('./documentChat');
+    const context = await captureDocumentContext(snapshot.document.id, null, source);
+    await source.sessions.add({ id: 'linked', documentId: snapshot.document.id, position: 0, title: '검토',
+      createdAt: 1, updatedAt: 1, researchMode: 'general', selectedModel: 'gemini-3.8-flash' });
+    await source.messages.add({ id: 'answer', sessionId: 'linked', position: 0, role: 'assistant',
+      content: '답변', timestamp: 1, documentContext: context });
+    const bundle = await createWorkspaceBundle(source);
+    await restoreWorkspaceBundle(bundle, target);
+    expect((await target.sessions.get('linked'))?.documentId).toBe(snapshot.document.id);
+    expect((await target.messages.get(['linked', 'answer']))?.documentContext).toEqual(context);
+    const corrupted = structuredClone(bundle);
+    corrupted.data.messages[0].documentContext!.markdown = '변조';
+    await expect(restoreWorkspaceBundle(corrupted, target)).rejects.toThrow('hash');
+  });
+
   it('round-trips canonical revisions, contracts and block lineage in the current backup', async () => {
     const input = { title: '정본', markdown: '# 가정\n\nx > 0', contract: { ...EMPTY_CONTRACT, scope: '실수' } };
     const first = await createTheory(input, source);
     const second = await saveTheoryVersion(first.document.id, first.version.id, { ...input, markdown: '# 가정\n\nx > 1' }, source);
     const bundle = await createWorkspaceBundle(source);
-    expect(bundle.version).toBe(22);
+    expect(bundle.version).toBe(24);
     await restoreWorkspaceBundle(JSON.parse(serializeWorkspaceBundle(bundle)), target);
     expect(await loadTheory(first.document.id, target)).toEqual(second);
     expect((await createWorkspaceBundle(target)).data).toEqual(bundle.data);

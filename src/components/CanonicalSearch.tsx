@@ -36,10 +36,9 @@ export default function CanonicalSearch({ snapshot, query, selected, onSelect }:
     {error && <p role="alert">{error}</p>}
     {searched && !candidates.length && <p>일치하는 정본 용어가 없습니다. 용어를 바꾸거나 아래에서 목표를 직접 선택하세요. 관련 관계가 없다는 판정은 아닙니다.</p>}
     {candidates.map(candidate => <article key={candidate.block.id} aria-label={`정본 후보 블록 ${candidate.block.position + 1}`}>
-      <p>블록 {candidate.block.position + 1} · BM25 {candidate.score.toFixed(3)} · {candidate.error ? '연결 범위 미확인' : `추가 전제 ${candidate.premiseBlockIds.length} · 승인 관계 ${candidate.relationCount} · proof 순환 후보 ${candidate.proofCycleCount} · 외부 관계 미전송 ${candidate.excludedExternalCount}`}</p>
+      <p>블록 {candidate.block.position + 1} · BM25 {candidate.score.toFixed(3)} · 추가 전제 {candidate.premiseBlockIds.length} · 승인 관계 {candidate.relationCount} · proof 순환 후보 {candidate.proofCycleCount} · 외부 관계 미전송 {candidate.excludedExternalCount}</p>
       <pre>{candidate.block.text}</pre>
-      {candidate.error && <p role="alert">{candidate.error}</p>}
-      <button type="button" disabled={!!candidate.error} onClick={() => onSelect(candidate.block.id)}>{selected.includes(candidate.block.id) ? '후보 목표 선택 해제' : '이 후보를 목표에 추가'}</button>
+      <button type="button" onClick={() => onSelect(candidate.block.id)}>{selected.includes(candidate.block.id) ? '후보 목표 선택 해제' : '이 후보를 목표에 추가'}</button>
       <p>추가 전제는 최종 원문 미리보기에서 확인하세요. 선택 후 변경된 정본/관계는 전송 전에 다시 검사합니다.</p>
     </article>)}
   </section>;

@@ -54,43 +54,6 @@ export const ChatPanelHeader: React.FC<ChatPanelHeaderProps> = ({
   return (
     <div className="chat-panel-header">
       <div className="chat-panel-header-left">
-        {isEditingTitle ? (
-          <form onSubmit={handleTitleSubmit} className="title-edit-form">
-            <input
-              type="text"
-              className="title-edit-input"
-              aria-label="대화 제목 입력"
-              value={titleInput}
-              onChange={e => setTitleInput(e.target.value)}
-              autoFocus
-              onBlur={event => {
-                if (!event.currentTarget.form?.contains(event.relatedTarget as Node | null)) setIsEditingTitle(false);
-              }}
-              onKeyDown={event => {
-                if (event.key === 'Escape') finishTitleEditing();
-              }}
-            />
-            <button type="submit" className="title-save-btn" aria-label="대화 제목 저장">
-              <Check size={14} />
-            </button>
-          </form>
-        ) : (
-          <div className="title-display">
-            <h2 aria-label={currentSession.title || '새로운 연구 대화'}>
-              <button
-                ref={titleButtonRef}
-                type="button"
-                className="title-edit-btn"
-                onClick={() => { setTitleInput(currentSession.title); setIsEditingTitle(true); }}
-                aria-label={`${currentSession.title || '새로운 연구 대화'} 제목 수정`}
-              >
-                <span>{currentSession.title || '새로운 연구 대화'}</span>
-                <Edit3 size={13} className="edit-icon" />
-              </button>
-            </h2>
-          </div>
-        )}
-
         {/* Mode Selector */}
         <div className="chat-panel-mode-wrapper">
           <label htmlFor="chat-panel-mode-select" className="chat-panel-mode-label">모드</label>
@@ -108,16 +71,55 @@ export const ChatPanelHeader: React.FC<ChatPanelHeaderProps> = ({
             ))}
           </select>
         </div>
+
+        <h2 className="sr-only" aria-label={currentSession.title || '새로운 연구 대화'}>
+          {currentSession.title || '새로운 연구 대화'}
+        </h2>
+
+        {isEditingTitle && (
+          <form onSubmit={handleTitleSubmit} className="title-edit-form chat-title-edit-form">
+            <input
+              type="text"
+              className="title-edit-input"
+              aria-label="대화 제목 입력"
+              value={titleInput}
+              onChange={e => setTitleInput(e.target.value)}
+              autoFocus
+              onBlur={event => {
+                if (!event.currentTarget.form?.contains(event.relatedTarget as Node | null)) setIsEditingTitle(false);
+              }}
+              onKeyDown={event => {
+                if (event.key === 'Escape') finishTitleEditing();
+              }}
+            />
+            <button type="submit" className="title-save-btn topbar-tooltip" data-tooltip="대화 제목 저장" aria-label="대화 제목 저장">
+              <Check size={14} />
+            </button>
+          </form>
+        )}
       </div>
 
       <div className="chat-panel-header-right">
+        {!isEditingTitle && (
+          <button
+            ref={titleButtonRef}
+            type="button"
+            className="title-edit-btn chat-title-toggle-btn topbar-tooltip"
+            onClick={() => { setTitleInput(currentSession.title); setIsEditingTitle(true); }}
+            data-tooltip="제목 변경"
+            aria-label={`${currentSession.title || '새로운 연구 대화'} 제목 수정`}
+          >
+            <Edit3 size={16} aria-hidden="true" />
+          </button>
+        )}
+
         {/* Chat History Toggle Button (Rotate Arrow) */}
         {onToggleHistory && (
           <button
             type="button"
-            className={`chat-panel-action-btn chat-history-toggle-btn ${isHistoryOpen ? 'active' : ''}`}
+            className={`chat-panel-action-btn chat-history-toggle-btn topbar-tooltip ${isHistoryOpen ? 'active' : ''}`}
             onClick={onToggleHistory}
-            title="대화 기록 보기 (이전 대화 목록 열기/닫기)"
+            data-tooltip="대화 기록"
             aria-label="대화 기록 보기"
             aria-expanded={isHistoryOpen}
           >
@@ -128,9 +130,9 @@ export const ChatPanelHeader: React.FC<ChatPanelHeaderProps> = ({
         {/* Export Markdown Button */}
         <button
           type="button"
-          className="chat-panel-action-btn chat-export-btn"
+          className="chat-panel-action-btn chat-export-btn topbar-tooltip"
           onClick={handleExportMarkdown}
-          title={currentSession.messages.length === 0 ? "대화 내용 Markdown 내보내기 (대화 내역이 있을 때 가능)" : "대화 내용 Markdown 파일로 저장"}
+          data-tooltip="대화 내보내기"
           aria-label="대화 내용 Markdown 내보내기"
           disabled={currentSession.messages.length === 0}
         >
@@ -140,9 +142,9 @@ export const ChatPanelHeader: React.FC<ChatPanelHeaderProps> = ({
         {/* New Session Button */}
         <button
           type="button"
-          className="chat-panel-action-btn chat-panel-new-chat-btn"
+          className="chat-panel-action-btn chat-panel-new-chat-btn topbar-tooltip"
           onClick={onNewSession}
-          title="새 연구 대화 시작 (새 대화 세션 생성)"
+          data-tooltip="새 대화"
           aria-label="새 대화 시작"
         >
           <Plus size={16} />

@@ -38,10 +38,12 @@ export function saveSessions(sessions: ChatSession[]): Promise<void> {
 
 export function createNewSession(
   mode: ResearchMode = 'general',
-  model: string = DEFAULT_SETTINGS.defaultModel
+  model: string = DEFAULT_SETTINGS.defaultModel,
+  documentId: string | null = null
 ): ChatSession {
   const newSession: ChatSession = {
     id: 'session_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+    documentId,
     title: '새로운 연구 대화',
     createdAt: Date.now(),
     updatedAt: Date.now(),

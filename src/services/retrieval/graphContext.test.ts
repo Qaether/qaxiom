@@ -117,7 +117,7 @@ it('imports genuine v11 graph answers and migrates populated v11 without requiri
   await target.delete(); const legacy = new Dexie(target.name);
   legacy.version(11).stores(Object.fromEntries(db.tables.map(t => [t.name, [t.schema.primKey.src, ...t.schema.indexes.map(i => i.src)].join(',')])));
   for (const table of db.tables) await legacy.table(table.name).bulkAdd(await table.toArray());
-  legacy.close(); await target.open(); expect(target.verno).toBe(23); expect((await target.messages.get(['s', 'm']))!.contextBundle).toEqual(bundle);
+  legacy.close(); await target.open(); expect(target.verno).toBe(25); expect((await target.messages.get(['s', 'm']))!.contextBundle).toEqual(bundle);
 });
 it.each(['gemini-3.1-pro-preview', 'gpt-6-astra', 'claude-sonnet-5'])('routes a graph-only question without any reference payload to %s', async model => {
   const { snapshot, graph } = await fixture(); const bundle = assembleContext('Only theory', [], [], { references: [], referenceSpans: [] }, snapshot.version, graph);
@@ -143,7 +143,7 @@ it('invalidates changed relations, accepted claims, selected reference provenanc
 });
 it('restores frozen graph answers after subsequent retraction, exports original context and rejects tampering atomically', async () => {
   const { bundle, relation } = await fixture(); await storeBundle(bundle); await retractRelation(relation.id, 'Later retraction', db);
-  const backup = await createWorkspaceBundle(db); expect(backup.version).toBe(22); await restoreWorkspaceBundle(backup, target);
+  const backup = await createWorkspaceBundle(db); expect(backup.version).toBe(24); await restoreWorkspaceBundle(backup, target);
   expect((await target.messages.get(['s', 'm']))!.contextBundle!.graph).toEqual(bundle.graph);
   const report = sessionToMarkdown({ id: 's', title: 'Session', createdAt: 1, updatedAt: 1, researchMode: 'general', selectedModel: 'gemini-3.1-pro-preview', messages: backup.data.messages });
   expect(report).toContain(bundle.graph!.context.contextHash); expect(report).toContain('[[G1]]'); expect(report).not.toContain('PRIVATE');
@@ -161,7 +161,7 @@ it('imports legacy v10 answers without inventing graph evidence and migrates a p
   await target.delete(); const legacy = new Dexie(target.name);
   legacy.version(10).stores(Object.fromEntries(db.tables.map(t => [t.name, [t.schema.primKey.src, ...t.schema.indexes.map(i => i.src)].join(',')])));
   for (const table of db.tables) await legacy.table(table.name).bulkAdd(await table.toArray());
-  legacy.close(); await target.open(); expect(target.verno).toBe(23); expect(await target.messages.count()).toBe(1);
+  legacy.close(); await target.open(); expect(target.verno).toBe(25); expect(await target.messages.count()).toBe(1);
 });
 it.each(['gemini-3.1-pro-preview', 'gpt-6-astra', 'claude-sonnet-5'])('sends approved graph as untrusted citation data and defers completion validation for %s', async model => {
   const { bundle } = await fixture(); const actual = assertGraphContextCurrent;

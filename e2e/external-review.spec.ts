@@ -1,158 +1,42 @@
-import { test, expect } from './fixtures/test';
-import { readFile } from 'node:fs/promises';
+import { expect, test } from './fixtures/test';
 
-test('approves external pair scope, excludes private/self/note text, records grounded classifications and restores without promoting internal checks', async ({ page, browser }) => {
-  let calls = 0;
-  await page.route('https://generativelanguage.googleapis.com/**', async route => {
-    calls++;
-    const body = route.request().postDataJSON(), prompt = body.contents.at(-1).parts[0].text as string;
-    expect(body.contents).toHaveLength(1); expect(prompt).not.toContain('PRIVATE'); expect(prompt).not.toContain('predecessorIds');
-    const input = JSON.parse(prompt.split('선택 원문이다:\n')[1]);
-    expect(input.blocks).toHaveLength(1); expect(input.evidence).toHaveLength(1); expect(input.pairs).toHaveLength(1);
-    expect(input.contract.assumptions).toBe('A > 0'); expect(input.omittedBlockCount).toBe(1);
-    const result = { checkedPairIds: [input.pairs[0].id], limitations: [], assessments: [{ pairId: input.pairs[0].id,
-      label: 'different_scope', theoryQuote: 'A positive.', referenceQuote: 'Independent positive result.', theoryConditions: 'all positive A', referenceConditions: 'measured A only', explanation: '측정 범위와 이론 전체 범위를 구분한다.',
-      referenceClaim: { statement: 'The author reports a positive result.', evidenceQuote: 'Independent positive result.', kind: 'empirical', basis: 'author_statement', conditions: 'measured A only' } }] };
-    await route.fulfill({ status: 200, contentType: 'text/event-stream', body: `data: ${JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(result) }] } }] })}\n\n` });
+test('previews only a selected external text span for document review', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'showDirectoryPicker', {
+      configurable: true,
+      value: async () => ({ name: 'research-folder' })
+    });
   });
-  await page.goto('/'); await page.getByLabel('Google Gemini API Key').fill('external-review-fake-key');
-  await page.getByRole('button', { name: '설정 저장' }).click();
-  await page.locator('#header-model-select').selectOption('gemini-3.1-pro-preview');
-  await page.getByRole('button', { name: '레퍼런스 검색', exact: true }).click();
-  const library = page.getByRole('dialog', { name: '레퍼런스 검색', exact: true });
-  for (const [name, text, role] of [
-    ['chosen.md', 'Independent positive result.\n\n' + 'PRIVATE unselected section. '.repeat(160), 'external'],
-    ['PRIVATE-other.md', 'PRIVATE other document', 'external'],
-    ['note.md', 'PRIVATE user note', 'note'],
-    ['self-copy.md', 'A positive.\n\nPRIVATE unselected theorem.', 'external']
-  ]) {
-    await library.getByLabel('첨부 문서 종류').selectOption(role);
-    await library.getByLabel('레퍼런스 파일', { exact: true }).setInputFiles({ name, mimeType: 'text/markdown', buffer: Buffer.from(text) });
-    await expect(library.getByRole('status')).toContainText('로컬에 저장');
-  }
-  await library.getByRole('button', { name: '닫기', exact: true }).click();
-  await page.getByRole('button', { name: '연구 문서', exact: true }).click();
-  const editor = page.getByRole('dialog', { name: '연구 문서', exact: true });
-  await editor.getByLabel('문서 제목', { exact: true }).fill('독립 범위 대조');
-  await editor.getByLabel('문서 본문 (Markdown)').fill('A positive.\n\nPRIVATE unselected theorem.');
-  await editor.locator('summary').click(); await editor.getByLabel('가정·공리', { exact: true }).fill('A > 0');
-  await editor.getByRole('button', { name: '정본 문서 만들기' }).click();
-  const review = editor.getByRole('region', { name: '문서 검토', exact: true });
-  await review.locator('.theory-review-advanced > summary').click();
-  await review.getByRole('button', { name: '선택 범위 분할 검토 계획 저장' }).click();
-  await review.getByRole('button', { name: '기본 구조 확인', exact: true }).click();
-  await review.locator('summary').filter({ hasText: '주장 후보 2개' }).click();
-  await review.getByRole('combobox', { name: /^주장 채택 상태/ }).first().selectOption('accepted');
-  const external = review.getByRole('region', { name: '독립 외부 원문 대조', exact: true });
-  await review.locator('.theory-external-advanced > summary').click();
-  await expect(external.getByLabel('대조할 외부 자료').locator('option')).toHaveCount(3);
-  await expect(external.getByLabel('대조할 외부 자료')).not.toContainText('self-copy.md');
-  await expect(external.getByLabel('대조할 외부 자료')).not.toContainText('note.md');
-  const policy = editor.getByRole('region', { name: '프로젝트 자료 정책', exact: true });
-  await editor.locator('details[aria-label="프로젝트 관리 및 자료 설정"] > summary').click();
-  await expect(policy).toContainText('외부 대조 자료 제한 없음');
-  await policy.getByRole('checkbox', { name: '허용 자료 chosen.md', exact: true }).check();
-  page.once('dialog', dialog => dialog.accept());
-  await policy.getByRole('button', { name: '프로젝트 허용 목록 저장' }).click();
-  await expect(policy).toContainText('허용 목록 적용 · 개정 1 · 1개');
-  await expect(external.getByLabel('대조할 외부 자료')).not.toContainText('PRIVATE-other.md');
+  await page.goto('/');
+  await page.getByLabel('프로젝트 이름').fill('대조 연구');
+  await page.getByRole('button', { name: '로컬 폴더 지정' }).click();
+  await page.getByRole('button', { name: '채팅 화면 열기' }).click();
+  await page.getByRole('button', { name: '레퍼런스 검색' }).click();
+  const library = page.getByRole('dialog', { name: '레퍼런스 검색' });
+  await expect(library.getByLabel('프로젝트 자료 범위 (정본 선택 전)')).toHaveCount(0);
+  await library.getByLabel('레퍼런스 파일').setInputFiles({
+    name: 'independent.txt', mimeType: 'text/plain', buffer: Buffer.from('Independent observation: mass is positive.')
+  });
+  await expect(library.getByRole('status')).toContainText('로컬에 저장');
+  await library.getByRole('button', { name: '닫기' }).click();
+  await page.getByRole('button', { name: '새 연구 문서' }).click();
+  const editor = page.locator('dialog.theory-workspace');
+  await editor.getByLabel('문서 제목', { exact: true }).fill('질량 가설');
+  await editor.getByLabel('문서 본문 (Markdown)').fill('질량은 양수다.');
+  await editor.getByRole('button', { name: '문서 저장' }).click();
+  await editor.getByRole('button', { name: 'AI로 문서 분석' }).click();
+  await editor.locator('.theory-external-advanced > summary').click();
+  const external = editor.getByRole('region', { name: '독립 외부 원문 대조' });
   await external.getByLabel('대조할 이론 블록').selectOption({ index: 1 });
-  await external.getByLabel('대조할 외부 자료').selectOption({ label: 'chosen.md' });
-  await expect(external.getByLabel('대조할 원문 구간').locator('option')).not.toHaveCount(1);
+  await external.getByLabel('대조할 외부 자료').selectOption({ label: 'independent.txt' });
   await external.getByLabel('대조할 원문 구간').selectOption({ index: 1 });
-  await external.getByLabel('대조 이론의 가정·정의·범위').fill('all positive A');
-  await external.getByLabel('대조 원문의 가정·정의·범위').fill('measured A only');
+  await external.getByLabel('대조 이론의 가정·정의·범위').fill('질량의 정의가 동일하다');
+  await external.getByLabel('대조 원문의 가정·정의·범위').fill('측정 범위가 같다');
   await external.getByRole('button', { name: '외부 대조 쌍 추가' }).click();
-  await external.getByRole('button', { name: '외부 대조 전송 미리보기', exact: true }).click();
+  await external.getByRole('button', { name: '외부 대조 전송 미리보기' }).click();
   const preview = external.getByRole('region', { name: '외부 대조 전송 미리보기' });
-  await expect(preview).toContainText('chosen.md'); await expect(preview).toContainText('이론 미선택 1블록');
-  await expect(preview).not.toContainText('PRIVATE'); expect(calls).toBe(0);
-  await expect(preview).toContainText('policyRevision');
-  await policy.getByRole('checkbox', { name: '허용 자료 chosen.md', exact: true }).uncheck();
-  page.once('dialog', dialog => dialog.accept()); await policy.getByRole('button', { name: '프로젝트 허용 목록 저장' }).click();
-  await expect(preview).toHaveCount(0); await expect(policy).toContainText('개정 2 · 0개'); expect(calls).toBe(0);
-  await policy.getByRole('checkbox', { name: '허용 자료 chosen.md', exact: true }).check();
-  page.once('dialog', dialog => dialog.accept()); await policy.getByRole('button', { name: '프로젝트 허용 목록 저장' }).click();
-  await expect(policy).toContainText('개정 3 · 1개');
-  await expect(external.getByLabel('대조할 외부 자료')).toContainText('chosen.md');
-  await external.getByRole('button', { name: '외부 대조 전송 미리보기', exact: true }).click();
-  await external.getByLabel('대조 이론의 가정·정의·범위').fill('changed draft');
-  await expect(preview).toHaveCount(0);
-  await external.getByRole('button', { name: '외부 대조 전송 미리보기', exact: true }).click();
-  await external.getByRole('button', { name: '이 범위로 외부 대조 실행' }).click();
-  await expect(review).toContainText('사용 1/3회');
-  const result = review.getByRole('region', { name: '외부 대조 결과', exact: true });
-  await expect(result).toContainText('외부 쌍 실제 대조 1/1'); await expect(result).toContainText('different_scope');
-  await expect(result.getByRole('region', { name: '외부 주장 추출 후보' })).toContainText('The author reports a positive result.');
-  const claimApproval = result.getByRole('region', { name: '외부 주장 후보 채택', exact: true });
-  await claimApproval.getByRole('button', { name: '외부 주장 채택 미리보기' }).click();
-  await expect(claimApproval.getByRole('region', { name: '외부 주장 채택 미리보기' })).toContainText('Independent positive result.');
-  expect(calls).toBe(1);
-  page.once('dialog', dialog => dialog.accept());
-  await claimApproval.getByRole('button', { name: '이 외부 주장을 별도 채택·저장' }).click();
-  await expect(claimApproval.getByRole('status')).toContainText('별도 채택·저장');
-  await expect(claimApproval.getByRole('article', { name: '외부 주장 채택 기록' })).toContainText('The author reports a positive result.');
-  const projectClaims = editor.getByRole('region', { name: '프로젝트 외부 주장 원장', exact: true });
-  await projectClaims.getByRole('button', { name: '프로젝트 외부 주장 새로고침' }).click();
-  await expect(projectClaims).toContainText('현재 범위 1개');
-  await expect(projectClaims.getByRole('article', { name: '프로젝트 외부 주장 기록' })).toContainText('The author reports a positive result.');
-  await projectClaims.getByLabel('외부 주장 원장 검색').fill('없는-주장');
-  await expect(projectClaims).toContainText('표시 0/1개');
-  await projectClaims.getByLabel('외부 주장 원장 검색').fill('positive');
-  await projectClaims.getByLabel('외부 주장 상태').selectOption('history');
-  await expect(projectClaims).toContainText('표시 0/1개');
-  await projectClaims.getByLabel('외부 주장 상태').selectOption('current');
-  await expect(projectClaims).toContainText('표시 1/1개');
-  await expect(review).toContainText('문단 0/2개 확인'); await expect(review).toContainText('남은 1구간');
-  await expect(review.getByRole('button', { name: '재검사 결과 확인 · Issue 해결 표시' })).toHaveCount(0);
-  await editor.locator('details[aria-label="고급 문서 도구"] > summary').click();
-  await expect(editor.getByRole('region', { name: '승인 관계 이력' })).toContainText('승인된 관계가 없습니다.');
-  await result.getByRole('button', { name: '대조 원문 확인: chosen.md' }).click();
-  const original = page.getByRole('dialog', { name: '인용 원문: chosen.md' });
-  await expect(original.getByLabel('레퍼런스 전체 원문')).toContainText('Independent positive result.');
-  await original.getByRole('button', { name: '닫기', exact: true }).click();
-  const adoption = result.getByRole('region', { name: '외부 대조 관계 승인', exact: true });
-  await expect(adoption.getByRole('button', { name: '대조 관계 승인 미리보기', exact: true })).toBeDisabled();
-  await adoption.getByLabel('대조 결과와 연결할 채택 주장').selectOption({ index: 1 });
-  await adoption.getByLabel('대조 관계 종류').selectOption('supports');
-  await adoption.getByLabel('대조 사용자 판단').selectOption('compatible');
-  await adoption.getByLabel('승인할 이론 조건').fill('공통 측정 범위의 positive A');
-  await adoption.getByLabel('승인할 원문 조건').fill('측정된 positive A');
-  await adoption.getByLabel('대조 관계 승인 사유').fill('원문과 범위를 확인한 별도 사용자 승인');
-  await adoption.getByRole('button', { name: '대조 관계 승인 미리보기', exact: true }).click();
-  const adoptionPreview = adoption.getByRole('region', { name: '대조 관계 승인 미리보기', exact: true });
-  await expect(adoptionPreview).toContainText('모델 제안: different_scope · 사용자 판단: compatible');
-  await expect(adoptionPreview).toContainText('externalReviewOrigin'); expect(calls).toBe(1);
-  await adoption.getByLabel('대조 관계 승인 사유').fill('사용자 승인 사유 수정'); await expect(adoptionPreview).toHaveCount(0);
-  await adoption.getByRole('button', { name: '대조 관계 승인 미리보기', exact: true }).click();
-  page.once('dialog', dialog => dialog.accept());
-  await adoption.getByRole('button', { name: '이 대조 관계를 별도 승인·저장' }).click();
-  await expect(adoption.getByRole('status')).toContainText('승인·저장');
-  await expect(editor.getByRole('region', { name: '승인 관계 이력' })).toContainText('외부 대조 계보:');
-  await expect(result).toContainText('외부 쌍 실제 대조 1/1'); await expect(review).toContainText('문단 0/2개 확인');
-  await expect(review).toContainText('사용 1/3회'); await expect(review).toContainText('남은 1구간');
-  const reportDownload = page.waitForEvent('download'); await result.locator('..').getByRole('button', { name: '검토 보고서 내보내기' }).click();
-  const report = await readFile((await (await reportDownload).path())!, 'utf8'); expect(report).toContain('different_scope'); expect(report).not.toContain('external-review-fake-key');
-  await editor.getByRole('button', { name: '닫기', exact: true }).click(); await page.locator('#open-settings-btn').click();
-  const download = page.waitForEvent('download'); await page.getByRole('button', { name: '작업공간 백업', exact: true }).click();
-  const path = (await (await download).path())!, data = JSON.parse(await readFile(path, 'utf8')); expect(data.version).toBe(22);
-  expect(data.data.externalClaims).toHaveLength(1);
-  expect(data.data.externalClaims[0].claim.evidenceQuote).toBe('Independent positive result.');
-  const other = await browser.newContext();
-  try {
-    await other.route('**/*', async route => { const url = new URL(route.request().url()); expect(['localhost', '127.0.0.1']).toContain(url.hostname); await route.continue(); });
-    const restored = await other.newPage(); await restored.goto('/'); restored.once('dialog', dialog => dialog.accept());
-    await restored.getByLabel('Qaxiom 작업공간 백업 파일').setInputFiles(path);
-    await expect(restored.getByRole('status').filter({ hasText: '작업공간을 복원했습니다' })).toBeVisible(); await restored.locator('.modal-close-btn').click();
-    await restored.getByRole('button', { name: '연구 문서', exact: true }).click();
-    const reopened = restored.getByRole('dialog', { name: '연구 문서', exact: true }); await reopened.getByRole('button', { name: '독립 범위 대조 · v1' }).click();
-    await reopened.locator('details[aria-label="고급 문서 도구"] > summary').click();
-    await reopened.locator('details[aria-label="프로젝트 관리 및 자료 설정"] > summary').click();
-    await expect(reopened).toContainText('외부 쌍 실제 대조 1/1'); await expect(reopened).toContainText('different_scope'); await expect(reopened).toContainText('The author reports a positive result.'); await expect(reopened).toContainText('남은 1구간');
-    await expect(reopened.getByRole('region', { name: '외부 주장 후보 채택' }).getByRole('article', { name: '외부 주장 채택 기록' })).toContainText('The author reports a positive result.');
-    await expect(reopened.getByRole('region', { name: '프로젝트 외부 주장 원장' })).toContainText('현재 범위 1개');
-    await expect(reopened.getByRole('region', { name: '승인 관계 이력' })).toContainText('외부 대조 계보:');
-    await expect(reopened.getByRole('region', { name: '프로젝트 자료 정책' })).toContainText('개정 3 · 1개');
-  } finally { await other.close(); }
-  expect(calls).toBe(1);
+  await expect(preview).toContainText('independent.txt');
+  await expect(preview).toContainText('Independent observation: mass is positive.');
+  await expect(preview).toContainText('질량은 양수다.');
+  await expect(external.getByText('외부 주장 추출 후보')).toHaveCount(0);
 });

@@ -32,7 +32,7 @@ describe('text reference retrieval', () => {
     for (const table of oldTables) await legacy.table(table.name).bulkAdd(await target.table(table.name).toArray());
     legacy.close();
     await db.open();
-    expect(db.verno).toBe(23);
+    expect(db.verno).toBe(25);
     expect(await db.document_versions.get(theory.version.id)).toEqual(theory.version);
     expect(await db.document_blocks.count()).toBe(theory.blocks.length);
     expect(await db.references.count()).toBe(0);
@@ -121,7 +121,7 @@ describe('text reference retrieval', () => {
     await db.sessions.add({ id: 's', position: 0, title: '인용', createdAt: 1, updatedAt: 1, selectedModel: 'gpt-6-astra', researchMode: 'general' });
     await db.messages.add({ id: 'a', sessionId: 's', position: 0, role: 'assistant', content: '답변 [[R1]]', timestamp: 1, contextBundle: bundle });
     const backup = await createWorkspaceBundle(db);
-    expect(backup.version).toBe(22);
+    expect(backup.version).toBe(24);
     expect(backup.markdown[0].content).toContain('전송한 원문 근거');
     await restoreWorkspaceBundle(JSON.parse(JSON.stringify(backup)), target);
     expect((await createWorkspaceBundle(target)).data).toEqual(backup.data);

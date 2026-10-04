@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { QaxiomDatabase } from '../database';
 import { createWorkspaceBundle, restoreWorkspaceBundle } from '../workspace';
 import { createTheory, loadTheory, saveTheoryVersion } from './documents';
-import { moveTheoryProject } from './projects';
+import { seedLegacyProjectMove as moveTheoryProject } from './legacyProjectFixtures';
 import { runLocalReview } from './reviews';
 import { deleteTheory, prepareTheoryDeletion } from './theoryDeletion';
 import { EMPTY_CONTRACT } from './types';
@@ -14,6 +14,18 @@ beforeEach(() => { db = new QaxiomDatabase(`theory-delete-${crypto.randomUUID()}
 afterEach(async () => { await db.delete(); await target.delete(); });
 
 describe('research document deletion', () => {
+  it('removes an empty document chat but blocks deletion while that chat has messages', async () => {
+    const snapshot = await createTheory(input(), db);
+    await db.sessions.add({ id: 'linked', documentId: snapshot.document.id, position: 0, title: '새로운 연구 대화',
+      createdAt: 1, updatedAt: 1, researchMode: 'general', selectedModel: 'gemini-3.8-flash' });
+    const preview = await prepareTheoryDeletion(snapshot.document.id, snapshot.version.id, db);
+    await db.messages.add({ sessionId: 'linked', id: 'question', position: 0, role: 'user', content: '질문', timestamp: 1 });
+    await expect(deleteTheory(preview, db)).rejects.toThrow('대화가 남아');
+    await db.messages.clear();
+    await deleteTheory(preview, db);
+    expect(await db.sessions.get('linked')).toBeUndefined();
+  });
+
   it('removes own versions, blocks, reviews and campaign atomically while preserving unrelated data and valid backup', async () => {
     const first = await createTheory(input(), db);
     const second = await saveTheoryVersion(first.document.id, first.version.id, { ...input(), markdown: '# 가정\n\nA > 1' }, db);

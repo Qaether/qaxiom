@@ -1,4 +1,4 @@
-import type { ChatSession, WikiPage } from '../types';
+import type { ChatSession, DocumentChatContext, WikiPage } from '../types';
 import {
   type DocumentChunkRecord,
   type DocumentRecord,
@@ -31,9 +31,12 @@ import { verifyPatchImpactHashes } from './theory/patchImpact';
 import { externalContextHash, verifyExternalHashes } from './theory/externalReview';
 import { parseExternalClaimData, verifyExternalClaimHashes, type ExternalClaimData } from './theory/externalClaims';
 import { parseExternalClaimLinkData, verifyExternalClaimLinkHashes, type ExternalClaimLinkData } from './theory/externalClaimLinks';
+import { verifyDocumentContext } from './documentChat';
+import { EMPTY_CONTRACT } from './theory/types';
+import { parseAnalysisRuns, type AnalysisRun } from './theory/analysis';
 
 export const WORKSPACE_FORMAT = 'qaxiom-workspace';
-export const WORKSPACE_VERSION = 22;
+export const WORKSPACE_VERSION = 24;
 
 export interface WorkspaceMarkdownDocument {
   sessionId: string;
@@ -55,6 +58,7 @@ export interface WorkspaceBundle {
     jobs: JobRecord[];
     pdfAssets: PdfAssetBackup[];
     reviewCampaigns: ReviewCampaign[];
+    analysisRuns: AnalysisRun[];
   };
   markdown: WorkspaceMarkdownDocument[];
 }
@@ -140,7 +144,7 @@ export async function createWorkspaceBundle(
     version: WORKSPACE_VERSION,
     exportedAt: new Date().toISOString(),
     data: {
-      sessions, messages, documents, documentChunks, wikiPages, sourceSpans, jobs,
+      sessions: sessions.map(session => ({ ...session, documentId: session.documentId ?? null })), messages, documents, documentChunks, wikiPages, sourceSpans, jobs,
       projects: await database.projects.toArray(),
       theoryDocuments: await database.theory_documents.toArray(),
       documentVersions: await database.document_versions.toArray(),
@@ -149,6 +153,7 @@ export async function createWorkspaceBundle(
       referenceSpans: await database.reference_spans.toArray(),
       pdfAssets: (await database.pdf_assets.toArray()).map(encodePdfAsset),
       reviewRuns: await database.review_runs.toArray(),
+      analysisRuns: await database.analysis_runs.toArray(),
       reviewCampaigns: await database.review_campaigns.toArray(),
       embeddingSpaces: await database.embedding_spaces.toArray(),
       embeddingVectors: await database.embedding_vectors.toArray(),
@@ -202,8 +207,25 @@ function assertUnique(values: string[], label: string): void {
   if (new Set(values).size !== values.length) throw new Error(`${label} ID가 중복되었습니다.`);
 }
 
+function parseDocumentChatContext(value: unknown, theory: TheoryData): DocumentChatContext {
+  const contract = isRecord(value) ? value.contract : undefined;
+  if (!isRecord(value) || typeof value.documentId !== 'string' || typeof value.title !== 'string'
+    || typeof value.markdown !== 'string' || typeof value.contentHash !== 'string'
+    || typeof value.capturedAt !== 'number' || !Number.isFinite(value.capturedAt)
+    || value.versionId !== null && typeof value.versionId !== 'string'
+    || !isRecord(contract)
+    || Object.keys(EMPTY_CONTRACT).some(key => typeof contract[key] !== 'string')) {
+    throw new Error('대화의 기준 연구문서 문맥 형식이 올바르지 않습니다.');
+  }
+  if (!theory.theoryDocuments.some(document => document.id === value.documentId)
+    || value.versionId && !theory.documentVersions.some(version => version.id === value.versionId && version.documentId === value.documentId)) {
+    throw new Error('대화의 기준 연구문서 또는 버전 참조가 올바르지 않습니다.');
+  }
+  return value as unknown as DocumentChatContext;
+}
+
 export function parseWorkspaceBundle(value: unknown): WorkspaceBundle {
-  if (!isRecord(value) || value.format !== WORKSPACE_FORMAT || ![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, WORKSPACE_VERSION].includes(Number(value.version)) || typeof value.version !== 'number') {
+  if (!isRecord(value) || value.format !== WORKSPACE_FORMAT || ![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, WORKSPACE_VERSION].includes(Number(value.version)) || typeof value.version !== 'number') {
     throw new Error('지원하지 않는 Qaxiom 작업공간 형식 또는 버전입니다.');
   }
   if (typeof value.exportedAt !== 'string' || !isRecord(value.data)) {
@@ -224,6 +246,7 @@ export function parseWorkspaceBundle(value: unknown): WorkspaceBundle {
   const references = Number(value.version) >= 3 ? parseReferenceData(value.data, theory.documentVersions, pdfAssets) : { references: [], referenceSpans: [] };
   if (theory.projects.some(p => p.sourcePolicy?.allowedSourceIds.some(id => !references.references.some(s => s.id === id)))) throw new Error('프로젝트 허용 자료 참조가 올바르지 않습니다. 기존 작업공간을 유지합니다.');
   const review = Number(value.version) >= 5 ? parseReviewData(value.data, theory, references) : { reviewRuns: [] };
+  const analysisRuns = Number(value.version) >= 24 ? parseAnalysisRuns(value.data.analysisRuns, theory) : [];
   const reviewCampaigns = Number(value.version) >= 6 ? parseCampaigns(value.data.reviewCampaigns, theory, review.reviewRuns, references) : [];
   const embeddings = Number(value.version) >= 7 ? parseEmbeddingData(value.data, references, Number(value.version) >= 8)
     : { embeddingSpaces: [], embeddingVectors: [], embeddingManifests: [], embeddingActivations: [] };
@@ -236,6 +259,8 @@ export function parseWorkspaceBundle(value: unknown): WorkspaceBundle {
 
   const sessions = sessionValues.map(record => ({
     id: requireString(record, 'id'),
+    documentId: Number(value.version) >= 23
+      ? record.documentId === null ? null : requireString(record, 'documentId') : null,
     position: requireNumber(record, 'position'),
     title: requireString(record, 'title'),
     createdAt: requireNumber(record, 'createdAt'),
@@ -251,7 +276,9 @@ export function parseWorkspaceBundle(value: unknown): WorkspaceBundle {
     role: requireString(record, 'role') as MessageRecord['role'],
     content: requireText(record, 'content'),
     timestamp: requireNumber(record, 'timestamp'),
-    ...(record.contextBundle !== undefined ? { contextBundle: parseContextBundle(record.contextBundle, references, theory.documentVersions, embeddings, { theory, reviews: review, relations }) } : {})
+    ...(record.contextBundle !== undefined ? { contextBundle: parseContextBundle(record.contextBundle, references, theory.documentVersions, embeddings, { theory, reviews: review, relations }) } : {}),
+    ...(Number(value.version) >= 23 && record.documentContext !== undefined
+      ? { documentContext: parseDocumentChatContext(record.documentContext, theory) } : {})
   } as MessageRecord));
   const documents = documentValues.map(record => ({
     ...record,
@@ -309,6 +336,14 @@ export function parseWorkspaceBundle(value: unknown): WorkspaceBundle {
   assertUnique(jobs.map(record => record.id), '작업');
 
   const sessionIds = new Set(sessions.map(record => record.id));
+  const theoryIds = new Set(theory.theoryDocuments.map(record => record.id));
+  if (sessions.some(record => record.documentId !== null && !theoryIds.has(record.documentId))) {
+    throw new Error('대화 세션의 기준 연구문서가 존재하지 않습니다.');
+  }
+  const sessionDocuments = new Map(sessions.map(record => [record.id, record.documentId]));
+  if (messages.some(record => record.documentContext && record.documentContext.documentId !== sessionDocuments.get(record.sessionId))) {
+    throw new Error('대화 메시지의 기준 연구문서가 세션과 다릅니다.');
+  }
   const documentIds = new Set(documents.map(record => record.id));
   if (messages.some(record => !sessionIds.has(record.sessionId))) {
     throw new Error('존재하지 않는 세션을 참조하는 메시지가 있습니다.');
@@ -324,7 +359,7 @@ export function parseWorkspaceBundle(value: unknown): WorkspaceBundle {
     format: WORKSPACE_FORMAT,
     version: WORKSPACE_VERSION,
     exportedAt: value.exportedAt,
-    data: { sessions, messages, documents, documentChunks, wikiPages, sourceSpans, jobs, ...theory, ...references, ...review, ...embeddings, ...relations, ...externalClaims, ...externalClaimLinks, reviewCampaigns, pdfAssets: pdfAssets.map(encodePdfAsset) },
+    data: { sessions, messages, documents, documentChunks, wikiPages, sourceSpans, jobs, ...theory, ...references, ...review, ...embeddings, ...relations, ...externalClaims, ...externalClaimLinks, reviewCampaigns, analysisRuns, pdfAssets: pdfAssets.map(encodePdfAsset) },
     markdown: []
   };
 }
@@ -335,6 +370,7 @@ export async function restoreWorkspaceBundle(
 ): Promise<WorkspaceBundle> {
   const bundle = parseWorkspaceBundle(input);
   await verifyTheoryHashes(bundle.data);
+  for (const message of bundle.data.messages) if (message.documentContext) await verifyDocumentContext(message.documentContext);
   await verifyReferenceHashes(bundle.data);
   await verifyEmbeddingHashes(bundle.data);
   await verifyRelationHashes(bundle.data, bundle.data.reviewRuns);
@@ -383,6 +419,7 @@ export async function restoreWorkspaceBundle(
     database.reference_spans,
     database.pdf_assets,
     database.review_runs,
+    database.analysis_runs,
     database.review_campaigns,
     database.embedding_spaces,
     database.embedding_vectors,
@@ -410,6 +447,7 @@ export async function restoreWorkspaceBundle(
     if (bundle.data.referenceSpans.length) await database.reference_spans.bulkAdd(bundle.data.referenceSpans);
     if (pdfAssets.length) await database.pdf_assets.bulkAdd(pdfAssets);
     if (bundle.data.reviewRuns.length) await database.review_runs.bulkAdd(bundle.data.reviewRuns);
+    if (bundle.data.analysisRuns.length) await database.analysis_runs.bulkAdd(bundle.data.analysisRuns);
     if (bundle.data.reviewCampaigns.length) await database.review_campaigns.bulkAdd(bundle.data.reviewCampaigns);
     if (bundle.data.embeddingSpaces.length) await database.embedding_spaces.bulkAdd(bundle.data.embeddingSpaces);
     if (bundle.data.embeddingVectors.length) await database.embedding_vectors.bulkAdd(bundle.data.embeddingVectors);

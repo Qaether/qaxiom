@@ -76,7 +76,7 @@ it('rejects old versions and forged approval inputs', async () => {
 it('preserves retracted provenance through JSON backup and rejects broken origin or result hash atomically', async () => {
   const f = await fixture(), row = await approveExternalRelation(await prepareExternalRelation(f.run.id, f.pairId, f.input, db), db);
   await retractRelation(row.id, '사용자 철회', db);
-  const bundle = await createWorkspaceBundle(db); expect(bundle.version).toBe(22);
+  const bundle = await createWorkspaceBundle(db); expect(bundle.version).toBe(24);
   await restoreWorkspaceBundle(JSON.parse(JSON.stringify(bundle)), target);
   const restored = await target.research_relations.get(row.id); expect(restored!.externalReviewOrigin).toEqual(row.externalReviewOrigin);
   for (const edit of [
@@ -104,7 +104,7 @@ it('upgrades genuine v15 schemas/backups without inventing external relation pro
   await target.delete(); const legacy = new Dexie(target.name);
   legacy.version(15).stores(Object.fromEntries(db.tables.map(t => [t.name, [t.schema.primKey.src, ...t.schema.indexes.map(i => i.src)].join(',')])));
   for (const t of db.tables) await legacy.table(t.name).bulkAdd(await t.toArray()); legacy.close(); await target.open();
-  expect(target.verno).toBe(23); expect((await target.research_relations.toArray())[0].externalReviewOrigin).toBeUndefined();
+  expect(target.verno).toBe(25); expect((await target.research_relations.toArray())[0].externalReviewOrigin).toBeUndefined();
 });
 
 it('prevents bypassing frozen-context hash checks through the generic relation approval API', async () => {

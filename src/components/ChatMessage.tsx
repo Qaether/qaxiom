@@ -2,9 +2,8 @@ import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
-import { AlertTriangle, BookOpen, Check, CircleStop, Copy, RotateCcw, Sparkles, User } from 'lucide-react';
+import { AlertTriangle, BookOpen, Check, CircleStop, Copy, RotateCcw, User } from 'lucide-react';
 import type { ChatMessage as ChatMessageType } from '../types';
-import { RESEARCH_MODES } from '../constants';
 import type { ContextEvidence } from '../services/retrieval/types';
 import { inspectCitations } from '../services/retrieval/context';
 import { spanLocation } from '../services/retrieval/pdfTypes';
@@ -27,36 +26,14 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onRetry, onOp
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const modeBadge = message.researchMode && RESEARCH_MODES[message.researchMode]?.badge;
   const citations = message.contextBundle ? inspectCitations(message.content, message.contextBundle) : null;
 
   return (
     <div className={`message-row ${isUser ? 'user-message-row' : 'assistant-message-row'}`}>
       <div className="message-container">
-        {/* Avatar */}
-        <div className={`message-avatar ${isUser ? 'user-avatar' : 'assistant-avatar'}`}>
-          {isUser ? <User size={18} /> : <Sparkles size={18} />}
-        </div>
+        {isUser && <div className="message-avatar user-avatar"><User size={18} /></div>}
 
-        {/* Bubble */}
         <div className="message-body">
-          {/* Header for assistant message */}
-          {!isUser && (
-            <div className="message-meta">
-              <span className="model-badge">{message.model || 'Qaxiom Engine'}</span>
-              {modeBadge && <span className="mode-badge">{modeBadge}</span>}
-              <button 
-                id={`copy-btn-${message.id}`}
-                className="copy-btn" 
-                onClick={handleCopy} 
-                title="답변 복사"
-              >
-                {copied ? <Check size={14} className="copied-icon" /> : <Copy size={14} />}
-                <span>{copied ? '복사됨' : '복사'}</span>
-              </button>
-            </div>
-          )}
-
           {/* Content */}
           <div className="markdown-content">
             <ReactMarkdown
@@ -166,6 +143,19 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onRetry, onOp
               )}
             </div>
           )}
+
+          {!isUser && <div className="assistant-message-footer">
+            <button
+              type="button"
+              id={`copy-btn-${message.id}`}
+              className="copy-btn"
+              onClick={handleCopy}
+              title={copied ? '복사됨' : '답변 복사'}
+              aria-label={copied ? '복사됨' : '답변 복사'}
+            >
+              {copied ? <Check size={14} className="copied-icon" /> : <Copy size={14} />}
+            </button>
+          </div>}
 
           {/* User message timestamp/actions */}
           {isUser && (

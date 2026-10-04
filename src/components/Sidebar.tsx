@@ -8,13 +8,15 @@ import {
   Folder,
   ArrowRightLeft,
   Settings,
-  Cloud
+  Cloud,
+  Trash2
 } from 'lucide-react';
 
 interface SidebarProps {
   projectName: string;
   documents: { id: string; title: string; version: number }[];
   onOpenDocument: (id: string) => void;
+  onDeleteDocument: (id: string, trigger: HTMLButtonElement) => void;
   onChangeProject: () => void;
   onOpenTheory: () => void;
   onOpenReferences: () => void;
@@ -28,6 +30,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   projectName,
   documents,
   onOpenDocument,
+  onDeleteDocument,
   onChangeProject,
   onOpenTheory,
   onOpenReferences,
@@ -81,9 +84,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="sidebar-brand-wrapper">
           <button
             type="button"
-            className="sidebar-brand-btn"
+            className="sidebar-brand-btn topbar-tooltip"
             onClick={onChangeProject}
-            title="프로젝트 관리 / 전환 화면으로 이동"
+            data-tooltip="프로젝트 관리"
             aria-label="프로젝트 관리 / 전환 화면으로 이동"
           >
             <div className="brand-logo">
@@ -95,7 +98,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           </button>
           {mobileOpen && (
-            <button ref={closeButtonRef} type="button" className="mobile-menu-close" onClick={onCloseMobile} aria-label="대화 메뉴 닫기">
+            <button ref={closeButtonRef} type="button" className="mobile-menu-close topbar-tooltip" onClick={onCloseMobile} data-tooltip="대화 메뉴 닫기" aria-label="대화 메뉴 닫기">
               <X size={20} />
             </button>
           )}
@@ -131,14 +134,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="session-list">
             {!documents.length && <p className="empty-sessions">아직 만든 연구 문서가 없습니다.</p>}
             {documents.map(document => (
-              <button
-                type="button"
-                className="sidebar-document"
-                key={document.id}
-                onClick={() => onOpenDocument(document.id)}
-              >
-                {document.title} <small>v{document.version}</small>
-              </button>
+              <div className="sidebar-document-row" key={document.id}>
+                <button
+                  type="button"
+                  className="sidebar-document"
+                  onClick={() => onOpenDocument(document.id)}
+                >
+                  <span className="sidebar-document-title">{document.title}</span>
+                  <small>v{document.version}</small>
+                </button>
+                <button
+                  type="button"
+                  className="sidebar-document-delete"
+                  aria-label={`${document.title} 문서 삭제`}
+                  title={`${document.title} 문서 삭제`}
+                  onClick={event => onDeleteDocument(document.id, event.currentTarget)}
+                >
+                  <Trash2 size={15} />
+                </button>
+              </div>
             ))}
           </div>
         </div>
@@ -147,23 +161,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Spacer pushing the following elements to the bottom */}
       <div className="sidebar-spacer" />
 
-      {/* Bottom Section: Wiki, References, and Footer Actions */}
+      {/* Bottom Section: References and Footer Actions */}
       <div className="sidebar-bottom-section">
-
-        {/* Wiki uses the authoritative theory-document workspace. */}
-        <div className="sidebar-section wiki-banner-section">
-          <div className="wiki-banner">
-            <div className="wiki-banner-icon">
-              <BookMarked size={16} />
-            </div>
-            <div className="wiki-banner-content">
-              <div className="wiki-banner-title">LLM Research Wiki</div>
-              <div className="wiki-banner-desc">연구 문서에서 주장·원문 탐색</div>
-            </div>
-            <span className="coming-tag">문서 내</span>
-          </div>
-        </div>
-
         {/* Sidebar Footer */}
         <div className="sidebar-footer">
           <button className="settings-button" type="button" onClick={onOpenReferences}>

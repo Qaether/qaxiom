@@ -32,6 +32,7 @@ export interface ModelOption {
   reasoningEffort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max';
   verifiedAt: string;
   recommended?: boolean;
+  contextWindowTokens?: number;
 }
 
 export interface ChatMessage {
@@ -45,10 +46,22 @@ export interface ChatMessage {
   status?: MessageStatus;
   errorMessage?: string;
   contextBundle?: ContextBundle;
+  documentContext?: DocumentChatContext;
+}
+
+export interface DocumentChatContext {
+  documentId: string;
+  versionId: string | null;
+  title: string;
+  markdown: string;
+  contentHash: string;
+  contract: import('./services/theory/types').ResearchContract;
+  capturedAt: number;
 }
 
 export interface ChatSession {
   id: string;
+  documentId?: string | null;
   title: string;
   createdAt: number;
   updatedAt: number;

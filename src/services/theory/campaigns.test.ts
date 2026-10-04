@@ -24,7 +24,7 @@ it('appends schema v6 and preserves populated v5 workspaces', async () => {
   legacy.version(5).stores(Object.fromEntries(tables.map(t => [t.name, [t.schema.primKey.src, ...t.schema.indexes.map(i => i.src)].join(',')])));
   for (const table of tables) await legacy.table(table.name).bulkAdd(await table.toArray());
   legacy.close(); await target.open();
-  expect(target.verno).toBe(23); expect(await target.document_versions.get(snapshot.version.id)).toEqual(snapshot.version);
+  expect(target.verno).toBe(25); expect(await target.document_versions.get(snapshot.version.id)).toEqual(snapshot.version);
   expect(await target.review_campaigns.count()).toBe(0);
 });
 
@@ -40,15 +40,15 @@ it('reserves only one owner across concurrent tabs, retaining a charged attempt 
   } finally { second.close(); }
 });
 
-it('retains full criteria in exact disjoint batches and resumes only unchecked blocks', async () => {
+it('keeps the full document in one planned request and tracks unchecked blocks', async () => {
   const { snapshot, ids, campaign } = await fixture();
-  expect(planReviewBatches(snapshot, ids)).toEqual(ids.map(id => [id]));
+  expect(planReviewBatches(snapshot, ids)).toEqual([ids]);
   await saveReviewPlan(campaign.id, snapshot, ids, db);
   const attempt = await reserveReviewAttempt(campaign.id, snapshot, [ids[0]], 'model', db);
   const run = reviewSkeleton(snapshot, 'llm-v1', [ids[0]], 'model');
   run.outcome = 'insufficient';
   const saved = await finishReviewAttempt(campaign.id, attempt.token, run, db);
-  expect(pendingBatches(saved, [run])).toEqual([[ids[1]], [ids[2]]]);
+  expect(pendingBatches(saved, [run])).toEqual([[ids[1], ids[2]]]);
   const next = await saveTheoryVersion(snapshot.document.id, snapshot.version.id, { title: snapshot.version.title, markdown: '새 버전', contract: snapshot.version.contract }, db);
   expect((await ensureCampaign(next.document.id, db)).attempts).toHaveLength(1);
   await expect(reserveReviewAttempt(campaign.id, snapshot, [ids[1]], 'model', db)).rejects.toThrow('버전');
@@ -56,9 +56,9 @@ it('retains full criteria in exact disjoint batches and resumes only unchecked b
   await expect(reserveReviewAttempt(campaign.id, next, [next.blocks[0].id], 'model', db)).rejects.toThrow('소진');
 });
 
-it('rejects oversized individual blocks and mismatched document plans without truncation', async () => {
+it('accepts long individual blocks without truncation and rejects mismatched document plans', async () => {
   const { snapshot, campaign } = await fixture();
-  expect(() => planReviewBatches({ ...snapshot, blocks: [{ ...snapshot.blocks[0], text: '가'.repeat(20000) }] }, [snapshot.blocks[0].id])).toThrow('단일 요청');
+  expect(planReviewBatches({ ...snapshot, blocks: [{ ...snapshot.blocks[0], text: '가'.repeat(20000) }] }, [snapshot.blocks[0].id])).toEqual([[snapshot.blocks[0].id]]);
   const other = await createTheory({ title: '다른 문서', markdown: '다른 문서', contract: { ...EMPTY_CONTRACT } }, db);
   await expect(saveReviewPlan(campaign.id, other, other.blocks.map(b => b.id), db)).rejects.toThrow('버전');
 });

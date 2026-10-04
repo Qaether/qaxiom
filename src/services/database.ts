@@ -5,6 +5,7 @@ import type { ResearchProject, TheoryDocument, DocumentVersion, DocumentBlock } 
 import type { ReferenceDocument, ReferenceSpan } from './retrieval/types';
 import type { PdfAsset } from './retrieval/pdfTypes';
 import type { ReviewRun } from './theory/reviewTypes';
+import type { AnalysisRun } from './theory/analysis';
 import type { ReviewCampaign } from './theory/campaigns';
 import type { EmbeddingSpace, EmbeddingVector, EmbeddingManifest, EmbeddingActivation } from './retrieval/embeddingTypes';
 import type { ResearchRelation } from './theory/relationTypes';
@@ -18,6 +19,7 @@ const SESSION_MIGRATION_KEY = 'legacy_sessions_v1';
 
 export interface SessionRecord {
   id: string;
+  documentId?: string | null;
   position: number;
   title: string;
   createdAt: number;
@@ -100,6 +102,7 @@ export class QaxiomDatabase extends Dexie {
   reference_spans!: Table<ReferenceSpan, string>;
   pdf_assets!: Table<PdfAsset, string>;
   review_runs!: Table<ReviewRun, string>;
+  analysis_runs!: Table<AnalysisRun, string>;
   review_campaigns!: Table<ReviewCampaign, string>;
   embedding_spaces!: Table<EmbeddingSpace, string>;
   embedding_vectors!: Table<EmbeddingVector, [string, string]>;
@@ -159,6 +162,12 @@ export class QaxiomDatabase extends Dexie {
       });
     });
     this.version(23).stores({ project_folders: '&id' });
+    this.version(24).stores({ sessions: '&id, documentId, position, updatedAt, createdAt' }).upgrade(async transaction => {
+      await transaction.table('sessions').toCollection().modify(session => {
+        if (session.documentId === undefined) session.documentId = null;
+      });
+    });
+    this.version(25).stores({ analysis_runs: '&id, documentId, versionId, createdAt' });
   }
 }
 
@@ -167,6 +176,7 @@ export const qaxiomDatabase = new QaxiomDatabase();
 function toSessionRecord(session: ChatSession, position: number): SessionRecord {
   return {
     id: session.id,
+    documentId: session.documentId ?? null,
     position,
     title: session.title,
     createdAt: session.createdAt,
@@ -280,6 +290,7 @@ export async function loadSessionsFromDatabase(
 
   return sessionRecords.map(session => ({
     id: session.id,
+    documentId: session.documentId ?? null,
     title: session.title,
     createdAt: session.createdAt,
     updatedAt: session.updatedAt,

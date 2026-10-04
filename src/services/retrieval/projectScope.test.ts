@@ -4,8 +4,7 @@ import Dexie from 'dexie';
 import { qaxiomDatabase as db, QaxiomDatabase } from '../database';
 import { createTheory, saveTheoryVersion } from '../theory/documents';
 import { EMPTY_CONTRACT } from '../theory/types';
-import { saveProjectSources } from '../theory/projectSources';
-import { moveTheoryProject } from '../theory/projects';
+import { seedLegacyPolicy as saveProjectSources, seedLegacyProjectMove as moveTheoryProject } from '../theory/legacyProjectFixtures';
 import { importReference, loadReferenceSelection } from './references';
 import { assembleContext } from './assembly';
 import { searchBM25 } from './bm25';
@@ -178,7 +177,7 @@ it('imports genuine v18 backups and migrates populated v18 projects without inve
   await target.delete(); const legacy = new Dexie(target.name);
   legacy.version(18).stores(Object.fromEntries(db.tables.map(t => [t.name, [t.schema.primKey.src, ...t.schema.indexes.map(i => i.src)].join(',')])));
   for (const table of db.tables) await legacy.table(table.name).bulkAdd(await table.toArray());
-  legacy.close(); await target.open(); expect(target.verno).toBe(23);
+  legacy.close(); await target.open(); expect(target.verno).toBe(25);
   expect((await target.projects.get(f.snapshot.document.projectId))!.sourcePolicy?.scope).toBe('research');
 });
 it('migrates populated v17 policies/backups without expanding external-only scope', async () => {
@@ -188,5 +187,5 @@ it('migrates populated v17 policies/backups without expanding external-only scop
   await target.delete(); const legacy = new Dexie(target.name);
   legacy.version(17).stores(Object.fromEntries(db.tables.map(t => [t.name, [t.schema.primKey.src, ...t.schema.indexes.map(i => i.src)].join(',')])));
   for (const t of db.tables) await legacy.table(t.name).bulkAdd(await t.toArray()); legacy.close(); await target.open();
-  expect(target.verno).toBe(23); expect((await target.projects.get(f.snapshot.document.projectId))!.sourcePolicy!.scope).toBe('external_review');
+  expect(target.verno).toBe(25); expect((await target.projects.get(f.snapshot.document.projectId))!.sourcePolicy!.scope).toBe('external_review');
 });

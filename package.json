@@ -26,6 +26,7 @@
     "react-dom": "^19.2.8",
     "react-markdown": "^10.1.0",
     "rehype-katex": "^7.0.1",
+    "rehype-mathjax": "^7.1.0",
     "remark-math": "^6.0.0"
   },
   "devDependencies": {
@@ -43,5 +44,8 @@
     "typescript": "~6.0.2",
     "vite": "^8.3.0",
     "vitest": "^4.1.11"
+  },
+  "overrides": {
+    "@xmldom/xmldom": "^0.9.12"
   }
 }

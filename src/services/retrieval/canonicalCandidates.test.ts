@@ -61,10 +61,10 @@ it('keeps proof cycles visible as declared candidates and excludes external rela
   const candidates = await describeCanonicalCandidates(snapshot, searchCanonicalBlocks(snapshot.blocks, 'needle'), db);
   expect(candidates[0].proofCycleCount).toBe(2); expect(candidates[0].excludedExternalCount).toBe(1); expect(JSON.stringify(candidates)).not.toContain('PRIVATE');
 });
-it('reports mandatory premise overflow without silently omitting an otherwise matching target', async () => {
+it('includes long mandatory premises without an artificial review cap', async () => {
   const { snapshot } = await fixture('A ' + 'x'.repeat(23000));
   const candidates = await describeCanonicalCandidates(snapshot, searchCanonicalBlocks(snapshot.blocks, 'needle'), db);
-  expect(candidates).toHaveLength(1); expect(candidates[0].error).toContain('40 KB'); expect(candidates[0].block.text).toContain('needle');
+  expect(candidates).toHaveLength(1); expect(candidates[0].premiseBlockIds).toHaveLength(1); expect(candidates[0].block.text).toContain('needle');
 });
 it('refuses forged worker IDs/scores, duplicate hits, invalid query limits and interrupted operations', async () => {
   const { snapshot, b } = await fixture();

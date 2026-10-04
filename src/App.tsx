@@ -19,10 +19,14 @@ import {
   getRetryContext,
   settleAssistantMessage
 } from './services/chatState';
-import { loadSessionsFromDatabase } from './services/database';
-import { listTheories } from './services/theory/documents';
+import { flushSessionWrites, loadSessionsFromDatabase } from './services/database';
+import { listTheories, loadTheory } from './services/theory/documents';
+import { deleteTheory, prepareTheoryDeletion, type TheoryDeletionPreview } from './services/theory/theoryDeletion';
 import { folderPermission, getActiveProjectFolder, listRecentProjectFolders, rememberProjectFolder, requestFolderPermission } from './services/projectFolder';
 import type { ContextBundle, ContextEvidence } from './services/retrieval/types';
+import { withReferenceContext } from './services/retrieval/context';
+import { captureDocumentContext, sessionsForDocument, verifyDocumentContext, withDocumentContext, type DocumentDraft } from './services/documentChat';
+import { classifyChatRoute, internalLightModel, LIGHT_CHAT_MODELS } from './services/chatRouting';
 import {
   createWorkspaceBundle,
   restoreWorkspaceBundle,
@@ -103,6 +107,8 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
   const [projectLoading, setProjectLoading] = useState(true);
   const [projectLoadError, setProjectLoadError] = useState('');
   const [theoryDocumentId, setTheoryDocumentId] = useState<string | null>(null);
+  const [documentDraft, setDocumentDraft] = useState<DocumentDraft | null>(null);
+  const [newDocumentToken, setNewDocumentToken] = useState(0);
   const [theoryDocuments, setTheoryDocuments] = useState<{ id: string; title: string; version: number }[]>([]);
   const [isReferencesOpen, setIsReferencesOpen] = useState(false);
   const [sourceEvidence, setSourceEvidence] = useState<ContextEvidence | null>(null);
@@ -132,6 +138,38 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
   });
 
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [pendingDeleteSessionId, setPendingDeleteSessionId] = useState<string | null>(null);
+  const [isDeletingSession, setIsDeletingSession] = useState(false);
+  const deleteDialogCancelRef = useRef<HTMLButtonElement>(null);
+  const deleteDialogTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const [pendingDeleteDocumentId, setPendingDeleteDocumentId] = useState<string | null>(null);
+  const [documentDeletePreview, setDocumentDeletePreview] = useState<TheoryDeletionPreview | null>(null);
+  const [documentDeleteError, setDocumentDeleteError] = useState('');
+  const [isPreparingDocumentDelete, setIsPreparingDocumentDelete] = useState(false);
+  const [isDeletingDocument, setIsDeletingDocument] = useState(false);
+  const documentDeleteCancelRef = useRef<HTMLButtonElement>(null);
+  const documentDeleteTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const routingRef = useRef(false);
+
+  useEffect(() => {
+    if (pendingDeleteSessionId) deleteDialogCancelRef.current?.focus();
+  }, [pendingDeleteSessionId]);
+
+  useEffect(() => {
+    if (!pendingDeleteDocumentId) return;
+    let active = true;
+    documentDeleteCancelRef.current?.focus();
+    if (documentDraft?.dirty && documentDraft.documentId === pendingDeleteDocumentId || isStreaming) return;
+    void (async () => {
+      await flushSessionWrites();
+      const snapshot = await loadTheory(pendingDeleteDocumentId);
+      const preview = await prepareTheoryDeletion(pendingDeleteDocumentId, snapshot.version.id);
+      if (active) setDocumentDeletePreview(preview);
+    })().catch(cause => {
+      if (active) setDocumentDeleteError(cause instanceof Error ? cause.message : '문서 삭제 범위를 확인하지 못했습니다.');
+    }).finally(() => { if (active) setIsPreparingDocumentDelete(false); });
+    return () => { active = false; };
+  }, [pendingDeleteDocumentId, documentDraft?.dirty, documentDraft?.documentId, isStreaming]);
 
   const handleLeftResizerMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -267,6 +305,22 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
     return () => { active = false; };
   }, [openedProject, isTheoryOpen]);
 
+  useEffect(() => {
+    if (!openedProject || !theoryDocumentId) return;
+    const scoped = sessionsForDocument(sessions, theoryDocumentId);
+    if (scoped.some(session => session.id === currentSessionId)) return;
+    let active = true;
+    queueMicrotask(() => {
+      if (!active) return;
+      if (scoped.length) { setCurrentSessionId(scoped[0].id); return; }
+      const created = createNewSession(settings.defaultMode, settings.defaultModel, theoryDocumentId);
+      setSessions(previous => previous.some(session => session.documentId === theoryDocumentId)
+        ? previous : [created, ...previous]);
+      setCurrentSessionId(created.id);
+    });
+    return () => { active = false; };
+  }, [openedProject, theoryDocumentId, sessions, currentSessionId, settings.defaultMode, settings.defaultModel]);
+
   // Scroll to bottom on new message
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -276,17 +330,18 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
     scrollToBottom();
   }, [sessions, isStreaming]);
 
-  const currentSession = sessions.find(s => s.id === currentSessionId) || sessions[0];
+  const visibleSessions = sessionsForDocument(sessions, theoryDocumentId);
+  const currentSession = visibleSessions.find(session => session.id === currentSessionId) || visibleSessions[0];
 
   const handleModeChange = (newMode: ResearchMode) => {
-    setSessions(prev => prev.map(s => s.id === currentSessionId ? { ...s, researchMode: newMode, updatedAt: Date.now() } : s));
+    setSessions(prev => prev.map(s => s.id === currentSession?.id ? { ...s, researchMode: newMode, updatedAt: Date.now() } : s));
   };
 
   // Create new chat session
   const handleNewSession = () => {
     if (deletingSessionRef.current) return;
     if (isStreaming) handleStopStreaming();
-    const newSession = createNewSession(currentSession?.researchMode || settings.defaultMode, currentSession?.selectedModel || settings.defaultModel);
+    const newSession = createNewSession(currentSession?.researchMode || settings.defaultMode, currentSession?.selectedModel || settings.defaultModel, theoryDocumentId);
     setSessions(prev => [newSession, ...prev]);
     setCurrentSessionId(newSession.id);
     setIsHistoryOpen(false);
@@ -301,30 +356,110 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
   // Select session
   const handleSelectSession = (id: string) => {
     if (deletingSessionRef.current) return;
+    if (!visibleSessions.some(session => session.id === id)) return;
     if (isStreaming) handleStopStreaming();
     setCurrentSessionId(id);
   };
 
-  // Delete session
-  const handleDeleteSession = async (id: string, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
+  const closeDeleteSessionDialog = () => {
+    if (isDeletingSession) return;
+    setPendingDeleteSessionId(null);
+    requestAnimationFrame(() => deleteDialogTriggerRef.current?.focus());
+  };
+
+  const requestDeleteSession = (id: string, trigger: HTMLButtonElement) => {
     if (deletingSessionRef.current) return;
     if (isStreaming) { window.alert('응답 생성이 끝난 뒤 세션을 삭제해 주세요.'); return; }
+    const target = visibleSessions.find(session => session.id === id);
+    if (!target) return;
+    deleteDialogTriggerRef.current = trigger;
+    setPendingDeleteSessionId(id);
+  };
+
+  // Delete session after an explicit in-app confirmation.
+  const handleDeleteSession = async () => {
+    if (!pendingDeleteSessionId || deletingSessionRef.current) return;
+    const id = pendingDeleteSessionId;
     const target = sessions.find(session => session.id === id);
-    if (!target || !window.confirm(`연구 세션 “${target.title}”와 메시지 ${target.messages.length}개를 삭제할까요? 이 작업은 되돌릴 수 없습니다.`)) return;
+    if (!target) { setPendingDeleteSessionId(null); return; }
     deletingSessionRef.current = true;
+    setIsDeletingSession(true);
     const filtered = sessions.length <= 1
-      ? [createNewSession(settings.defaultMode, settings.defaultModel)]
+      ? [createNewSession(settings.defaultMode, settings.defaultModel, theoryDocumentId)]
       : sessions.filter(session => session.id !== id);
     try {
       await saveSessions(filtered);
       setSessions(filtered);
-      if (currentSessionId === id) setCurrentSessionId(filtered[0].id);
+      if (currentSessionId === id) setCurrentSessionId(filtered.find(session => session.documentId === theoryDocumentId)?.id ?? '');
       setPersistenceError(null);
+      setPendingDeleteSessionId(null);
     } catch (error) {
       setPersistenceError(`세션 삭제를 저장하지 못했습니다. ${getStorageErrorMessage(error)}`);
     } finally {
       deletingSessionRef.current = false;
+      setIsDeletingSession(false);
+    }
+  };
+
+  const closeDeleteDocumentDialog = () => {
+    if (isDeletingDocument) return;
+    setPendingDeleteDocumentId(null);
+    requestAnimationFrame(() => documentDeleteTriggerRef.current?.focus());
+  };
+
+  const requestDeleteDocument = (id: string, trigger: HTMLButtonElement) => {
+    if (isDeletingDocument || !theoryDocuments.some(row => row.id === id)) return;
+    documentDeleteTriggerRef.current = trigger;
+    const reason = documentDraft?.dirty && documentDraft.documentId === id
+      ? '현재 문서에 저장되지 않은 변경사항이 있습니다. 먼저 저장하거나 변경사항을 버린 뒤 삭제하세요.'
+      : isStreaming ? '응답 생성이 끝난 뒤 문서를 삭제해 주세요.' : '';
+    setDocumentDeletePreview(null);
+    setDocumentDeleteError(reason);
+    setIsPreparingDocumentDelete(!reason);
+    setPendingDeleteDocumentId(id);
+  };
+
+  const handleDeleteDocument = async () => {
+    if (!documentDeletePreview || isDeletingDocument || isPreparingDocumentDelete) return;
+    if (isStreaming || documentDraft?.dirty && documentDraft.documentId === documentDeletePreview.documentId) {
+      setDocumentDeleteError('응답 생성 또는 미저장 문서 수정이 끝난 뒤 다시 시도하세요.');
+      return;
+    }
+    const preview = documentDeletePreview;
+    setIsDeletingDocument(true);
+    setDocumentDeleteError('');
+    try {
+      await flushSessionWrites();
+      await deleteTheory(preview);
+      const nextId = theoryDocumentId === preview.documentId
+        ? theoryDocuments.find(row => row.id !== preview.documentId)?.id ?? null
+        : theoryDocumentId;
+      const remainingSessions = sessions.filter(session => session.documentId !== preview.documentId);
+      const nextSessions = remainingSessions.length ? remainingSessions
+        : [createNewSession(settings.defaultMode, settings.defaultModel, nextId)];
+      setSessions(nextSessions);
+      setCurrentSessionId(nextSessions.find(session => session.documentId === nextId)?.id ?? '');
+      setTheoryDocuments(previous => previous.filter(row => row.id !== preview.documentId));
+      if (theoryDocumentId === preview.documentId) {
+        setTheoryDocumentId(nextId);
+        setIsTheoryOpen(Boolean(nextId));
+        setNewDocumentToken(previous => previous + 1);
+        setDocumentDraft(null);
+      }
+      try {
+        if (nextId) localStorage.setItem('qaxiom_last_open_document_id', nextId);
+        else localStorage.removeItem('qaxiom_last_open_document_id');
+      } catch {}
+      setPendingDeleteDocumentId(null);
+      setPersistenceError(null);
+      requestAnimationFrame(() => {
+        const next = document.querySelector<HTMLButtonElement>('.sidebar-document');
+        (next ?? document.getElementById('new-theory-btn'))?.focus();
+      });
+    } catch (cause) {
+      setDocumentDeleteError(cause instanceof Error ? cause.message : '문서를 삭제하지 못했습니다.');
+    } finally {
+      setIsDeletingDocument(false);
     }
   };
 
@@ -332,7 +467,7 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
   const handleUpdateTitle = (newTitle: string) => {
     if (deletingSessionRef.current) return;
     setSessions(prev =>
-      prev.map(s => (s.id === currentSessionId ? { ...s, title: newTitle, updatedAt: Date.now() } : s))
+      prev.map(s => (s.id === currentSession?.id ? { ...s, title: newTitle, updatedAt: Date.now() } : s))
     );
   };
 
@@ -340,7 +475,7 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
   const handleModelChange = (modelId: string) => {
     if (deletingSessionRef.current) return;
     setSessions(prev =>
-      prev.map(s => (s.id === currentSessionId ? { ...s, selectedModel: modelId } : s))
+      prev.map(s => (s.id === currentSession?.id ? { ...s, selectedModel: modelId } : s))
     );
   };
 
@@ -372,7 +507,8 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
     userPrompt: string,
     options?: { retryAssistantMessageId?: string; contextBundle?: ContextBundle }
   ) => {
-    if (!currentSession || isStreaming || deletingSessionRef.current) return;
+    if (!currentSession || isStreaming || routingRef.current || deletingSessionRef.current) return;
+    if (!theoryDocumentId || currentSession.documentId !== theoryDocumentId) return;
 
     const retryContext = options?.retryAssistantMessageId
       ? getRetryContext(currentSession.messages, options.retryAssistantMessageId)
@@ -403,9 +539,21 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
       }
     }
 
-    const assistantMessage = createAssistantMessage(model.name, currentSession.researchMode);
     const contextBundle = options?.contextBundle || (options?.retryAssistantMessageId
       ? currentSession.messages.find(message => message.id === options.retryAssistantMessageId)?.contextBundle : undefined);
+    const priorAnswer = options?.retryAssistantMessageId
+      ? currentSession.messages.find(message => message.id === options.retryAssistantMessageId) : undefined;
+    routingRef.current = true;
+    let route: 'light' | 'research';
+    try {
+      route = contextBundle || currentSession.researchMode !== 'general' ? 'research'
+        : priorAnswer ? internalLightModel(priorAnswer.model ?? '') ? 'light' : 'research'
+          : await classifyChatRoute(userPrompt, model.provider, apiKey);
+    } finally {
+      routingRef.current = false;
+    }
+    const responseModel = route === 'light' ? LIGHT_CHAT_MODELS[model.provider] ?? model : model;
+    const assistantMessage = createAssistantMessage(responseModel.name, currentSession.researchMode);
     if (contextBundle) assistantMessage.contextBundle = contextBundle;
     const assistantMessageId = assistantMessage.id;
 
@@ -419,10 +567,28 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
       ? retryContext.history
       : [...currentSession.messages, createUserMessage(userPrompt)];
 
+    let documentContext;
+    try {
+      if (route === 'research') {
+        if (documentDraft?.documentId !== theoryDocumentId) throw new Error('기준 연구문서를 불러오는 중입니다. 잠시 후 다시 질문해 주세요.');
+        const prior = priorAnswer?.documentContext;
+        if (prior && prior.documentId !== theoryDocumentId) throw new Error('재시도할 답변의 기준 연구문서가 현재 문서와 다릅니다.');
+        documentContext = prior ?? await captureDocumentContext(theoryDocumentId, documentDraft);
+        await verifyDocumentContext(documentContext);
+        if (contextBundle?.assembly?.research && contextBundle.assembly.research.documentId !== theoryDocumentId)
+          throw new Error('선택한 검색 문맥의 연구문서가 현재 문서와 다릅니다.');
+        withDocumentContext(contextBundle ? withReferenceContext(updatedMessages, contextBundle) : updatedMessages, documentContext);
+      }
+    } catch (cause) {
+      window.alert(cause instanceof Error ? cause.message : '연구문서 문맥을 확인하지 못했습니다.');
+      return;
+    }
+    if (documentContext) assistantMessage.documentContext = documentContext;
+
     // Optimistically update session
     setSessions(prev =>
       prev.map(s =>
-        s.id === currentSessionId
+        s.id === currentSession.id
           ? {
               ...s,
               title: sessionTitle,
@@ -436,11 +602,11 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
 
     setIsStreaming(true);
     abortControllerRef.current = new AbortController();
-    activeStreamRef.current = { sessionId: currentSessionId, messageId: assistantMessageId };
+    activeStreamRef.current = { sessionId: currentSession.id, messageId: assistantMessageId };
 
     await sendChatMessage(
-      updatedMessages,
-      model.id,
+      route === 'light' ? [updatedMessages.at(-1)!] : updatedMessages,
+      responseModel.id,
       currentSession.researchMode,
       settings,
       {
@@ -448,7 +614,7 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
           if (stoppedMessageIdsRef.current.has(assistantMessageId)) return;
           setSessions(prev =>
             prev.map(s => {
-              if (s.id !== currentSessionId) return s;
+              if (s.id !== currentSession.id) return s;
               return {
                 ...s,
                 messages: s.messages.map(m =>
@@ -468,7 +634,7 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
           }
           setSessions(prev =>
             prev.map(s => {
-              if (s.id !== currentSessionId) return s;
+              if (s.id !== currentSession.id) return s;
               return {
                 ...s,
                 messages: s.messages.map(m =>
@@ -489,7 +655,7 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
           }
           setSessions(prev =>
             prev.map(s => {
-              if (s.id !== currentSessionId) return s;
+              if (s.id !== currentSession.id) return s;
               return {
                 ...s,
                 messages: s.messages.map(m =>
@@ -503,7 +669,8 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
         }
       },
       abortControllerRef.current.signal,
-      contextBundle
+      route === 'research' ? contextBundle : undefined,
+      route === 'research' ? documentContext : undefined
     );
   };
 
@@ -637,8 +804,9 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
             } catch {}
             closeMobileSidebar();
           }}
+          onDeleteDocument={requestDeleteDocument}
           onChangeProject={() => { setRememberedProject(openedProject); setOpenedProject(null); closeMobileSidebar(); }}
-          onOpenTheory={() => { if (isMobileSidebarOpen) mobileMenuButtonRef.current?.focus(); setTheoryDocumentId(null); setIsTheoryOpen(true); setIsMobileSidebarOpen(false); }}
+          onOpenTheory={() => { if (isMobileSidebarOpen) mobileMenuButtonRef.current?.focus(); setNewDocumentToken(previous => previous + 1); setTheoryDocumentId(null); setIsTheoryOpen(true); setIsMobileSidebarOpen(false); }}
           onOpenReferences={() => { if (isMobileSidebarOpen) mobileMenuButtonRef.current?.focus(); setIsReferencesOpen(true); setIsMobileSidebarOpen(false); }}
           onOpenSettings={() => setIsSettingsOpen(true)}
           mobileOpen={isMobileSidebarOpen}
@@ -663,6 +831,7 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
           {isTheoryOpen || theoryDocumentId ? (
             <React.Suspense fallback={<div className="pane-loading" role="status">연구 문서 불러오는 중…</div>}>
               <TheoryWorkspace
+                key={newDocumentToken}
                 onClose={() => { setIsTheoryOpen(false); setTheoryDocumentId(null); }}
                 initialDocumentId={theoryDocumentId}
                 settings={settings}
@@ -670,9 +839,14 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
                 assistantDraft={currentSession?.messages.findLast(message => message.role === 'assistant' && message.status === 'complete')?.content}
                 embedded={true}
                 projectName={openedProject.name}
-                onChangeProject={() => { setRememberedProject(openedProject); setOpenedProject(null); }}
                 onOpenMobileMenu={() => setIsMobileSidebarOpen(true)}
-                onNewDocument={() => { setTheoryDocumentId(null); setIsTheoryOpen(true); }}
+                onContextChange={setDocumentDraft}
+                onSaved={document => {
+                  setTheoryDocumentId(document.id);
+                  setTheoryDocuments(previous => previous.some(row => row.id === document.id)
+                    ? previous.map(row => row.id === document.id ? document : row) : [...previous, document]);
+                }}
+                onNewDocument={() => { setNewDocumentToken(previous => previous + 1); setTheoryDocumentId(null); setIsTheoryOpen(true); }}
               />
             </React.Suspense>
           ) : (
@@ -684,8 +858,9 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
                     ref={mobileMenuButtonRef}
                     type="button"
                     id="mobile-menu-btn"
-                    className="mobile-menu-btn"
+                    className="mobile-menu-btn topbar-tooltip"
                     onClick={() => setIsMobileSidebarOpen(true)}
+                    data-tooltip="대화 메뉴 열기"
                     aria-label="대화 메뉴 열기"
                     aria-expanded={isMobileSidebarOpen}
                     aria-controls="chat-sidebar"
@@ -693,24 +868,18 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
                     <Menu size={18} />
                   </button>
 
-                  <button
-                    type="button"
-                    className="header-project-chip"
-                    onClick={() => { setRememberedProject(openedProject); setOpenedProject(null); }}
-                    title="프로젝트 관리 / 전환 화면으로 이동"
-                    aria-label={`현재 프로젝트: ${openedProject.name}. 클릭하여 프로젝트 관리 화면으로 이동`}
-                  >
+                  <div className="header-project-chip header-project-label" aria-label={`현재 프로젝트: ${openedProject.name}`}>
                     <Folder size={13} className="header-project-icon" />
                     <span className="header-project-name">{openedProject.name}</span>
-                  </button>
+                  </div>
                 </div>
 
                 <div className="center-header-right">
                   <button
                     type="button"
-                    className="center-header-new-btn"
+                    className="center-header-new-btn topbar-tooltip"
                     onClick={() => { setTheoryDocumentId(null); setIsTheoryOpen(true); }}
-                    title="새 연구 문서 작성"
+                    data-tooltip="새 문서"
                     aria-label="새 문서 작성"
                   >
                     <Plus size={14} />
@@ -803,7 +972,7 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
               <div className="chat-history-drawer-header">
                 <div className="chat-history-drawer-title">
                   <History size={15} />
-                  <span>대화 기록 ({sessions.length})</span>
+                  <span>대화 기록 ({visibleSessions.length})</span>
                 </div>
                 <div className="chat-history-drawer-actions">
                   <button
@@ -832,10 +1001,10 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
               </div>
 
               <div className="chat-history-drawer-list">
-                {sessions.length === 0 ? (
+                {visibleSessions.length === 0 ? (
                   <div className="chat-history-drawer-empty">저장된 연구 대화가 없습니다.</div>
                 ) : (
-                  sessions.map(session => (
+                  visibleSessions.map(session => (
                     <div
                       key={session.id}
                       className={`chat-history-drawer-item ${currentSessionId === session.id ? 'active' : ''}`}
@@ -862,9 +1031,9 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
                       <button
                         type="button"
                         className="chat-history-drawer-item-delete"
-                        onClick={e => {
-                          e.stopPropagation();
-                          handleDeleteSession(session.id);
+                        onClick={event => {
+                          event.stopPropagation();
+                          requestDeleteSession(session.id, event.currentTarget);
                         }}
                         title="대화 삭제"
                         aria-label={`${session.title || '새로운 연구 대화'} 세션 삭제`}
@@ -923,6 +1092,102 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
           )}
         </aside>
       </div>
+
+      {pendingDeleteSessionId && (() => {
+        const target = sessions.find(session => session.id === pendingDeleteSessionId);
+        if (!target) return null;
+        return (
+          <div className="session-delete-backdrop">
+            <div
+              className="session-delete-dialog"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="session-delete-title"
+              aria-describedby="session-delete-description"
+              onKeyDown={event => {
+                if (event.key === 'Escape') {
+                  event.preventDefault();
+                  closeDeleteSessionDialog();
+                  return;
+                }
+                if (event.key !== 'Tab') return;
+                const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)'));
+                if (!buttons.length) return;
+                const first = buttons[0];
+                const last = buttons[buttons.length - 1];
+                if (event.shiftKey && document.activeElement === first) {
+                  event.preventDefault();
+                  last.focus();
+                } else if (!event.shiftKey && document.activeElement === last) {
+                  event.preventDefault();
+                  first.focus();
+                }
+              }}
+            >
+              <h3 id="session-delete-title">대화를 삭제할까요?</h3>
+              <p id="session-delete-description">
+                연구 세션 “{target.title || '새로운 연구 대화'}”와 메시지 {target.messages.length}개를 삭제합니다. 이 작업은 되돌릴 수 없습니다.
+              </p>
+              <div className="session-delete-actions">
+                <button ref={deleteDialogCancelRef} type="button" onClick={closeDeleteSessionDialog} disabled={isDeletingSession}>취소</button>
+                <button type="button" className="session-delete-confirm" onClick={() => void handleDeleteSession()} disabled={isDeletingSession}>
+                  {isDeletingSession ? '삭제 중…' : '대화 삭제'}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {pendingDeleteDocumentId && (
+        <div className="session-delete-backdrop">
+          <div
+            className="session-delete-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="document-delete-title"
+            aria-describedby="document-delete-description"
+            onKeyDown={event => {
+              if (event.key === 'Escape') {
+                event.preventDefault();
+                closeDeleteDocumentDialog();
+                return;
+              }
+              if (event.key !== 'Tab') return;
+              const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)'));
+              if (!buttons.length) return;
+              const first = buttons[0];
+              const last = buttons[buttons.length - 1];
+              if (event.shiftKey && document.activeElement === first) {
+                event.preventDefault();
+                last.focus();
+              } else if (!event.shiftKey && document.activeElement === last) {
+                event.preventDefault();
+                first.focus();
+              }
+            }}
+          >
+            <h3 id="document-delete-title">연구 문서를 삭제할까요?</h3>
+            <p id="document-delete-description">
+              “{documentDeletePreview?.title ?? theoryDocuments.find(row => row.id === pendingDeleteDocumentId)?.title ?? '선택한 문서'}”
+              {documentDeletePreview && <>의 버전 {documentDeletePreview.versionCount}개, 문단 {documentDeletePreview.blockCount}개, 검토 기록 {documentDeletePreview.reviewCount}개를 삭제합니다.
+                {' '}{documentDeletePreview.projectAction === 'remove' ? '이 문서만 있는 프로젝트도 삭제됩니다.'
+                  : documentDeletePreview.projectAction === 'choose_representative' ? '다른 문서가 프로젝트 대표가 됩니다.' : '다른 문서는 유지됩니다.'}
+              </>}
+              {' '}이 작업은 현재 작업공간에서 되돌릴 수 없습니다.
+            </p>
+            {isPreparingDocumentDelete && <p role="status" className="document-delete-feedback">삭제 범위 확인 중…</p>}
+            {documentDeleteError && <p role="alert" className="document-delete-feedback">{documentDeleteError}</p>}
+            <div className="session-delete-actions">
+              <button ref={documentDeleteCancelRef} type="button" onClick={closeDeleteDocumentDialog} disabled={isDeletingDocument}>취소</button>
+              <button type="button" className="session-delete-confirm" onClick={() => void handleDeleteDocument()}
+                disabled={!documentDeletePreview || isPreparingDocumentDelete || isDeletingDocument}>
+                {isDeletingDocument ? '삭제 중…' : '문서 삭제'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Settings & Other Modals */}
       {isReferencesOpen && (

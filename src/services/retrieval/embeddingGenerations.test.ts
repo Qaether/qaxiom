@@ -95,7 +95,7 @@ it('revalidates preview completeness and rejects a disappearing vector before pu
 
 it('round trips v8 complete/active generations and preserves the existing workspace on malformed manifests/pointers', async () => {
   const { active } = await fixture(); const bundle = await createWorkspaceBundle(db);
-  expect(bundle.version).toBe(22); await restoreWorkspaceBundle(bundle, target);
+  expect(bundle.version).toBe(24); await restoreWorkspaceBundle(bundle, target);
   expect(await target.embedding_activations.get('active')).toEqual(active);
   const corrupt = structuredClone(bundle); corrupt.data.embeddingManifests[0].manifestHash = 'bad'; corrupt.data.embeddingActivations[0].manifestHash = 'bad';
   await expect(restoreWorkspaceBundle(corrupt, target)).rejects.toThrow('manifest 해시');
@@ -121,7 +121,7 @@ it('imports and migrates genuine v7 caches without silently activating them', as
   const tables = db.tables.filter(t => !['embedding_manifests', 'embedding_activations', 'research_relations'].includes(t.name));
   legacy.version(7).stores(Object.fromEntries(tables.map(t => [t.name, [t.schema.primKey.src, ...t.schema.indexes.map(i => i.src)].join(',')])));
   for (const table of tables) await legacy.table(table.name).bulkAdd(await table.toArray());
-  legacy.close(); await target.open(); expect(target.verno).toBe(23);
+  legacy.close(); await target.open(); expect(target.verno).toBe(25);
   expect(await target.embedding_vectors.count()).toBe(1); expect(await target.embedding_manifests.count()).toBe(0);
 });
 

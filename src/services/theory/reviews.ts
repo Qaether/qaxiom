@@ -157,7 +157,6 @@ export function prepareReviewRequest(snapshot: TheorySnapshot, selected: string[
     ...(omitted.length <= 64 ? { omittedBlockIds: omitted.map(block => block.id) }
       : { omittedBlockCount: omitted.length, omittedBlockRanges: ranges, positionBase: 0 })
   });
-  if (new TextEncoder().encode(request).byteLength > 40000) throw new Error('연구 기준과 검토 원문이 40 KB 예산을 넘습니다. 블록을 나눠 검토하세요. 내용을 자동으로 잘라내지 않습니다.');
   return request;
 }
 

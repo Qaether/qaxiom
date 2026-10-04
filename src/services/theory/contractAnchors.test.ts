@@ -52,7 +52,7 @@ it('rejects stale or fabricated anchors and validates v22 backups atomically', a
   const saved = await saveTheoryVersion(snapshot.document.id, snapshot.version.id, { title: snapshot.version.title,
     markdown: snapshot.version.markdown, contract: snapshot.version.contract,
     contractAnchors: { assumptions: { blockId: block.id, blockHash: block.contentHash } } }, db);
-  const bundle = await createWorkspaceBundle(db); expect(bundle.version).toBe(22);
+  const bundle = await createWorkspaceBundle(db); expect(bundle.version).toBe(24);
   await restoreWorkspaceBundle(bundle, target);
   expect((await target.document_versions.get(saved.version.id))?.contractAnchors).toEqual(saved.version.contractAnchors);
   const bad = structuredClone(bundle); bad.data.documentVersions.find(version => version.id === saved.version.id)!.contractAnchors.assumptions!.blockHash = '0'.repeat(64);
@@ -76,6 +76,6 @@ it('imports v21 backups and upgrades populated v21 stores without inventing anch
     await legacy.table(table.name).bulkAdd(table.name === 'document_versions' ? rows.map(row => { const copy = { ...row }; delete copy.contractAnchors; return copy; }) : rows);
   }
   legacy.close(); await target.open();
-  expect(target.verno).toBe(23);
+  expect(target.verno).toBe(25);
   expect((await target.document_versions.get(snapshot.version.id))?.contractAnchors).toEqual({});
 });

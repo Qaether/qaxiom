@@ -233,6 +233,10 @@ test('saves a fresh workspace backup to an explicitly selected browser folder', 
 
 test('requires confirmation before deleting a session and keeps the deletion after reload', async ({ page }) => {
   await page.addInitScript(({ settingsKey, sessionsKey }) => {
+    Object.defineProperty(window, 'showDirectoryPicker', {
+      configurable: true,
+      value: async () => ({ name: 'delete-test-folder' })
+    });
     localStorage.setItem(settingsKey, JSON.stringify({ apiKeys: { gemini: 'e2e-key' } }));
     localStorage.setItem(sessionsKey, JSON.stringify(['첫 대화', '남길 대화'].map((title, index) => ({
       id: `delete-test-${index}`, title, createdAt: index + 1, updatedAt: index + 1,
@@ -242,24 +246,42 @@ test('requires confirmation before deleting a session and keeps the deletion aft
     }))));
   }, { settingsKey: SETTINGS_KEY, sessionsKey: SESSIONS_KEY });
   await page.goto('/');
+  await page.getByLabel('프로젝트 이름').fill('삭제 테스트');
+  await page.getByRole('button', { name: '로컬 폴더 지정' }).click();
+  await page.getByRole('button', { name: '채팅 화면 열기' }).click();
+  await page.getByRole('button', { name: '대화 기록 보기' }).click();
   await expect(page.getByText('대화 기록 (2)')).toBeVisible();
-  await page.getByRole('button', { name: '첫 대화 세션 선택' }).focus();
+  await page.getByRole('button', { name: '첫 대화 선택' }).focus();
   await page.keyboard.press('Tab');
   await expect(page.getByRole('button', { name: '첫 대화 세션 삭제' })).toBeFocused();
   await expect(page.getByRole('button', { name: '첫 대화 세션 삭제' })).toHaveCSS('opacity', '1');
-  page.once('dialog', dialog => dialog.dismiss());
   await page.keyboard.press('Enter');
+  const deleteDialog = page.getByRole('dialog', { name: '대화를 삭제할까요?' });
+  await expect(deleteDialog).toBeVisible();
+  await expect(deleteDialog.getByText('연구 세션 “첫 대화”와 메시지 1개를 삭제합니다.')).toBeVisible();
+  await expect(deleteDialog.getByRole('button', { name: '취소' })).toBeFocused();
+  await deleteDialog.getByRole('button', { name: '취소' }).click();
   await expect(page.getByText('대화 기록 (2)')).toBeVisible();
-  page.once('dialog', dialog => dialog.accept());
+  await expect(page.getByRole('button', { name: '첫 대화 세션 삭제' })).toBeFocused();
   await page.getByRole('button', { name: '첫 대화 세션 삭제' }).click();
+  await expect(deleteDialog).toBeVisible();
+  await deleteDialog.getByRole('button', { name: '대화 삭제' }).click();
   await expect(page.getByText('대화 기록 (1)')).toBeVisible();
   await page.reload();
+  await page.getByLabel('프로젝트 이름').fill('삭제 테스트');
+  await page.getByRole('button', { name: '로컬 폴더 지정' }).click();
+  await page.getByRole('button', { name: '채팅 화면 열기' }).click();
+  await page.getByRole('button', { name: '대화 기록 보기' }).click();
   await expect(page.getByText('대화 기록 (1)')).toBeVisible();
   await expect(page.getByRole('button', { name: '첫 대화 세션 삭제' })).toHaveCount(0);
-  page.once('dialog', dialog => dialog.accept());
   await page.getByRole('button', { name: '남길 대화 세션 삭제' }).click();
+  await page.getByRole('dialog', { name: '대화를 삭제할까요?' }).getByRole('button', { name: '대화 삭제' }).click();
   await expect(page.getByRole('heading', { name: '새로운 연구 대화' })).toBeVisible();
   await page.reload();
+  await page.getByLabel('프로젝트 이름').fill('삭제 테스트');
+  await page.getByRole('button', { name: '로컬 폴더 지정' }).click();
+  await page.getByRole('button', { name: '채팅 화면 열기' }).click();
+  await page.getByRole('button', { name: '대화 기록 보기' }).click();
   await expect(page.getByText('대화 기록 (1)')).toBeVisible();
   await expect(page.getByRole('button', { name: '남길 대화 세션 삭제' })).toHaveCount(0);
 });

@@ -55,7 +55,7 @@ it('records actual checked scope separately, keeps frozen approvals after retrac
   await finishReviewAttempt(campaign.id, attempt.token, run, db);
   expect(run.checkedBlockIds).toEqual([b.blockId]); expect(run.graph).toEqual(prepared.graph);
   await retractRelation(relation.id, 'Later retraction', db);
-  const bundle = await createWorkspaceBundle(db); expect(bundle.version).toBe(22); await restoreWorkspaceBundle(bundle, target);
+  const bundle = await createWorkspaceBundle(db); expect(bundle.version).toBe(24); await restoreWorkspaceBundle(bundle, target);
   expect((await target.review_runs.get(run.id))!.graph).toEqual(prepared.graph);
   expect(reviewToMarkdown(run, snapshot.version, snapshot.blocks)).toContain(prepared.graph.contextHash);
   const tampered = structuredClone(bundle); tampered.data.reviewRuns.find(r => r.id === run.id)!.graph!.contextHash = '0'.repeat(64);
@@ -87,16 +87,18 @@ it('imports genuine v9 backups and upgrades populated v9 without inventing graph
   await target.delete(); const legacy = new Dexie(target.name);
   legacy.version(9).stores(Object.fromEntries(db.tables.map(t => [t.name, [t.schema.primKey.src, ...t.schema.indexes.map(i => i.src)].join(',')])));
   for (const t of db.tables) await legacy.table(t.name).bulkAdd(await t.toArray());
-  legacy.close(); await target.open(); expect(target.verno).toBe(23); expect(await target.document_versions.get(snapshot.version.id)).toEqual(snapshot.version);
+  legacy.close(); await target.open(); expect(target.verno).toBe(25); expect(await target.document_versions.get(snapshot.version.id)).toEqual(snapshot.version);
 });
-it('rejects oversized mandatory premises without truncation, transmission or budget reservation', async () => {
+it('previews long mandatory premises without truncation, transmission or budget reservation', async () => {
   const snapshot = await createTheory({ title: 'Large graph', markdown: `# 가정\n\nA ${'x'.repeat(23000)}\n\n# 결과\n\nB needs A.`, contract: { ...EMPTY_CONTRACT } }, db);
   const run = await runLocalReview(snapshot, db);
   for (const c of run.claims) { await setClaimAcceptance(run.id, c.id, 'accepted', db); c.acceptance = 'accepted'; }
   const [a, b] = run.claims.map(c => claimAnchor(run, c.id));
   await approveRelation({ documentId: snapshot.document.id, from: b, to: a, kind: 'depends_on', dependencyType: 'proof', assessment: null, note: 'Mandatory large premise' }, db);
   const campaign = await ensureCampaign(snapshot.document.id, db); const fetchMock = vi.spyOn(globalThis, 'fetch');
-  await expect(prepareGraphReview(snapshot, [b.blockId], db)).rejects.toThrow('40 KB');
+  const prepared = await prepareGraphReview(snapshot, [b.blockId], db);
+  expect(new TextEncoder().encode(prepared.request).byteLength).toBeGreaterThan(40000);
+  expect(prepared.request).toContain('x'.repeat(23000));
   expect((await db.review_campaigns.get(campaign.id))!.attempts).toEqual([]); expect(fetchMock).not.toHaveBeenCalled();
 });
 it('rejects forged premise scopes, approval snapshots and attempt/run divergence before replacing data', async () => {

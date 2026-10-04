@@ -29,9 +29,7 @@ export async function streamOpenAI(
     input,
     stream: true,
     store: false,
-    reasoning: {
-      effort: model.reasoningEffort || 'medium'
-    }
+    ...(model.reasoningEffort ? { reasoning: { effort: model.reasoningEffort } } : {})
   };
 
   const response = await fetch('https://api.openai.com/v1/responses', {

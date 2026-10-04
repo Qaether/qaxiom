@@ -101,14 +101,16 @@ it('maps split/merged lineages and later edits; removed scope falls back to full
   expect(final.lostLineage).toBe(true); expect(final.blockIds).toEqual(removed.blocks.map(b => b.id));
 });
 
-it('uses local inspection without a provider budget, while oversized recheck requests still reject truncation', async () => {
+it('uses local inspection and prepares the full long recheck request without truncation', async () => {
   const { snapshot, run, patch } = await fixture('', 'A revised.\n\n');
   const large = { ...run.patches[0], replacement: 'A '.repeat(25000) };
   await db.review_runs.update(run.id, { patches: [large] });
   const prepared = await preparePatchImpact(run.id, patch.id, db);
   const saved = await applyTheoryPatch(run.id, patch.id, db, prepared.impact);
   const scope = await currentPatchImpactScope(run.id, patch.id, saved, db);
-  await expect(prepareGraphReview(saved, scope.blockIds, db)).rejects.toThrow('40 KB');
+  const recheck = await prepareGraphReview(saved, scope.blockIds, db);
+  expect(new TextEncoder().encode(recheck.request).byteLength).toBeGreaterThan(40000);
+  expect(recheck.request).toContain('A '.repeat(25000));
   expect(saved.version.parentVersionId).toBe(snapshot.version.id);
 });
 
@@ -124,7 +126,7 @@ it('rolls back both impact approval and version creation on storage failure', as
 it('restores historical impact after retraction and rejects scope/hash/provenance corruption atomically', async () => {
   const { run, patch, relations } = await fixture(); const saved = await applyTheoryPatch(run.id, patch.id, db);
   await retractRelation(relations[0].id, '나중에 철회', db);
-  const bundle = await createWorkspaceBundle(db); expect(bundle.version).toBe(22); await restoreWorkspaceBundle(bundle, target);
+  const bundle = await createWorkspaceBundle(db); expect(bundle.version).toBe(24); await restoreWorkspaceBundle(bundle, target);
   const restored = (await target.review_runs.get(run.id))!;
   expect((await currentPatchImpactScope(run.id, patch.id, await loadTheory(saved.document.id, target), target)).blockIds).toHaveLength(5);
   for (const edit of [
@@ -156,7 +158,7 @@ it('imports genuine v13 applied patches and upgrades populated v13 without fabri
   await target.delete(); const legacy = new Dexie(target.name);
   legacy.version(13).stores(Object.fromEntries(db.tables.map(t => [t.name, [t.schema.primKey.src, ...t.schema.indexes.map(i => i.src)].join(',')])));
   for (const t of db.tables) await legacy.table(t.name).bulkAdd(await t.toArray());
-  legacy.close(); await target.open(); expect(target.verno).toBe(23);
+  legacy.close(); await target.open(); expect(target.verno).toBe(25);
   expect((await target.review_runs.get(run.id))!.patches[0].impact).toBeUndefined();
 });
 

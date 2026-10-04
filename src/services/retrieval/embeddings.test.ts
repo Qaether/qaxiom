@@ -37,7 +37,7 @@ it('adds schema v7 after populated v6 without changing earlier canonical data', 
   const tables = db.tables.filter(t => !['embedding_spaces', 'embedding_vectors', 'embedding_manifests', 'embedding_activations', 'research_relations'].includes(t.name));
   legacy.version(6).stores(Object.fromEntries(tables.map(t => [t.name, [t.schema.primKey.src, ...t.schema.indexes.map(i => i.src)].join(',')])));
   for (const table of tables) await legacy.table(table.name).bulkAdd(await table.toArray());
-  legacy.close(); await target.open(); expect(target.verno).toBe(23);
+  legacy.close(); await target.open(); expect(target.verno).toBe(25);
   expect(await target.references.get(selected.source.id)).toEqual(selected.source); expect(await target.embedding_spaces.count()).toBe(0);
 });
 
@@ -128,7 +128,7 @@ it('round trips vectors, clears running ownership, rejects hash tampering and im
   const { selected, space } = await fixture(); fakeProvider();
   await indexEmbeddingPlan(await prepareEmbeddingPlan(space.id, [selected.source.id], 3, db), 'key', new AbortController().signal, () => {}, db);
   await db.embedding_spaces.update(space.id, { runId: 'in-flight', deadlineAt: Date.now() + 120000 });
-  const bundle = await createWorkspaceBundle(db); expect(bundle.version).toBe(22); await restoreWorkspaceBundle(bundle, target);
+  const bundle = await createWorkspaceBundle(db); expect(bundle.version).toBe(24); await restoreWorkspaceBundle(bundle, target);
   expect(await target.embedding_vectors.toArray()).toEqual(bundle.data.embeddingVectors);
   expect((await target.embedding_spaces.get(space.id))!.runId).toBeNull();
   const bad = structuredClone(bundle); bad.data.embeddingVectors[0].values = vector(1);

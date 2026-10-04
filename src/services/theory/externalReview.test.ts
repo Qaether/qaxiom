@@ -100,14 +100,16 @@ it('keeps external claim extraction as a grounded, unaccepted candidate and pres
   expect(await externalAssessmentHash(legacy)).toBe(oldHash);
 });
 
-it('rejects empty/duplicate/oversized selections and mandatory budget overflow without reserving requests', async () => {
+it('rejects empty or duplicate selections and retains long criteria without reserving requests', async () => {
   const { snapshot, inputs, campaign } = await fixture();
   await expect(prepareExternalReview(snapshot, [], db)).rejects.toThrow('1–8');
   await expect(prepareExternalReview(snapshot, [inputs[0], inputs[0]], db)).rejects.toThrow();
   await expect(prepareExternalReview(snapshot, [{ ...inputs[0], theoryConditions: '' }], db)).rejects.toThrow();
   await expect(prepareExternalReview(snapshot, Array(9).fill(inputs[0]), db)).rejects.toThrow('1–8');
   const prepared = await prepareExternalReview(snapshot, inputs, db);
-  expect(() => externalReviewRequest({ ...prepared.context, contract: { ...prepared.context.contract, scope: '가'.repeat(20000) } })).toThrow('40 KB');
+  const longRequest = externalReviewRequest({ ...prepared.context, contract: { ...prepared.context.contract, scope: '가'.repeat(20000) } });
+  expect(new TextEncoder().encode(longRequest).byteLength).toBeGreaterThan(40000);
+  expect(longRequest).toContain('가'.repeat(20000));
   expect((await db.review_campaigns.get(campaign.id))!.attempts).toEqual([]);
 });
 
@@ -151,7 +153,7 @@ it('drops external classifications on deadline and rolls back result/ownership o
 
 it('restores frozen external results and rejects quote/context hash/own-origin tampering atomically', async () => {
   const f = await start(); await finishReviewAttempt(f.campaign.id, f.attempt.token, f.run, db);
-  const bundle = await createWorkspaceBundle(db); expect(bundle.version).toBe(22); await restoreWorkspaceBundle(JSON.parse(JSON.stringify(bundle)), target);
+  const bundle = await createWorkspaceBundle(db); expect(bundle.version).toBe(24); await restoreWorkspaceBundle(JSON.parse(JSON.stringify(bundle)), target);
   expect((await target.review_runs.get(f.run.id))!.external).toEqual(f.run.external);
   for (const mutate of [
     (b: typeof bundle) => { b.data.reviewRuns[0].external!.context.contextHash = '0'.repeat(64); },
@@ -210,7 +212,7 @@ it('imports genuine v14 ledgers and upgrades populated v14 without fabricating e
   await target.delete(); const legacy = new Dexie(target.name);
   legacy.version(14).stores(Object.fromEntries(db.tables.map(t => [t.name, [t.schema.primKey.src, ...t.schema.indexes.map(i => i.src)].join(',')])));
   for (const t of db.tables) await legacy.table(t.name).bulkAdd(await t.toArray());
-  legacy.close(); await target.open(); expect(target.verno).toBe(23); expect(await target.document_versions.get(snapshot.version.id)).toEqual(snapshot.version);
+  legacy.close(); await target.open(); expect(target.verno).toBe(25); expect(await target.document_versions.get(snapshot.version.id)).toEqual(snapshot.version);
 });
 
 it('routes the same approved selected-pair request to all three existing provider adapters without extra conversation or real network calls', async () => {

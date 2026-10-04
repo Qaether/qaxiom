@@ -4,6 +4,7 @@ import type { ChatMessage } from '../../types';
 import { streamAnthropic } from './anthropic';
 import { streamGemini, type ProviderCallbacks } from './gemini';
 import { streamOpenAI } from './openai';
+import { LIGHT_CHAT_MODELS } from '../chatRouting';
 
 const messages: ChatMessage[] = [
   { id: 'u1', role: 'user', content: '질문', timestamp: 1 },
@@ -40,6 +41,15 @@ afterEach(() => {
 });
 
 describe('provider streaming adapters', () => {
+  it('omits unsupported reasoning settings for the internal GPT-4o mini route', async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(responseFromSSE('data: {"type":"response.completed"}\n\n'));
+    vi.stubGlobal('fetch', fetchMock);
+    await streamOpenAI(messages, LIGHT_CHAT_MODELS.openai!, 'system', 'key', callbacks());
+    const request = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
+    expect(request.model).toBe('gpt-4o-mini');
+    expect(request).not.toHaveProperty('reasoning');
+  });
+
   it('streams OpenAI Responses deltas and sends a stateless reasoning request', async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(responseFromSSE(
       'data: {"type":"response.output_text.delta","delta":"안"}\n\n',

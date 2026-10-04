@@ -24,8 +24,8 @@ describe('canonical theory revisions', () => {
     await legacy.table('metadata').add({ key: 'legacy_sessions_v1', sourceCount: 1, completedAt: 1 });
     legacy.close();
     await db.open();
-    expect(db.verno).toBe(23);
-    expect(await db.sessions.get('legacy')).toEqual(old);
+    expect(db.verno).toBe(25);
+    expect(await db.sessions.get('legacy')).toEqual({ ...old, documentId: null });
     expect(await db.metadata.count()).toBe(1);
     expect(await db.document_versions.count()).toBe(0);
   });

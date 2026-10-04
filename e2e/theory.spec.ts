@@ -25,9 +25,9 @@ test('saves a document and starts AI analysis through the primary flow', async (
   expect(saveBox!.y).toBeLessThan(optionalCriteriaBox!.y);
   await editor.getByRole('button', { name: '정본 문서 만들기' }).click();
   const review = editor.getByRole('region', { name: '문서 검토', exact: true });
-  await expect(review.getByRole('button', { name: 'AI로 문서 분석' })).toBeVisible();
+  await expect(review.getByRole('button', { name: '전송 내용 확인' })).toBeVisible();
   await expect(review.locator('.theory-review-advanced')).not.toHaveAttribute('open', '');
-  await review.getByRole('button', { name: 'AI로 문서 분석' }).click();
+  await review.getByRole('button', { name: '전송 내용 확인' }).click();
   const preview = review.getByRole('region', { name: '검토 전송 미리보기' });
   await expect(preview).toContainText('질량은 양수다.');
   expect(calls).toBe(0);
@@ -59,14 +59,14 @@ test('plans a long document into explicitly confirmed AI analysis segments', asy
   await editor.getByLabel('문서 본문 (Markdown)').fill(['가'.repeat(8000), '나'.repeat(8000), '다'.repeat(8000)].join('\n\n'));
   await editor.getByRole('button', { name: '정본 문서 만들기' }).click();
   const review = editor.getByRole('region', { name: '문서 검토', exact: true });
-  await review.getByRole('button', { name: 'AI로 문서 분석' }).click();
+  await review.getByRole('button', { name: '전송 내용 확인' }).click();
   const preview = review.getByRole('region', { name: '검토 전송 미리보기' });
   await expect(preview).toContainText('전체 3구간 중 이번 구간');
   await expect(preview).toContainText('문서 문단 1/3개');
   expect(checked).toHaveLength(0);
   await preview.getByRole('button', { name: '이 범위로 LLM 검토 실행' }).click();
   await expect(review).toContainText('전체 3구간 · 남은 2구간');
-  await review.getByRole('button', { name: 'AI로 문서 분석' }).click();
+  await review.getByRole('button', { name: '전송 내용 확인' }).click();
   await expect(preview).toContainText('문서 문단 1/3개');
   expect(checked).toHaveLength(1);
   await preview.getByRole('button', { name: '이 범위로 LLM 검토 실행' }).click();
@@ -207,7 +207,7 @@ test('links a declared research criterion to an immutable canonical block and re
   await expect(editor.getByRole('status')).toContainText('v1 저장 완료');
   await editor.locator('.theory-review-advanced > summary').click();
   await expect(editor.getByRole('button', { name: '기본 구조 확인', exact: true })).toBeVisible();
-  await expect(editor.locator('details[aria-label="프로젝트 관리 및 자료 설정"]')).not.toHaveAttribute('open');
+  await expect(editor.getByRole('button', { name: '프로젝트 자료·문서 관리' })).toHaveCount(0);
   await expect(editor.locator('details[aria-label="고급 문서 도구"]')).not.toHaveAttribute('open');
   const anchor = editor.getByRole('combobox', { name: '근거 블록: 가정·공리' });
   await anchor.selectOption({ index: 2 });

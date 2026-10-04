@@ -33,7 +33,7 @@ describe('PDF persistence and page provenance', () => {
       : [table.schema.primKey.src, ...table.schema.indexes.map(index => index.src)].join(',')])));
     for (const table of tables) await legacy.table(table.name).bulkAdd(await target.table(table.name).toArray());
     legacy.close(); await db.open();
-    expect(db.verno).toBe(23);
+    expect(db.verno).toBe(25);
     expect(await db.references.get(old.source.id)).toEqual(old.source);
     await run((await register()).asset.id, ['mass']);
     expect(await db.references.count()).toBe(2);
@@ -140,7 +140,7 @@ describe('PDF persistence and page provenance', () => {
   it('backs up original bytes and rejects corrupt page metadata, missing assets or byte hashes before replacement', async () => {
     await run((await register()).asset.id, ['mass', 'energy']);
     const backup = await createWorkspaceBundle(db);
-    expect(backup.version).toBe(22);
+    expect(backup.version).toBe(24);
     await restoreWorkspaceBundle(JSON.parse(JSON.stringify(backup)), target);
     expect((await createWorkspaceBundle(target)).data).toEqual(backup.data);
     expect((await target.pdf_assets.toArray())[0].bytes).toEqual(bytes());

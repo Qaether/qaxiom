@@ -16,16 +16,16 @@ describe('research criteria suggestions', () => {
 
   it('requires parseable output and refuses silent truncation of a long document', () => {
     expect(() => parseContractSuggestions('not json', '제목', '본문')).toThrow('읽지 못했습니다');
-    expect(() => prepareContractSuggestionRequest('제목', 'x'.repeat(41000))).toThrow('40 KB');
+    expect(() => prepareContractSuggestionRequest('제목', 'x'.repeat(301000))).toThrow('300 KB');
   });
 
   it('splits a long Unicode document without omitting or duplicating text', () => {
-    const body = `# 가정\n${'질량은 양수다. 🌍\n'.repeat(4500)}`;
+    const body = `# 가정\n${'질량은 양수다. 🌍\n'.repeat(30000)}`;
     const requests = prepareContractSuggestionRequests('중력 모형', body);
     expect(requests.length).toBeGreaterThan(1);
     expect(requests.map(item => item.markdown).join('')).toBe(body.trim());
     for (const request of requests) {
-      expect(new TextEncoder().encode(JSON.stringify({ title: '중력 모형', markdown: request.markdown })).length).toBeLessThanOrEqual(40000);
+      expect(new TextEncoder().encode(JSON.stringify({ title: '중력 모형', markdown: request.markdown })).length).toBeLessThanOrEqual(300000);
       expect(request.prompt).toContain(JSON.stringify({ title: '중력 모형', markdown: request.markdown }));
     }
   });

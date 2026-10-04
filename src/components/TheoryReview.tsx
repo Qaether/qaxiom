@@ -6,13 +6,12 @@ import type { TheorySnapshot } from '../services/theory/types';
 import type { ReviewRun } from '../services/theory/reviewTypes';
 import { checkerCovers, isLocalChecker } from '../services/theory/reviewTypes';
 import { applyTheoryPatch, parseModelReview, prepareReviewRequest, reviewSkeleton, runLocalReview, setClaimAcceptance, resolveReviewIssue } from '../services/theory/reviews';
-import { activeAttempt, assertPlannedGraph, changeCampaignBudget, closeCampaign, confirmCampaignResume, ensureCampaign, finishReviewAttempt, getCampaign, pendingBatches, recoverExpiredAttempt, reserveReviewAttempt, saveReviewPlan, spentTime, startNewCampaign, type ReviewCampaign } from '../services/theory/campaigns';
+import { activeAttempt, changeCampaignBudget, closeCampaign, confirmCampaignResume, ensureCampaign, finishReviewAttempt, getCampaign, recoverExpiredAttempt, reserveReviewAttempt, spentTime, startNewCampaign, type ReviewCampaign } from '../services/theory/campaigns';
 import { campaignStop, STOP_LABELS } from '../services/theory/campaignPolicy';
 import { reviewToMarkdown } from '../services/theory/reviewReport';
 import { assertGraphReviewCurrent, prepareGraphReview, type GraphReviewPreparation } from '../services/theory/reviewGraph';
 import PatchImpact from './PatchImpact';
 import ExternalRelationApproval from './ExternalRelationApproval';
-import ExternalClaimApproval from './ExternalClaimApproval';
 import ExternalReview from './ExternalReview';
 import ReferenceSource from './ReferenceSource';
 import type { ContextEvidence } from '../services/retrieval/types';
@@ -52,7 +51,6 @@ export default function TheoryReview({ snapshot, settings, modelId, dirty, onSav
   const [previewModel, setPreviewModel] = useState('');
   const [includeGraph, setIncludeGraph] = useState(false);
   const [graphPreview, setGraphPreview] = useState<GraphReviewPreparation | null>(null);
-  const [usingPlan, setUsingPlan] = useState(false);
   const [externalOriginal, setExternalOriginal] = useState<ContextEvidence | null>(null);
   const [modelRunning, setModelRunning] = useState(false);
   const [error, setError] = useState('');
@@ -64,14 +62,22 @@ export default function TheoryReview({ snapshot, settings, modelId, dirty, onSav
   const requestBudget = campaign?.maxRequests ?? 3;
   const usedRequests = campaign?.attempts.length ?? 0;
   const runningAttempt = campaign && activeAttempt(campaign);
-  const batches = campaign ? pendingBatches(campaign, runs) : [];
   const stop = campaign ? campaignStop(campaign, runs) : null;
   const selectedCurrent = selected.filter(id => snapshot.blocks.some(block => block.id === id));
   const previewBlockIds = graphPreview?.blockIds ?? selectedCurrent;
   const previewBlocks = snapshot.blocks.filter(block => previewBlockIds.includes(block.id));
+  const omittedBlocks = snapshot.blocks.filter(block => !previewBlockIds.includes(block.id));
+  const previewDocument = previewBlocks.length === snapshot.blocks.length
+    ? snapshot.version.markdown : previewBlocks.map(block => block.text).join('\n');
   const filledContract = (Object.keys(contractLabels) as (keyof typeof contractLabels)[])
     .filter(key => snapshot.version.contract[key].trim());
   const controller = useRef<AbortController | null>(null);
+  const previewRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (preview && previewVersion === snapshot.version.id && previewModel === modelId) {
+      previewRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [preview, previewVersion, previewModel, snapshot.version.id, modelId]);
   const refresh = async () => {
     setRuns(await qaxiomDatabase.review_runs.where('documentId').equals(snapshot.document.id).reverse().sortBy('createdAt'));
     setCampaign(await ensureCampaign(snapshot.document.id));
@@ -106,7 +112,6 @@ export default function TheoryReview({ snapshot, settings, modelId, dirty, onSav
     if (!campaign || !preview || previewModel !== modelId || previewVersion !== snapshot.version.id
       || (includeGraph && (!prepared || selectedCurrent.length !== prepared.graph.targetBlockIds.length || selectedCurrent.some(id => !prepared.graph.targetBlockIds.includes(id))))
       || preview !== prepareReviewRequest(snapshot, blockIds, prepared?.graph)) throw new Error('전송 범위 또는 회차 예산을 다시 확인하세요.');
-    if (usingPlan && prepared) assertPlannedGraph((await getCampaign(snapshot.document.id))?.plan ?? null, prepared);
     const attempt = await reserveReviewAttempt(campaign.id, snapshot, blockIds, modelId, qaxiomDatabase, prepared ?? undefined);
     await refresh();
     const abort = new AbortController(); controller.current = abort;
@@ -139,43 +144,62 @@ export default function TheoryReview({ snapshot, settings, modelId, dirty, onSav
   });
   const prepareSimpleReview = () => execute(async () => {
     const allBlocks = snapshot.blocks.map(block => block.id);
-    const savedPlan = campaign?.plan?.versionId === snapshot.version.id &&
-      campaign.plan.batches.flat().length === allBlocks.length &&
-      campaign.plan.batches.flat().every(id => allBlocks.includes(id)) && !campaign.plan.graphContexts ? campaign : null;
-    let target = allBlocks;
-    let request: string;
-    if (savedPlan && pendingBatches(savedPlan, runs).length) {
-      target = pendingBatches(savedPlan, runs)[0];
-      request = prepareReviewRequest(snapshot, target);
-    } else {
-      try { request = prepareReviewRequest(snapshot, allBlocks); }
-      catch (cause) {
-        if (!(cause instanceof Error) || !cause.message.includes('40 KB 예산')) throw cause;
-        if (!campaign) throw new Error('검토 준비가 끝나지 않았습니다. 다시 시도해 주세요.');
-        const planned = await saveReviewPlan(campaign.id, snapshot, allBlocks, qaxiomDatabase, false);
-        setCampaign(planned);
-        target = pendingBatches(planned, runs)[0] ?? [];
-        if (!target.length) throw new Error('현재 문서의 모든 구간이 이미 확인되었습니다. 재검토 범위를 상세 설정에서 선택해 주세요.');
-        request = prepareReviewRequest(snapshot, target);
-      }
-    }
-    setSelected(target); setIncludeGraph(false); setUsingPlan(false); setGraphPreview(null);
+    const request = prepareReviewRequest(snapshot, allBlocks);
+    setSelected(allBlocks); setIncludeGraph(false); setGraphPreview(null);
     setPreviewVersion(snapshot.version.id); setPreviewModel(modelId); setPreview(request);
   });
   const latest = runs[0];
   return <section aria-label="문서 검토" className="theory-review">
-    <h3>2. AI 분석</h3>
-    <p>저장한 문서를 분석해 주장과 확인할 문제를 제안받습니다. 전송 범위를 확인한 뒤 시작하며, 결과를 보고 문서를 수정할 수 있습니다.</p>
-    {dirty && <p>먼저 편집 내용을 새 버전으로 저장하세요.</p>}
+    <div className="theory-review-intro">
+      <div>
+        <p className="theory-review-eyebrow">현재 문서 · v{snapshot.version.number}</p>
+        <h4>{snapshot.version.title}</h4>
+        <p>AI가 문서의 주장과 논리상 확인할 지점을 제안합니다. 결과는 검토를 돕는 의견이며 정합성이나 참을 보증하지 않습니다.</p>
+      </div>
+      <p className="theory-review-model">모델 <strong>{modelId}</strong></p>
+    </div>
+    {dirty && <p className="theory-review-warning" role="status">저장하지 않은 수정이 있습니다. 새 버전으로 저장한 뒤 분석하세요.</p>}
     {error && <p role="alert">{error}</p>}
     <div className="theory-review-primary">
+      <div><strong>연구 문서 전체 분석</strong><p>저장한 문서와 연구 기준을 한 번에 확인합니다. 대화·레퍼런스·PDF 원본은 보내지 않습니다.</p></div>
       <button type="button" disabled={busy || dirty || !campaign || !!runningAttempt || !!campaign.closure || !!stop || usedRequests >= requestBudget || !snapshot.blocks.length}
-        onClick={() => void prepareSimpleReview()}>AI로 문서 분석</button>
-      <p>먼저 전송할 모델·문서 범위를 보여 줍니다. 긴 문서는 문단별 구간으로 나누고 매 구간의 전송을 따로 확인합니다. 결과는 검토 제안이며 이론의 참을 보증하지 않습니다.</p>
-      {campaign?.plan?.versionId === snapshot.version.id && !campaign.plan.graphContexts && <p>현재 문서 분석 계획: 전체 {campaign.plan.batches.length}구간 · 남은 {batches.length}구간. 비용은 실제 승인한 요청마다 발생합니다.</p>}
-      {(stop || campaign?.closure || usedRequests >= requestBudget) && <p>이번 검토의 요청 한도 또는 중단 상태를 확인하려면 아래 상세 검토 설정을 여세요.</p>}
+        onClick={() => void prepareSimpleReview()}>전송 내용 확인</button>
     </div>
-    <details className="theory-review-advanced"><summary>상세 검토 설정 · 범위와 기록</summary>
+    <p className="theory-review-progress">이번 검토 {usedRequests}/{requestBudget}회 사용{usedRequests > 0 && ' · 요청마다 모델 비용 발생'}</p>
+    {(stop || campaign?.closure || usedRequests >= requestBudget) && <p className="theory-review-warning">추가 분석을 위해 아래 ‘검토 회차 관리’에서 중단 사유나 요청 한도를 확인하세요.</p>}
+    <details className="theory-review-advanced"><summary>부분 분석·추가 문맥 (선택)</summary>
+      <p>특정 부분만 다시 확인하거나 승인된 전제 관계를 함께 보내려는 경우에 사용하세요. 기본 분석은 저장 문서 전체를 한 번에 보냅니다.</p>
+      {runningAttempt && !modelRunning && <p>다른 탭 또는 중단된 실행의 기한: {new Date(runningAttempt.deadlineAt).toLocaleTimeString()}. 자동 재전송하지 않습니다.</p>}
+      {runningAttempt && !modelRunning && <button type="button" disabled={busy || now <= runningAttempt.deadlineAt} onClick={() => void execute(async () => {
+        const version = await qaxiomDatabase.document_versions.get(runningAttempt.versionId);
+        if (!version || !campaign) throw new Error('검토 원문 버전이 없습니다.');
+        const blocks = await qaxiomDatabase.document_blocks.where('versionId').equals(version.id).sortBy('position');
+        await recoverExpiredAttempt(campaign.id, { document: snapshot.document, version, blocks, history: snapshot.history }); await refresh();
+      })}>만료된 실행 종료 · 재개 준비</button>}
+      <fieldset disabled={busy || dirty || !campaign || !!runningAttempt || !!campaign.closure}>
+      <legend>전송할 문단과 추가 문맥</legend>
+      <p>선택한 문단과 연구 기준 전체만 보냅니다. 미선택 문단은 미검사로 남습니다.</p>
+      <label><input type="checkbox" checked={includeGraph} onChange={event => { setIncludeGraph(event.target.checked); setPreview(''); setGraphPreview(null); }} />승인 관계의 전제·정의도 포함</label>
+      {includeGraph && <p>선택한 문단에 연결된 승인 전제를 추가합니다. 추가 문맥도 전송 범위에 표시하며 외부 레퍼런스는 포함하지 않습니다.</p>}
+      <label>최대 검토 요청 횟수<input aria-label="최대 검토 요청 횟수" type="number" min={1} max={100} value={requestBudget} onChange={event => {
+        const value = Number(event.target.value); setPreview('');
+        if (campaign) void execute(async () => { setCampaign(await changeCampaignBudget(campaign.id, value)); });
+      }} /></label>
+      <p>사용 {usedRequests}/{requestBudget}회 · 요청별 최대 120초 · 저장된 사용 시간 {Math.ceil((campaign ? spentTime(campaign) : 0) / 1000)}/{requestBudget * 120}초. 실패도 회차를 사용합니다. 토큰 비용 추정은 제공하지 않습니다.</p>
+      <div className="theory-review-block-list">{snapshot.blocks.map(block => <label className="reference-choice" key={block.id}>
+        <input type="checkbox" checked={selected.includes(block.id)} onChange={event => {
+          setPreview(''); setGraphPreview(null); setSelected(previous => event.target.checked ? [...previous, block.id] : previous.filter(id => id !== block.id));
+        }} /><span>문단 {block.position + 1} · {blockKindLabels[block.kind]} · {block.text.slice(0, 100)}</span>
+      </label>)}</div>
+      <button type="button" disabled={!selectedCurrent.length || usedRequests >= requestBudget || !!stop} onClick={() => void execute(async () => {
+        setPreview(''); setGraphPreview(null);
+        const prepared = includeGraph ? await prepareGraphReview(snapshot, selectedCurrent) : null;
+        setGraphPreview(prepared); setPreviewVersion(snapshot.version.id); setPreviewModel(modelId);
+        setPreview(prepared?.request ?? prepareReviewRequest(snapshot, selectedCurrent));
+      })}>검토 전송 미리보기</button>
+      </fieldset>
+    </details>
+    {(usedRequests > 0 || !!stop || !!campaign?.closure || campaignHistory.some(item => item.id !== campaign?.id)) && <details className="theory-review-advanced"><summary>검토 회차 관리</summary>
     {stop && !campaign?.closure && <section aria-label="검토 중단 사유">
       <h4>추가 요청 전 확인 필요</h4>
       {stop.reasons.map(reason => <p key={reason}>{STOP_LABELS[reason]}</p>)}
@@ -208,74 +232,40 @@ export default function TheoryReview({ snapshot, settings, modelId, dirty, onSav
         <p>{item.note} · Issue 해결/정합성 통과 표시가 아님</p>
       </div>)}
     </details>}
-    <section className="theory-review-step" aria-labelledby="local-review-heading">
-      <h4 id="local-review-heading">1. 기본 구조 확인</h4>
-      <p>인터넷 전송 없이 빈 연구 기준, 끊어진 문단 연결, 직접 작성한 기호·의존성 선언의 형식만 확인합니다. 글의 의미나 이론의 옳고 그름을 판단하지 않습니다.</p>
+    </details>}
+    <details className="theory-review-advanced theory-review-local"><summary>로컬 구조 확인 · 인터넷 전송 없음</summary>
+      <p>연구 기준의 빈 항목, 문단 연결과 기호 선언 형식만 확인합니다. 글의 의미나 이론의 옳고 그름은 판단하지 않습니다.</p>
       <button type="button" disabled={busy || dirty} onClick={() => void execute(async () => { await runLocalReview(snapshot); await refresh(); })}>기본 구조 확인</button>
-    </section>
-    {runningAttempt && !modelRunning && <p>다른 탭 또는 중단된 실행의 기한: {new Date(runningAttempt.deadlineAt).toLocaleTimeString()}. 자동 재전송하지 않습니다.</p>}
-    {runningAttempt && !modelRunning && <button type="button" disabled={busy || now <= runningAttempt.deadlineAt} onClick={() => void execute(async () => {
-      const version = await qaxiomDatabase.document_versions.get(runningAttempt.versionId);
-      if (!version || !campaign) throw new Error('검토 원문 버전이 없습니다.');
-      const blocks = await qaxiomDatabase.document_blocks.where('versionId').equals(version.id).sortBy('position');
-      await recoverExpiredAttempt(campaign.id, { document: snapshot.document, version, blocks, history: snapshot.history }); await refresh();
-    })}>만료된 실행 종료 · 재개 준비</button>}
-    <fieldset disabled={busy || dirty || !campaign || !!runningAttempt || !!campaign.closure}>
-      <legend>2. AI로 내용과 논리 검토하기</legend>
-      <p>현재 모델: {modelId}. 연구 기준 전체와 선택 블록만 보냅니다. 기존 대화·레퍼런스·PDF 원본은 보내지 않습니다. 미선택 블록은 미검사로 남습니다.</p>
-      <label><input type="checkbox" checked={includeGraph} onChange={event => { setIncludeGraph(event.target.checked); setUsingPlan(false); setPreview(''); setGraphPreview(null); }} />승인 관계의 전제·정의도 포함</label>
-      {includeGraph && <p>선택한 목표에서 승인된 의존·정의 관계를 따라 추가 정본 블록을 포함합니다. 분할할 때도 필수 전제·관계·연구 기준 전체를 40 KB 예산에 포함하며 공통 전제는 각 구간에 반복 첨부합니다. 외부 레퍼런스는 보내지 않습니다. 한 목표의 필수 문맥조차 초과하면 생략하지 않고 계획 저장을 거부합니다.</p>}
-      <label>최대 검토 요청 횟수<input aria-label="최대 검토 요청 횟수" type="number" min={1} max={100} value={requestBudget} onChange={event => {
-        const value = Number(event.target.value); setPreview('');
-        if (campaign) void execute(async () => { setCampaign(await changeCampaignBudget(campaign.id, value)); });
-      }} /></label>
-      <p>사용 {usedRequests}/{requestBudget}회 · 요청별 최대 120초 · 저장된 사용 시간 {Math.ceil((campaign ? spentTime(campaign) : 0) / 1000)}/{requestBudget * 120}초 · 입력 40 KB/출력 100,000자. 실패도 회차를 사용하며 새로고침·버전 변경으로 초기화되지 않습니다. 토큰 비용 추정은 아직 제공하지 않습니다.</p>
-      <button type="button" disabled={!selectedCurrent.length} onClick={() => void execute(async () => {
-        if (campaign) setCampaign(await saveReviewPlan(campaign.id, snapshot, selectedCurrent, qaxiomDatabase, includeGraph)); setUsingPlan(false); setPreview(''); setGraphPreview(null);
-      })}>선택 범위 분할 검토 계획 저장</button>
-      {campaign?.plan && <p>저장된 분할 계획: {campaign.plan.batches.length}구간 · 남은 {batches.length}구간 · {campaign.plan.graphContexts ? '승인 그래프 전제 포함 · 실제 검사된 목표만 진행률 반영' : '선택 원문 기준'} {campaign.plan.versionId !== snapshot.version.id && '· 이전 버전 — 현재 버전으로 계획을 다시 저장하세요.'}. 구간 처리 완료는 구간 간 논증 정합성 판정이 아닙니다.</p>}
-      {campaign?.plan?.graphContexts && <details><summary>분할 구간별 필수 문맥</summary>{campaign.plan.graphContexts.map((graph, index) => <p key={graph.contextHash}>구간 {index + 1}: 목표 {graph.targetBlockIds.length} · 추가 전제 {graph.premiseBlockIds.length} · 관계 {graph.relationSnapshots.length} · proof 순환 후보 {graph.proofCycleRelationIds.length}</p>)}<p>관계·채택·정본이 변경되면 계획을 다시 저장해야 합니다. 다음 구간 선택은 자동 전송하지 않습니다.</p></details>}
-      {!!batches.length && campaign?.plan?.versionId === snapshot.version.id && <button type="button" onClick={() => { setSelected(batches[0]); setIncludeGraph(!!campaign.plan?.graphContexts); setUsingPlan(!!campaign.plan?.graphContexts); setPreview(''); setGraphPreview(null); }}>다음 미검사 구간 선택</button>}
-      {snapshot.blocks.map(block => <label className="reference-choice" key={block.id}>
-        <input type="checkbox" checked={selected.includes(block.id)} onChange={event => {
-          setPreview(''); setUsingPlan(false); setGraphPreview(null); setSelected(previous => event.target.checked ? [...previous, block.id] : previous.filter(id => id !== block.id));
-        }} /><span>문단 {block.position + 1} · {blockKindLabels[block.kind]} · {block.text.slice(0, 100)}</span>
-      </label>)}
-      <button type="button" disabled={!selectedCurrent.length || usedRequests >= requestBudget || !!stop} onClick={() => void execute(async () => {
-        setPreview(''); setGraphPreview(null);
-        const prepared = includeGraph ? await prepareGraphReview(snapshot, selectedCurrent) : null;
-        if (usingPlan && prepared) assertPlannedGraph((await getCampaign(snapshot.document.id))?.plan ?? null, prepared);
-        setGraphPreview(prepared); setPreviewVersion(snapshot.version.id); setPreviewModel(modelId);
-        setPreview(prepared?.request ?? prepareReviewRequest(snapshot, selectedCurrent));
-      })}>검토 전송 미리보기</button>
-    </fieldset>
     </details>
-    {preview && previewVersion === snapshot.version.id && previewModel === modelId && <section aria-label="검토 전송 미리보기">
-      <h4>AI에 보낼 내용 확인</h4>
-      <p><strong>아직 분석 결과가 아닙니다.</strong> 아래는 검토를 시작하기 전에 전송 범위를 확인하는 화면입니다.</p>
+    {preview && previewVersion === snapshot.version.id && previewModel === modelId && <section ref={previewRef} className="theory-review-preview" aria-label="검토 전송 미리보기">
+      <p className="theory-review-eyebrow">전송 전 확인 · 아직 모델에 보내지 않았습니다</p>
+      <h4>AI에 보낼 내용</h4>
       {includeGraph && graphPreview && <p>목표 {graphPreview.graph.targetBlockIds.length}블록 · 추가 전제 {graphPreview.graph.premiseBlockIds.length}블록 · 승인 관계 {graphPreview.graph.relationSnapshots.length}개 · 외부 자료 미전송 {graphPreview.graph.excludedCounts.external_not_selected}개. 추가 문맥의 첨부가 실제 검사를 의미하지는 않습니다.</p>}
-      <p>선택 모델: {modelId} · 문서 문단 {previewBlocks.length}/{snapshot.blocks.length}개 · 작성한 연구 기준 {filledContract.length}/6개</p>
-      {campaign?.plan?.versionId === snapshot.version.id && !campaign.plan.graphContexts && <p>전체 {campaign.plan.batches.length}구간 중 이번 구간입니다. 다른 구간은 이번 요청에 포함되지 않으며, 저장된 계획에서 다음 구간을 다시 확인해 진행할 수 있습니다.</p>}
-      {!!filledContract.length && <details><summary>함께 보내는 연구 기준 {filledContract.length}개</summary>
+      <p>선택 모델: {modelId} · {omittedBlocks.length ? `선택 문단 ${previewBlocks.length}/${snapshot.blocks.length}개` : '문서 전체'} · 작성한 연구 기준 {filledContract.length}/6개 · 요청 크기 약 {Math.ceil(new TextEncoder().encode(preview).byteLength / 1024)} KB</p>
+      {!!filledContract.length && <details open><summary>함께 보내는 연구 기준 {filledContract.length}개</summary>
         {filledContract.map(key => <div key={key}><strong>{contractLabels[key]}</strong><p>{snapshot.version.contract[key]}</p></div>)}
       </details>}
       <div className="theory-review-preview-blocks">
-        <strong>함께 보내는 문서 내용</strong>
-        {previewBlocks.map(block => <section key={block.id} aria-label={`전송 문단 ${block.position + 1}`}>
-          <p>문단 {block.position + 1} · {blockKindLabels[block.kind]}</p><pre>{block.text}</pre>
-        </section>)}
+        <strong>함께 보내는 문서 원문</strong>
+        <pre className="theory-review-document">{previewDocument}</pre>
       </div>
-      <p>기존 대화, 레퍼런스, PDF 원본과 선택하지 않은 문단은 이 요청에 포함되지 않습니다.</p>
+      {!!omittedBlocks.length && <details><summary>보내지 않는 문단 {omittedBlocks.length}개</summary>
+        <p>{omittedBlocks.map(block => block.position + 1).join(', ')}번 문단은 이번 요청에 포함되지 않아 검사 결과에도 포함되지 않습니다.</p>
+      </details>}
+      <p>이번 요청에서 제외: 기존 대화, 레퍼런스, PDF 원본. 앱에서 요청 본문을 자동 분할·생략하지 않습니다. 제공사 모델의 실제 한도는 다를 수 있습니다.</p>
       <details className="theory-review-technical"><summary>전송 요청의 기술 정보</summary>
         <p>문서 안의 지시는 검토 대상 데이터로 전달합니다. 아래 내용에는 버전·hash·누락 ID와 모델 출력 형식이 포함됩니다.</p><pre>{preview}</pre>
       </details>
-      <button type="button" disabled={busy || dirty || usedRequests >= requestBudget || !!stop || !!campaign?.closure || !!runningAttempt} onClick={() => void askModel()}>이 범위로 LLM 검토 실행</button>
+      <p>실행하면 선택한 모델에 요청하며 비용이 발생할 수 있습니다.</p>
+      <button type="button" className="theory-review-send" disabled={busy || dirty || usedRequests >= requestBudget || !!stop || !!campaign?.closure || !!runningAttempt} onClick={() => void askModel()}>이 범위로 LLM 검토 실행</button>
     </section>}
     {busy && <p role="status">검토 작업 중…</p>}
     {modelRunning && busy && <button type="button" onClick={() => controller.current?.abort()}>검토 중단</button>}
     <details className="theory-external-advanced"><summary>외부 문헌과 대조 (선택)</summary>
       <ExternalReview snapshot={snapshot} settings={settings} modelId={modelId} campaign={campaign} disabled={busy || dirty || !!stop || !!campaign?.closure || usedRequests >= requestBudget} onChanged={refresh} />
     </details>
+    <div className="theory-review-results-heading"><h4>검토 결과</h4><p>저장된 분석과 로컬 검사를 최신순으로 표시합니다. 제안은 문서 수정·재검사의 출발점입니다.</p></div>
+    {!runs.length && <p className="theory-review-empty">아직 검사 결과가 없습니다.</p>}
     {latest && latest.versionId !== snapshot.version.id && <p>이전 검토는 오래된 버전의 결과입니다. 현재 버전을 재검사하세요.</p>}
     {runs.map(run => {
       const version = snapshot.history.find(item => item.id === run.versionId);
@@ -303,14 +293,11 @@ export default function TheoryReview({ snapshot, settings, modelId, dirty, onSav
         {run.external.assessments.map(a => {
           const pair = run.external!.context.pairs.find(p => p.id === a.pairId), evidence = run.external!.context.evidence.find(e => e.citationId === pair?.citationId);
           return <div key={a.pairId}><p>{a.label} · {a.explanation}</p><p>이론 조건: {a.theoryConditions} / 원문 조건: {a.referenceConditions}</p><pre>{a.theoryQuote}</pre><pre>{a.referenceQuote}</pre>
-            {a.referenceClaim && <section aria-label="외부 주장 추출 후보"><p>외부 주장 추출 후보 · {a.referenceClaim.kind} · 근거 유형 {a.referenceClaim.basis}. 모델 제안이며 사용자 채택·독립성·참/정합성 검증은 아닙니다.</p><p>주장: {a.referenceClaim.statement}</p><p>적용 조건: {a.referenceClaim.conditions}</p><blockquote>{a.referenceClaim.evidenceQuote}</blockquote></section>}
             {evidence && <button type="button" onClick={() => setExternalOriginal(evidence)}>대조 원문 확인: {evidence.name}</button>}
-            <ExternalClaimApproval run={run} pairId={a.pairId} snapshot={snapshot} disabled={busy || dirty || !!runningAttempt} />
             <ExternalRelationApproval run={run} pairId={a.pairId} snapshot={snapshot} runs={runs} disabled={busy || dirty || !!runningAttempt} onChanged={refresh} /></div>;
         })}
-        <details><summary>전송 당시 독립 원문·조건·누락 범위</summary><pre>{JSON.stringify(run.external.context, null, 2)}</pre></details></section>}
-      {run.graph && <details><summary>전송 당시 승인 그래프 · 목표 {run.graph.targetBlockIds.length} / 추가 전제 {run.graph.premiseBlockIds.length}</summary><pre>{JSON.stringify(run.graph, null, 2)}</pre><p>전송 범위 기록이며 실제 검사는 위 검사 블록 수만 반영합니다. 외부 자료는 포함하지 않았습니다.</p></details>}
-      {!!run.uncheckedBlockIds.length && <details><summary>확인하지 않은 문단의 기술 정보</summary><pre>{run.uncheckedBlockIds.join('\n')}</pre></details>}
+        <p>전송 당시의 원문·조건·누락 범위는 내보낸 검토 보고서에 보존됩니다.</p></section>}
+      {run.graph && <p>승인 관계를 포함해 목표 {run.graph.targetBlockIds.length}개 문단과 추가 전제 {run.graph.premiseBlockIds.length}개 문단을 전송했습니다. 추가 전제는 검사 완료 수에 포함하지 않습니다.</p>}
       {run.error && <p>{run.error}</p>}
       {!!run.limitations.length && <details className="theory-review-limitations"><summary>이 검사로 확인하지 않은 것</summary>
         {run.limitations.map((limitation, index) => <p key={index}>{limitation}</p>)}</details>}
@@ -346,13 +333,10 @@ export default function TheoryReview({ snapshot, settings, modelId, dirty, onSav
           <details><summary>수정 제안의 기술 정보</summary><p>변경 전 원문 hash: {patch.beforeHash}</p></details>
           <div className="theory-diff"><pre>{snapshot.version.id === run.versionId ? snapshot.blocks.find(block => block.id === patch.blockId)?.text : '이전 버전의 원문'}</pre><pre>{patch.replacement}</pre></div>
           <PatchImpact run={run} patch={patch} snapshot={snapshot} runs={runs} disabled={busy || dirty} onApply={impact => {
-            void execute(async () => { const saved = await applyTheoryPatch(run.id, patch.id, qaxiomDatabase, impact); setPreview(''); setGraphPreview(null); setUsingPlan(false); setSelected(saved.blocks.map(block => block.id)); onSaved(saved); await refresh(); });
-          }} onSelect={blockIds => { setSelected(blockIds); setPreview(''); setGraphPreview(null); setIncludeGraph(false); setUsingPlan(false); }} />
+            void execute(async () => { const saved = await applyTheoryPatch(run.id, patch.id, qaxiomDatabase, impact); setPreview(''); setGraphPreview(null); setSelected(saved.blocks.map(block => block.id)); onSaved(saved); await refresh(); });
+          }} onSelect={blockIds => { setSelected(blockIds); setPreview(''); setGraphPreview(null); setIncludeGraph(false); }} />
         </div>)}
       </div>)}
-      <details className="theory-review-technical"><summary>검사 기록의 기술 정보</summary>
-        <p>검사 방식 {run.checker} · 실행 ID {run.id} · 버전 ID {run.versionId}</p>
-      </details>
     </article>; })}
     {externalOriginal && <ReferenceSource evidence={externalOriginal} onClose={() => setExternalOriginal(null)} />}
   </section>;

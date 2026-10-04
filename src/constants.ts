@@ -15,7 +15,7 @@ Your purpose is to assist researchers, scientists, and academics with rigorous, 
   },
   peer_review: {
     id: 'peer_review',
-    name: '피어 리뷰어 (Peer Review)',
+    name: '피어 리뷰',
     badge: 'Reviewer #2',
     description: '논문의 논리적 비약, 방법론 결함, 대조군 부족 등을 엄격하게 비판 검토',
     systemPrompt: `You are an exacting, top-tier journal Peer Reviewer (often known as the rigorous "Reviewer #2").
@@ -71,7 +71,8 @@ export const AVAILABLE_MODELS: ModelOption[] = [
     supportsTemperature: false,
     reasoningEffort: 'medium',
     verifiedAt: '2026-10-03',
-    recommended: true
+    recommended: true,
+    contextWindowTokens: 200000
   },
   {
     id: 'gpt-6.1-sol',
@@ -82,7 +83,8 @@ export const AVAILABLE_MODELS: ModelOption[] = [
     api: 'responses',
     supportsTemperature: false,
     reasoningEffort: 'medium',
-    verifiedAt: '2026-10-03'
+    verifiedAt: '2026-10-03',
+    contextWindowTokens: 128000
   },
   {
     id: 'gpt-6-luna',
@@ -93,7 +95,8 @@ export const AVAILABLE_MODELS: ModelOption[] = [
     api: 'responses',
     supportsTemperature: false,
     reasoningEffort: 'low',
-    verifiedAt: '2026-10-03'
+    verifiedAt: '2026-10-03',
+    contextWindowTokens: 128000
   },
   {
     id: 'claude-opus-5',
@@ -103,7 +106,8 @@ export const AVAILABLE_MODELS: ModelOption[] = [
     status: 'active',
     api: 'messages',
     supportsTemperature: false,
-    verifiedAt: '2026-10-03'
+    verifiedAt: '2026-10-03',
+    contextWindowTokens: 200000
   },
   {
     id: 'claude-sonnet-5',
@@ -113,7 +117,8 @@ export const AVAILABLE_MODELS: ModelOption[] = [
     status: 'active',
     api: 'messages',
     supportsTemperature: false,
-    verifiedAt: '2026-10-03'
+    verifiedAt: '2026-10-03',
+    contextWindowTokens: 200000
   },
   {
     id: 'gemini-3.1-pro-preview',
@@ -123,7 +128,8 @@ export const AVAILABLE_MODELS: ModelOption[] = [
     status: 'preview',
     api: 'generate-content',
     supportsTemperature: true,
-    verifiedAt: '2026-10-03'
+    verifiedAt: '2026-10-03',
+    contextWindowTokens: 2000000
   },
   {
     id: 'gemini-3.8-flash',
@@ -133,7 +139,8 @@ export const AVAILABLE_MODELS: ModelOption[] = [
     status: 'active',
     api: 'generate-content',
     supportsTemperature: true,
-    verifiedAt: '2026-10-03'
+    verifiedAt: '2026-10-03',
+    contextWindowTokens: 1000000
   }
 ];
 
@@ -164,3 +171,33 @@ export const DEFAULT_SETTINGS: UserSettings = {
   streamResponses: true,
   temperature: 0.7
 };
+
+/**
+ * 한국어, 영문, 특수기호 혼합 텍스트의 토큰 수(Token Count)를 실시간 추정합니다.
+ */
+export function estimateTokenCount(text: string): number {
+  if (!text) return 0;
+  const cjkMatches = text.match(/[\u3000-\u9FFF\uAC00-\uD7AF]/g);
+  const cjkCount = cjkMatches ? cjkMatches.length : 0;
+  
+  const nonCjkText = text.replace(/[\u3000-\u9FFF\uAC00-\uD7AF]/g, ' ');
+  const wordMatches = nonCjkText.match(/\S+/g);
+  const wordCount = wordMatches ? wordMatches.length : 0;
+  const nonCjkCharCount = nonCjkText.length - wordCount;
+  
+  const estimated = Math.ceil(cjkCount * 1.5 + wordCount * 1.3 + nonCjkCharCount * 0.25);
+  return Math.max(0, estimated);
+}
+
+/**
+ * 토큰 수치를 K, M 단위를 명시하여 직관적인 읽기용 문자열로 포맷팅합니다.
+ * 예: 128,000 -> 128K (128,000 토큰), 2,000,000 -> 2M (2,000,000 토큰)
+ */
+export function formatTokenLimit(tokens: number): string {
+  if (tokens >= 1_000_000) {
+    const m = (tokens / 1_000_000).toFixed(tokens % 1_000_000 === 0 ? 0 : 1);
+    return `${m}M (${tokens.toLocaleString()} 토큰)`;
+  }
+  const k = Math.round(tokens / 1000);
+  return `${k}K (${tokens.toLocaleString()} 토큰)`;
+}

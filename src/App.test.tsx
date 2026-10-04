@@ -50,4 +50,26 @@ describe('onboarding flow', () => {
     expect((await screen.findByRole('alert')).textContent).toContain('기존 대화 데이터는 보존했습니다.');
     expect(await screen.findByRole('heading', { name: 'Qaxiom Research Intelligence' })).toBeTruthy();
   });
+
+  it('exposes hover labels on the left and center pane top-bar buttons', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+
+    await enterProject(user);
+
+    await waitFor(() => {
+      expect(container.querySelector('.sidebar-brand-btn')?.getAttribute('data-tooltip')).toBe('프로젝트 관리');
+    });
+    expect(container.querySelector('.center-header-new-btn')?.getAttribute('data-tooltip')).toBe('새 문서');
+    expect(container.querySelector('.chat-history-toggle-btn')?.getAttribute('data-tooltip')).toBe('대화 기록');
+    expect(container.querySelector('.chat-title-toggle-btn')?.getAttribute('data-tooltip')).toBe('제목 변경');
+    expect(container.querySelector('.chat-panel-header-left')?.firstElementChild?.classList.contains('chat-panel-mode-wrapper')).toBe(true);
+    expect(container.querySelector('.chat-panel-header-right')?.firstElementChild?.classList.contains('chat-title-toggle-btn')).toBe(true);
+    expect(container.querySelector('.center-document-header .header-project-label')?.tagName).toBe('DIV');
+    expect(container.querySelector('.chat-title-toggle-btn span')).toBeNull();
+    expect(container.textContent).not.toContain('LLM Research Wiki');
+
+    await user.click(screen.getByRole('button', { name: '새로운 연구 대화 제목 수정' }));
+    expect(await screen.findByRole('textbox', { name: '대화 제목 입력' })).toBeTruthy();
+  });
 });

@@ -109,7 +109,7 @@ it('requires both applicability conditions and accepts all four human-assessed c
 
 it('round trips v9 relations and rejects forged quote/hash/foreign references before replacing a workspace', async () => {
   const { proposal } = await fixture(); await approveRelation(await referenceProposal(proposal, 'External claim.'), db);
-  const bundle = await createWorkspaceBundle(db); expect(bundle.version).toBe(22); await restoreWorkspaceBundle(bundle, target);
+  const bundle = await createWorkspaceBundle(db); expect(bundle.version).toBe(24); await restoreWorkspaceBundle(bundle, target);
   const original = await target.research_relations.toArray(); expect(original).toEqual(bundle.data.researchRelations);
   const hash = structuredClone(bundle); hash.data.researchRelations[0].note = 'changed after approval';
   await expect(restoreWorkspaceBundle(hash, target)).rejects.toThrow('관계 해시');
@@ -142,7 +142,7 @@ it('imports genuine v8 and migrates populated v8 without fabricating approved re
   const tables = db.tables.filter(t => t.name !== 'research_relations');
   legacy.version(8).stores(Object.fromEntries(tables.map(t => [t.name, [t.schema.primKey.src, ...t.schema.indexes.map(i => i.src)].join(',')])));
   for (const table of tables) await legacy.table(table.name).bulkAdd(await table.toArray());
-  legacy.close(); await target.open(); expect(target.verno).toBe(23);
+  legacy.close(); await target.open(); expect(target.verno).toBe(25);
   expect(await target.document_versions.get(snapshot.version.id)).toEqual(snapshot.version); expect(await target.research_relations.count()).toBe(0);
 });
 

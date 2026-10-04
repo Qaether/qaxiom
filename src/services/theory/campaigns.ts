@@ -63,44 +63,21 @@ export async function changeCampaignBudget(id: string, maxRequests: number, db: 
 }
 
 export function planReviewBatches(snapshot: TheorySnapshot, selected: string[]): string[][] {
-  // Validate all requested IDs once; each batch retains the full ResearchContract.
   reviewSkeleton(snapshot, 'llm-v1', selected, 'plan');
   if (!selected.length) throw new Error('분할 검토할 블록을 선택하세요.');
-  const batches: string[][] = []; let batch: string[] = [];
-  for (const block of snapshot.blocks.filter(block => selected.includes(block.id))) {
-    try { prepareReviewRequest(snapshot, [...batch, block.id]); batch.push(block.id); }
-    catch {
-      if (!batch.length) throw new Error(`블록 ${block.position + 1} 또는 필수 기준이 단일 요청 예산을 넘습니다. 원문을 나눠 저장하거나 더 작은 연구 기준으로 작업을 분리하세요.`);
-      batches.push(batch); batch = [block.id]; prepareReviewRequest(snapshot, batch);
-    }
-  }
-  if (batch.length) batches.push(batch);
-  return batches;
+  const blockIds = snapshot.blocks.filter(block => selected.includes(block.id)).map(block => block.id);
+  prepareReviewRequest(snapshot, blockIds);
+  return [blockIds];
 }
-/** Targets are disjoint; shared mandatory premises may appear in every batch. No provider calls. */
+/** New plans use one confirmed request; historical split plans remain readable. No provider calls. */
 export async function planGraphReviewBatches(snapshot: TheorySnapshot, selected: string[], db: QaxiomDatabase = qaxiomDatabase) {
   reviewSkeleton(snapshot, 'llm-v1', selected, 'plan');
   if (!selected.length) throw new Error('분할 검토할 블록을 선택하세요.');
   const initial = await readGraphReviewState(snapshot.document.id, db);
-  const prepared: GraphReviewPreparation[] = [];
-  let batch: GraphReviewPreparation | null = null;
-  for (const block of snapshot.blocks.filter(block => selected.includes(block.id))) {
-    try {
-      batch = await prepareGraphReview(snapshot, [...(batch?.graph.targetBlockIds ?? []), block.id], db);
-      if (batch.stateSignature !== initial.signature) throw new Error('분할 중 승인 그래프/원문이 변경되었습니다. 계획을 다시 저장하세요.');
-    } catch (cause) {
-      // Integrity/staleness failures must never be mistaken for a reason to split.
-      if (!(cause instanceof Error) || !cause.message.includes('40 KB 예산')) throw cause;
-      if (!batch) throw new Error(`블록 ${block.position + 1}의 필수 전제·관계·연구 기준이 단일 요청 40 KB 예산을 넘습니다. 전제를 생략하지 않습니다.`);
-      prepared.push(batch);
-      batch = await prepareGraphReview(snapshot, [block.id], db);
-      if (batch.stateSignature !== initial.signature) throw new Error('분할 중 승인 그래프/원문이 변경되었습니다.');
-    }
-    if (prepared.length >= 100) throw new Error('분할 계획은 최대 100구간입니다. 선택 범위를 나누세요.');
-  }
-  if (batch) prepared.push(batch);
+  const prepared: GraphReviewPreparation = await prepareGraphReview(snapshot, selected, db);
+  if (prepared.stateSignature !== initial.signature) throw new Error('계획 중 승인 그래프/원문이 변경되었습니다. 다시 확인하세요.');
   if ((await readGraphReviewState(snapshot.document.id, db)).signature !== initial.signature) throw new Error('분할 중 승인 그래프/원문이 변경되었습니다.');
-  return { batches: prepared.map(p => p.graph.targetBlockIds), graphContexts: prepared.map(p => p.graph), stateSignature: initial.signature };
+  return { batches: [prepared.graph.targetBlockIds], graphContexts: [prepared.graph], stateSignature: initial.signature };
 }
 export async function saveReviewPlan(id: string, snapshot: TheorySnapshot, selected: string[], db: QaxiomDatabase = qaxiomDatabase, includeGraph = false) {
   const graphPlan = includeGraph ? await planGraphReviewBatches(snapshot, selected, db) : null;

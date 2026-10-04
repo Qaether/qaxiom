@@ -13,8 +13,6 @@ import SemanticRetrieval from './SemanticRetrieval';
 import type { HybridTrace } from '../services/retrieval/embeddingTypes';
 import CanonicalSearch from './CanonicalSearch';
 import { assertRagProjectScopeCurrent, assertRagSearchScope, prepareRagProjectScope } from '../services/retrieval/projectScope';
-import { listResearchProjects } from '../services/theory/projects';
-import type { ResearchProject } from '../services/theory/types';
 import { deleteUnlinkedPdfAsset, deleteUnusedReference } from '../services/retrieval/referenceDeletion';
 
 const referenceRoleLabel = { external: '외부 문헌', note: '사용자 메모', theory_snapshot: '자체 문서 — 외부 증거 아님' };
@@ -35,8 +33,6 @@ export default function ReferenceLibrary({ onClose, onAsk, canAsk, canDelete, mo
   const [sources, setSources] = useState<ReferenceDocument[]>([]);
   const [researchVersions, setResearchVersions] = useState<DocumentVersion[]>([]);
   const [researchId, setResearchId] = useState('');
-  const [projectId, setProjectId] = useState('');
-  const [projects, setProjects] = useState<ResearchProject[]>([]);
   const [graphSnapshot, setGraphSnapshot] = useState<TheorySnapshot | null>(null);
   const [graphTargets, setGraphTargets] = useState<string[]>([]);
   const [includeGraph, setIncludeGraph] = useState(false);
@@ -64,8 +60,6 @@ export default function ReferenceLibrary({ onClose, onAsk, canAsk, canDelete, mo
       .catch(() => { if (active) setError('PDF 처리 목록을 읽지 못했습니다.'); });
     void listTheories().then(result => { if (active) setResearchVersions(result.map(item => item.version)); })
       .catch(() => { if (active) setError('연구 기준 목록을 불러오지 못했습니다.'); });
-    void listResearchProjects().then(result => { if (active) setProjects(result); })
-      .catch(() => { if (active) setError('프로젝트 목록을 불러오지 못했습니다.'); });
     return () => { active = false; element.close(); worker.current?.terminate(); pdfAbort.current?.abort(); };
   }, []);
   const clearResults = () => { setHits([]); setHybridTrace(null); setChosen([]); setBundle(null); setSearchData(null); setStatus(''); setError(''); };
@@ -124,7 +118,7 @@ export default function ReferenceLibrary({ onClose, onAsk, canAsk, canDelete, mo
   const search = async () => {
     clearResults(); setBusy(true);
     try {
-      await assertRagSearchScope(researchId, selected, qaxiomDatabase, projectId);
+      await assertRagSearchScope(researchId, selected, qaxiomDatabase);
       const data = await loadReferenceSelection(selected);
       setSearchData(data);
       const searchWorker = new Worker(new URL('../services/retrieval/search.worker.ts', import.meta.url), { type: 'module' });
@@ -180,14 +174,6 @@ export default function ReferenceLibrary({ onClose, onAsk, canAsk, canDelete, mo
     <fieldset disabled={busy}>
       <legend>이번 질문의 검색 범위</legend>
       {!sources.length && <p>레퍼런스 검색은 자료를 등록하고, 정본 단독 질문은 아래에서 연구 기준을 선택하세요.</p>}
-      <label htmlFor="reference-project">프로젝트 자료 범위 (정본 선택 전)</label>
-      <select id="reference-project" value={projectId} disabled={!!researchId} onChange={event => {
-        setProjectId(event.target.value); clearResults();
-      }}>
-        <option value="">작업공간 전체 · 프로젝트 정책 없음</option>
-        {projects.map(project => <option key={project.id} value={project.id}>{project.title}</option>)}
-      </select>
-      <p>정본을 선택하지 않아도 프로젝트의 자료 허용 목록을 검색·임베딩·답변에 적용할 수 있습니다. 정본을 선택하면 그 문서의 프로젝트를 사용합니다.</p>
       {sources.map(source => <div className="reference-choice-row" key={source.id}>
         <label className="reference-choice">
           <input type="checkbox" checked={selected.includes(source.id)} onChange={event => {
@@ -200,7 +186,7 @@ export default function ReferenceLibrary({ onClose, onAsk, canAsk, canDelete, mo
       {!!sources.length && <p>삭제는 과거 답변·검토·관계·프로젝트 정책·임베딩에 사용되지 않은 자료만 허용합니다. 사용 이력은 먼저 백업하고 보존하세요.</p>}
       <label htmlFor="reference-research">필수 연구 기준 (정본 버전 선택)</label>
       <select id="reference-research" value={researchId} onChange={event => {
-        const id = event.target.value; setResearchId(id); if (id) setProjectId(''); setBundle(null); setError(''); setGraphSnapshot(null); setGraphTargets([]); setIncludeGraph(false);
+        const id = event.target.value; setResearchId(id); setBundle(null); setError(''); setGraphSnapshot(null); setGraphTargets([]); setIncludeGraph(false);
         const version = researchVersions.find(v => v.id === id);
         if (version) { setBusy(true); void loadTheory(version.documentId).then(value => {
           if (value.version.id !== id) throw new Error('정본 버전이 변경되었습니다. 닫은 뒤 연구 기준을 다시 선택하세요.');
@@ -239,7 +225,7 @@ export default function ReferenceLibrary({ onClose, onAsk, canAsk, canDelete, mo
         }}>정본만으로 질문 미리보기</button>
       </>}
     </fieldset>
-    <SemanticRetrieval selected={selected} query={query} researchVersionId={researchId} projectId={projectId} apiKey={embeddingApiKey} busy={busy} onBusy={value => { setBusy(value); if (value) { setBundle(null); setStatus(''); setError(''); } }}
+    <SemanticRetrieval selected={selected} query={query} researchVersionId={researchId} projectId="" apiKey={embeddingApiKey} busy={busy} onBusy={value => { setBusy(value); if (value) { setBundle(null); setStatus(''); setError(''); } }}
       onResults={(result, data, trace) => { setSearchData(data); setHybridTrace(trace); setHits(result); setChosen(result.slice(0, 3).map(hit => hit.span.id)); setBundle(null); setStatus(`검색 결과 ${result.length}개. 전송할 근거를 선택해 주세요.`); }} />
     {busy && <p role="status">자료 처리 중…</p>}
     {searching && <button type="button" onClick={() => {
@@ -263,7 +249,7 @@ export default function ReferenceLibrary({ onClose, onAsk, canAsk, canDelete, mo
           const assembled = assembleContext(query, selected, hits.filter(hit => chosen.includes(hit.span.id)), searchData,
             researchVersions.find(version => version.id === researchId) ?? null, graph);
           setPreviewModel(modelName);
-          setBundle(await prepareRagProjectScope(hybridTrace ? { ...assembled, retriever: 'hybrid-rrf-v1', hybrid: hybridTrace } : assembled, qaxiomDatabase, projectId));
+          setBundle(await prepareRagProjectScope(hybridTrace ? { ...assembled, retriever: 'hybrid-rrf-v1', hybrid: hybridTrace } : assembled));
         }
         catch (cause) { setError(cause instanceof Error ? cause.message : '전송할 근거를 확인해 주세요.'); }
         finally { setBusy(false); }
@@ -274,7 +260,6 @@ export default function ReferenceLibrary({ onClose, onAsk, canAsk, canDelete, mo
       <p>현재 대화와 질문, 아래 원문 구간·파일명·종류·출처 ID가 선택 모델의 제공사로 전송됩니다. 선택하지 않은 자료의 원문은 추가하지 않습니다. 관련 내용이 기존 대화에 있으면 대화와 함께 전송됩니다.</p>
       <p>질문: {bundle.query}</p>
       {bundle.projectScope && <p>프로젝트 {bundle.projectScope.projectId} · 자료 정책 {bundle.projectScope.policyRevision === null ? '미설정 (명시적 자료 선택)' : `개정 ${bundle.projectScope.policyRevision}`} · {bundle.projectScope.policyScope === 'research' ? '프로젝트 RAG 허용 목록 적용' : '프로젝트 RAG 자료 제한 없음'} · 정책 SHA-256 {bundle.projectScope.policyHash ?? '없음'}.</p>}
-      {bundle.projectScope?.mode === 'project_only' && <p>프로젝트 자료 범위만 적용합니다. 정본 버전·ResearchContract·승인 그래프는 첨부하지 않았습니다.</p>}
       {bundle.retriever === 'graph-canonical-v1' && <p>정본 단독 문맥 · 이번 요청의 레퍼런스 원문 0개. 외부 근거 없이 선택 목표/승인 전제만 첨부합니다. 자체 문서에서 답변을 생성하더라도 참·정합성·외부 호환성 증명이 아닙니다.</p>}
       {bundle.hybrid && <p>검색 세대 {bundle.hybrid.spaceId} · {bundle.hybrid.model}/{bundle.hybrid.dimensions}차원 · 의미 색인 {bundle.hybrid.coveredSpanIds.length}구간/미색인 {bundle.hybrid.missingSpanIds.length}구간 · 제공사 revision 미확인. 검색 범위 통과는 전체 정합성 검사가 아닙니다.</p>}
       <p>원문 {bundle.evidence.length}/8개 · 원문과 연구 기준/그래프 {bundle.evidence.reduce((sum, item) => sum + item.span.text.length, 0) + (bundle.assembly?.research ? JSON.stringify(bundle.assembly.research).length : 0) + (bundle.graph ? JSON.stringify(bundle.graph).length : 0)}/12,000자 (UTF-16). 전체 대화·메타데이터는 요청 시 UTF-8 48 KB 한도를 추가 검사하며 모델별 토큰 보장은 아닙니다.</p>
