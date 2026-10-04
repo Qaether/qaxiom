@@ -9,6 +9,7 @@ export interface VersionInput {
   markdown: string;
   contract: ResearchContract;
   contractAnchors?: ContractAnchors;
+  referenceIds?: string[];
 }
 
 export function validateContractAnchors(anchors: ContractAnchors, contract: ResearchContract, blocks: DocumentBlock[]): ContractAnchors {
@@ -43,6 +44,7 @@ export async function createTheory(input: VersionInput, db: QaxiomDatabase = qax
   const version: DocumentVersion = {
     title: input.title.trim(), markdown: input.markdown, contract: { ...input.contract },
     contractAnchors: validateContractAnchors(input.contractAnchors ?? {}, input.contract, blocks),
+    referenceIds: input.referenceIds ? [...input.referenceIds] : [],
     id, documentId, number: 1, parentVersionId: null, restoredFromVersionId: null,
     contentHash: await hashText(input.markdown), createdAt
   };
@@ -90,12 +92,15 @@ export async function saveTheoryVersion(
     input.contract[field as keyof ResearchContract] === current.version.contract[field as keyof ResearchContract]
       && blocks.some(block => block.id === anchor.blockId && block.contentHash === anchor.blockHash)));
   const contractAnchors = validateContractAnchors(proposedAnchors, input.contract, blocks);
+  const referenceIds = input.referenceIds ? [...input.referenceIds] : (current.version.referenceIds ? [...current.version.referenceIds] : []);
   if (!restoredFromVersionId && contentHash === current.version.contentHash
     && input.title.trim() === current.version.title
     && JSON.stringify(input.contract) === JSON.stringify(current.version.contract)
-    && JSON.stringify(contractAnchors) === JSON.stringify(current.version.contractAnchors)) return current;
+    && JSON.stringify(contractAnchors) === JSON.stringify(current.version.contractAnchors)
+    && JSON.stringify(referenceIds) === JSON.stringify(current.version.referenceIds ?? [])) return current;
   const version: DocumentVersion = {
-    title: input.title.trim(), markdown: input.markdown, contract: { ...input.contract }, contractAnchors, id, documentId,
+    title: input.title.trim(), markdown: input.markdown, contract: { ...input.contract }, contractAnchors,
+    referenceIds, id, documentId,
     parentVersionId: baseVersionId, restoredFromVersionId, number: current.version.number + 1,
     contentHash, createdAt: Date.now()
   };
@@ -111,6 +116,14 @@ export async function saveTheoryVersion(
     await db.theory_documents.update(documentId, { currentVersionId: id, updatedAt: version.createdAt });
   });
   return loadTheory(documentId, db);
+}
+
+export async function updateVersionReferenceIds(
+  versionId: string,
+  referenceIds: string[],
+  db: QaxiomDatabase = qaxiomDatabase
+): Promise<void> {
+  await db.document_versions.update(versionId, { referenceIds: [...new Set(referenceIds)] });
 }
 
 export async function restoreTheoryVersion(documentId: string, baseVersionId: string, oldVersionId: string, db: QaxiomDatabase = qaxiomDatabase) {

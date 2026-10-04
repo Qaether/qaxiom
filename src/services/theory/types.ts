@@ -43,6 +43,7 @@ export interface DocumentVersion {
   contentHash: string;
   contract: ResearchContract;
   contractAnchors: ContractAnchors;
+  referenceIds?: string[];
   createdAt: number;
 }
 

@@ -2,6 +2,7 @@ import { qaxiomDatabase, type QaxiomDatabase } from '../database';
 import { hashText } from '../theory/blocks';
 import type { ReferenceRole, ReferenceDocument } from './types';
 import { assemblePdfPages } from './pdfLayout';
+import { syncReferenceToWiki } from '../wiki/wikiService';
 import { hashBytes, MAX_PDF_BYTES, type PdfAsset } from './pdfTypes';
 import type { PdfExtractionOptions } from './pdfExtraction';
 
@@ -66,7 +67,7 @@ export async function processPdf(
     })));
     const empty = assembled.locations.filter(page => page.status === 'empty').length;
     const status = empty === completed.pageCount ? 'ocr_required' : empty ? 'partial' : 'ready';
-    return await db.transaction('rw', [db.pdf_assets, db.references, db.reference_spans, db.document_versions], async () => {
+    const txResult = await db.transaction('rw', [db.pdf_assets, db.references, db.reference_spans, db.document_versions], async () => {
       signal.throwIfAborted();
       if ((await db.pdf_assets.get(assetId))?.runId !== runId) throw new Error('다른 작업이 PDF 처리를 이어받았습니다.');
       if (status !== 'ocr_required') {
@@ -84,6 +85,13 @@ export async function processPdf(
         error: empty ? `텍스트 없는 페이지 ${empty}개는 검색에서 제외됩니다. 검색 가능한 텍스트/Markdown 또는 텍스트 계층이 있는 PDF를 준비해 주세요. 빈 페이지일 수도 있습니다.` : '' };
       await db.pdf_assets.put(result); onProgress(result); return result;
     });
+    if (status !== 'ocr_required' && db.tables?.some(t => t.name === 'wiki_pages')) {
+      try {
+        const source = await db.references.get(sourceId);
+        if (source) await syncReferenceToWiki(source, db);
+      } catch { }
+    }
+    return txResult;
   } catch (cause) {
     const status = signal.aborted ? 'cancelled' : cause instanceof Error && cause.name === 'PasswordException' ? 'encrypted' : 'failed';
     const error = status === 'cancelled' ? '추출을 중단했습니다. 완료한 페이지부터 재개할 수 있습니다.'

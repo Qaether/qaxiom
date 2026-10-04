@@ -61,7 +61,8 @@ export function parseTheoryData(input: unknown, requireAnchors = false): TheoryD
     id: text(row, 'id'), documentId: text(row, 'documentId'), number: number(row, 'number'),
     parentVersionId: nullable(row, 'parentVersionId'), restoredFromVersionId: nullable(row, 'restoredFromVersionId'),
     title: text(row, 'title'), markdown: text(row, 'markdown'), contentHash: text(row, 'contentHash'),
-    contract: contract(row.contract), contractAnchors: contractAnchors(row.contractAnchors, requireAnchors), createdAt: number(row, 'createdAt')
+    contract: contract(row.contract), contractAnchors: contractAnchors(row.contractAnchors, requireAnchors), createdAt: number(row, 'createdAt'),
+    ...(Array.isArray(row.referenceIds) ? { referenceIds: row.referenceIds.filter((id): id is string => typeof id === 'string') } : {})
   }));
   const documentBlocks = rows(data, 'documentBlocks').map(row => {
     if (!['heading', 'paragraph', 'code', 'math'].includes(text(row, 'kind'))) fail();

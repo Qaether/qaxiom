@@ -259,12 +259,14 @@ body {
   width: 38px;
   height: 38px;
   border-radius: 10px;
-  background: linear-gradient(135deg, #6366f1, #3b82f6);
+  background: linear-gradient(135deg, rgba(134, 59, 255, 0.22), rgba(71, 191, 255, 0.12));
+  border: 1px solid rgba(134, 59, 255, 0.35);
   display: flex;
   align-items: center;
   justify-content: center;
   color: #fff;
-  box-shadow: 0 0 16px rgba(99, 102, 241, 0.4);
+  box-shadow: 0 0 16px rgba(134, 59, 255, 0.35);
+  transition: all 0.2s ease;
 }
 
 .brand-text {
@@ -589,15 +591,16 @@ body {
 }
 
 .top-brand-icon {
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
-  background: linear-gradient(135deg, #6366f1, #3b82f6);
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: linear-gradient(135deg, rgba(134, 59, 255, 0.22), rgba(71, 191, 255, 0.12));
+  border: 1px solid rgba(134, 59, 255, 0.35);
   display: flex;
   align-items: center;
   justify-content: center;
   color: #fff;
-  box-shadow: 0 0 10px rgba(99, 102, 241, 0.4);
+  box-shadow: 0 0 10px rgba(134, 59, 255, 0.35);
 }
 
 .top-brand-title {

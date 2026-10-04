@@ -1,6 +1,7 @@
 import { qaxiomDatabase, type QaxiomDatabase } from '../database';
 import { hashText, splitMarkdown } from '../theory/blocks';
 import type { ReferenceDocument, ReferenceRole, ReferenceSpan } from './types';
+import { syncReferenceToWiki } from '../wiki/wikiService';
 
 export const MAX_REFERENCE_BYTES = 2 * 1024 * 1024;
 export const MAX_SPAN_CHARS = 2400;
@@ -43,7 +44,7 @@ export async function importReference(
   const spans: ReferenceSpan[] = await Promise.all(splitReference(text).map(async (span, position) => ({
     ...span, id: crypto.randomUUID(), sourceId: id, position, contentHash: await hashText(span.text)
   })));
-  return db.transaction('rw', [db.references, db.reference_spans, db.document_versions], async () => {
+  const result = await db.transaction('rw', [db.references, db.reference_spans, db.document_versions], async () => {
     const existing = await db.references.where('contentHash').equals(contentHash).filter(source => source.parserVersion === 'text-v1').first();
     const ownVersion = await db.document_versions.where('contentHash').equals(contentHash).first();
     // Never silently promote an existing note or own document to independent evidence.
@@ -61,6 +62,10 @@ export async function importReference(
     await db.reference_spans.bulkAdd(spans);
     return { source, duplicate: false };
   });
+  if (db.tables?.some(t => t.name === 'wiki_pages')) {
+    try { await syncReferenceToWiki(result.source, db); } catch { }
+  }
+  return result;
 }
 
 export async function importReferenceFile(file: File, role: ReferenceRole) {

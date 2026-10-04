@@ -1,9 +1,11 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { qaxiomDatabase } from '../services/database';
 import { compareBlocks } from '../services/theory/blocks';
-import { createTheory, loadTheory, restoreTheoryVersion, saveTheoryVersion } from '../services/theory/documents';
+import { createTheory, loadTheory, restoreTheoryVersion, saveTheoryVersion, updateVersionReferenceIds } from '../services/theory/documents';
 import { EMPTY_CONTRACT, type ContractAnchors, type DocumentBlock, type ResearchContract, type TheorySnapshot } from '../services/theory/types';
 import './TheoryWorkspace.css';
+import NoteReferencesModal from './NoteReferencesModal';
+import NoteInlineSearchDrawer from './NoteInlineSearchDrawer';
 import DocumentAnalysisView from './DocumentAnalysisView';
 import { applyAnalysisSuggestion, deleteAnalysisRun, parseDocumentAnalysis, prepareDocumentAnalysis, prepareChunkedDocumentAnalysis, parseChunkedDocumentAnalysis, setAnalysisDecision, type AnalysisFinding, type AnalysisRun } from '../services/theory/analysis';
 import { sendChatMessage } from '../services/llm';
@@ -16,9 +18,10 @@ import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
+import { listWikiPages, publishTheoryToWiki } from '../services/wiki/wikiService';
 import {
   Bold, Italic, Heading, Code, Quote, List, Sigma, Eye, Edit3,
-  Sparkles, BookOpen, Save, X, Folder, Menu, Check, Cpu, Sliders
+  Sparkles, BookOpen, Save, X, Folder, Menu, Check, Cpu, Sliders, BookPlus, Search, Paperclip
 } from 'lucide-react';
 
 const MathJaxMarkdown = lazy(() => import('./MathJaxMarkdown'));
@@ -128,6 +131,8 @@ export default function TheoryWorkspace({
   const analysisAbort = useRef<AbortController | null>(null);
   const [previewMathRenderer, setPreviewMathRenderer] = useState<'mathjax' | 'katex'>('katex');
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
+  const [isSearchDrawerOpen, setIsSearchDrawerOpen] = useState(false);
+  const [isReferenceModalOpen, setIsReferenceModalOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(Boolean(initialDocumentId));
@@ -150,6 +155,39 @@ export default function TheoryWorkspace({
     const timeout = window.setTimeout(() => setStatus(''), 4000);
     return () => window.clearTimeout(timeout);
   }, [status]);
+
+  const [isWikiPublished, setIsWikiPublished] = useState(false);
+  const [publishBusy, setPublishBusy] = useState(false);
+
+  useEffect(() => {
+    if (!snapshot) {
+      setIsWikiPublished(false);
+      return;
+    }
+    void (async () => {
+      try {
+        const pages = await listWikiPages();
+        const published = pages.some(p => p.entryType === 'theory_snapshot' && p.versionId === snapshot.version.id);
+        setIsWikiPublished(published);
+      } catch {
+        setIsWikiPublished(false);
+      }
+    })();
+  }, [snapshot?.version.id]);
+
+  const handlePublishToWiki = async () => {
+    if (!snapshot || publishBusy) return;
+    setPublishBusy(true);
+    try {
+      await publishTheoryToWiki(snapshot.document, snapshot.version);
+      setIsWikiPublished(true);
+      setStatus('현재 버전이 Wiki 서고에 등록되었습니다.');
+    } catch {
+      setStatus('Wiki 등록에 실패했습니다.');
+    } finally {
+      setPublishBusy(false);
+    }
+  };
 
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
@@ -180,6 +218,30 @@ export default function TheoryWorkspace({
       textarea.focus();
       textarea.setSelectionRange(start + before.length, start + before.length + selected.length);
     }, 0);
+  };
+
+  const handleNavigateToLine = (lineNumber: number) => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    if (editorTab !== 'write') {
+      setEditorTab('write');
+    }
+
+    const lines = markdown.split('\n');
+    let startPos = 0;
+    for (let i = 0; i < lineNumber - 1 && i < lines.length; i++) {
+      startPos += lines[i].length + 1;
+    }
+    const lineLen = lines[lineNumber - 1]?.length ?? 0;
+    const endPos = startPos + lineLen;
+
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(startPos, endPos);
+      const lineHeight = 22;
+      textarea.scrollTop = Math.max(0, (lineNumber - 3) * lineHeight);
+    }, 50);
   };
 
   const handleEditorKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -287,6 +349,7 @@ export default function TheoryWorkspace({
   const persistDraft = async () => {
     const input = {
       title, markdown, contract,
+      ...(snapshot?.version.referenceIds ? { referenceIds: snapshot.version.referenceIds } : {}),
       ...(snapshot && JSON.stringify(contractAnchors) === JSON.stringify(snapshot.version.contractAnchors) ? {} : { contractAnchors })
     };
     const saved = snapshot
@@ -298,6 +361,34 @@ export default function TheoryWorkspace({
     return saved;
   };
   const save = () => run(async () => { await persistDraft(); });
+
+  const handleUpdateVersionReferenceIds = async (newIds: string[]) => {
+    if (!snapshot) return;
+    await updateVersionReferenceIds(snapshot.version.id, newIds);
+    setSnapshot(prev => prev ? {
+      ...prev,
+      version: { ...prev.version, referenceIds: newIds }
+    } : null);
+  };
+
+  const handleInsertQuote = (quoteText: string, sourceName: string, locationStr: string) => {
+    const quoteMarkdown = `\n\n> "${quoteText}"\n> — *출처: ${sourceName}${locationStr ? ` (${locationStr})` : ''}*\n\n`;
+    const textarea = textareaRef.current;
+    if (!textarea) {
+      setMarkdown(prev => prev + quoteMarkdown);
+      return;
+    }
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const before = markdown.slice(0, start);
+    const after = markdown.slice(end);
+    setMarkdown(before + quoteMarkdown + after);
+    setTimeout(() => {
+      textarea.focus();
+      const newCursor = start + quoteMarkdown.length;
+      textarea.setSelectionRange(newCursor, newCursor);
+    }, 50);
+  };
   const startAnalysis = async (overrideModelId?: string, overrideInstruction?: string, useChunking = isChunkingEnabled) => {
     if (analysisBusy || busy) return;
     const targetModelId = overrideModelId || analysisModelId || modelId;
@@ -529,6 +620,46 @@ export default function TheoryWorkspace({
           {snapshot && (
             <button
               type="button"
+              className="theory-topbar-btn topbar-tooltip"
+              onClick={() => setIsReferenceModalOpen(true)}
+              disabled={busy || loading}
+              data-tooltip="레퍼런스 추가"
+              aria-label="레퍼런스 추가"
+              style={{ color: '#fbbf24' }}
+            >
+              <Paperclip size={16} />
+            </button>
+          )}
+
+          <button
+            type="button"
+            className={`theory-topbar-btn topbar-tooltip ${isSearchDrawerOpen ? 'active' : ''}`}
+            onClick={() => setIsSearchDrawerOpen(prev => !prev)}
+            disabled={busy || loading}
+            data-tooltip="통합 검색 (노트내 단어 / 레퍼런스 RAG)"
+            aria-label="통합 검색"
+            style={{ color: '#38bdf8' }}
+          >
+            <Search size={16} />
+          </button>
+
+          {snapshot && (
+            <button
+              type="button"
+              className={`theory-topbar-btn topbar-tooltip ${isWikiPublished ? 'published' : ''}`}
+              onClick={handlePublishToWiki}
+              disabled={publishBusy || isWikiPublished || busy || loading}
+              data-tooltip={isWikiPublished ? `Wiki 등재됨 (v${snapshot.version.number})` : '이 버전을 Wiki에 등록'}
+              aria-label="이 버전을 Wiki에 등록"
+              style={isWikiPublished ? { color: '#4ade80' } : { color: '#c084fc' }}
+            >
+              {isWikiPublished ? <Check size={16} /> : <BookPlus size={16} />}
+            </button>
+          )}
+
+          {snapshot && (
+            <button
+              type="button"
               className="theory-topbar-btn theory-btn-criteria topbar-tooltip"
               onClick={() => setActiveModal('contract')}
               disabled={busy || loading}
@@ -554,6 +685,17 @@ export default function TheoryWorkspace({
 
       {error && <p role="alert" className="theory-error-banner">{error}</p>}
       {status && <p role="status" className="theory-status-banner">{status}</p>}
+
+      {snapshot && isReferenceModalOpen && (
+        <NoteReferencesModal
+          isOpen
+          onClose={() => setIsReferenceModalOpen(false)}
+          documentId={snapshot.document.id}
+          version={snapshot.version}
+          boundIds={snapshot.version.referenceIds ?? []}
+          onSaveBindings={handleUpdateVersionReferenceIds}
+        />
+      )}
 
       {/* 2. 에디터 본체: VCS 스타일의 풀스크린 마크다운 편집기 */}
       <div className="theory-editor-container vcs-mode" aria-busy={busy || loading}>
@@ -638,33 +780,6 @@ export default function TheoryWorkspace({
           />
           {editorTab === 'preview' && (
             <div className="theory-markdown-preview-pane vcs-preview-pane">
-              {analysisRun && analysisRun.findings.length > 0 && (
-                <div className="theory-preview-analysis-link-bar">
-                  <div className="preview-analysis-header">
-                    <Sparkles size={14} className="preview-analysis-icon" />
-                    <span>이 버전의 AI 검토 의견 {analysisRun.findings.length}건:</span>
-                  </div>
-                  <div className="preview-analysis-chips">
-                    {analysisRun.findings.map((f, i) => (
-                      <button
-                        key={f.id}
-                        type="button"
-                        className={`preview-finding-chip ${f.decision}`}
-                        onClick={() => {
-                          setEditorTab('analysis');
-                          setTimeout(() => {
-                            const el = document.getElementById(`analysis-${f.id}`);
-                            el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                          }, 100);
-                        }}
-                        title={`#${i + 1}: ${f.explanation} (클릭하여 분석 피드로 이동)`}
-                      >
-                        <span>#{i + 1} {f.explanation}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
               <div className="theory-preview-content">
                 {markdown.trim() ? (
                   previewMathRenderer === 'mathjax' ? (
@@ -701,6 +816,15 @@ export default function TheoryWorkspace({
               onDelete={run => void handleDeleteAnalysis(run)}
             />
           </div>}
+
+          <NoteInlineSearchDrawer
+            isOpen={isSearchDrawerOpen}
+            onClose={() => setIsSearchDrawerOpen(false)}
+            version={snapshot?.version}
+            markdown={markdown}
+            onInsertQuote={handleInsertQuote}
+            onSelectNoteLine={handleNavigateToLine}
+          />
         </div>
 
         {/* 에디터 하단 미니멀 정보 바 */}

@@ -1,5 +1,6 @@
 import React from 'react';
-import { Settings, Menu, Folder, Cloud, FileText, Atom } from 'lucide-react';
+import { Settings, Menu, Folder, Cloud, FileText } from 'lucide-react';
+import { QaxiomLogo } from './QaxiomLogo';
 
 interface HeaderProps {
   projectName?: string;
@@ -45,7 +46,7 @@ export const Header: React.FC<HeaderProps> = ({
           aria-label="Qaxiom 홈 및 프로젝트 관리 화면으로 이동"
         >
           <div className="top-brand-icon">
-            <Atom size={16} />
+            <QaxiomLogo size={18} />
           </div>
           <span className="top-brand-title">Qaxiom</span>
         </button>

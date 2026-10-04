@@ -84,11 +84,19 @@ export interface UserSettings {
   temperature: number;
 }
 
+export type WikiEntryType = 'paper' | 'web' | 'theory_snapshot' | 'note';
+
 export interface WikiPage {
   id: string;
   title: string;
   summary: string;
   content: string;
+  entryType?: WikiEntryType;
+  sourceId?: string;
+  url?: string;
+  versionId?: string;
+  documentId?: string;
+  contentHash?: string;
   tags: string[];
   backlinks: string[];
   createdAt: number;

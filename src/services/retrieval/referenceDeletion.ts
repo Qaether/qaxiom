@@ -1,6 +1,7 @@
 import { qaxiomDatabase, type QaxiomDatabase } from '../database';
 import type { ReferenceDocument } from './types';
 import { hashBytes } from './pdfTypes';
+import { deleteReferenceFromWiki } from '../wiki/wikiService';
 
 const DEPENDENCY_TABLES = [
   'messages', 'projects', 'research_relations', 'review_runs', 'review_campaigns',
@@ -24,7 +25,7 @@ export async function deleteUnusedReference(
   if (!sourceId || !expectedHash) throw new Error('삭제할 자료의 ID와 hash를 다시 확인하세요.');
   const tables = [db.references, db.reference_spans, db.pdf_assets,
     ...DEPENDENCY_TABLES.map(name => db.table(name))];
-  return db.transaction('rw', tables, async () => {
+  const result = await db.transaction('rw', tables, async () => {
     const source = await db.references.get(sourceId);
     if (!source || source.contentHash !== expectedHash) throw new Error('자료가 변경되었거나 이미 삭제되었습니다. 목록을 다시 확인하세요.');
     const spans = await db.reference_spans.where('sourceId').equals(sourceId).toArray();
@@ -51,6 +52,10 @@ export async function deleteUnusedReference(
     await db.references.delete(source.id);
     return { source, removedSpanCount: spans.length, removedPdfAsset };
   });
+  if (db.tables?.some(t => t.name === 'wiki_pages')) {
+    try { await deleteReferenceFromWiki(sourceId, db); } catch { }
+  }
+  return result;
 }
 
 /** Deletes a PDF asset only when extraction produced no reference or pinned history. */

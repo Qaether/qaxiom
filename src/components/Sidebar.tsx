@@ -3,7 +3,6 @@ import {
   Plus,
   BookMarked,
   ShieldCheck,
-  Cpu,
   X,
   Folder,
   ArrowRightLeft,
@@ -11,6 +10,7 @@ import {
   Cloud,
   Trash2
 } from 'lucide-react';
+import { QaxiomLogo } from './QaxiomLogo';
 
 interface SidebarProps {
   projectName: string;
@@ -90,7 +90,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             aria-label="프로젝트 관리 / 전환 화면으로 이동"
           >
             <div className="brand-logo">
-              <Cpu className="brand-icon" size={22} />
+              <QaxiomLogo size={24} />
             </div>
             <div className="brand-text">
               <span className="brand-title">Qaxiom</span>
@@ -167,7 +167,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="sidebar-footer">
           <button className="settings-button" type="button" onClick={onOpenReferences}>
             <BookMarked size={15} />
-            <span>레퍼런스 검색</span>
+            <span>Project References</span>
           </button>
 
           <div className="sidebar-footer-actions">
