@@ -24,6 +24,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 }) => {
   const [input, setInput] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const isComposingRef = useRef(false);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -39,16 +40,30 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       onStopStreaming();
       return;
     }
-    const trimmed = input.trim();
+    const currentVal = textareaRef.current?.value ?? input;
+    const trimmed = currentVal.trim();
     if (!trimmed) return;
     onSendMessage(trimmed);
     setInput('');
     if (textareaRef.current) {
+      textareaRef.current.value = '';
       textareaRef.current.style.height = 'auto';
     }
   };
 
+  const handleCompositionStart = () => {
+    isComposingRef.current = true;
+  };
+
+  const handleCompositionEnd = (e: React.CompositionEvent<HTMLTextAreaElement>) => {
+    isComposingRef.current = false;
+    setInput(e.currentTarget.value);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.nativeEvent.isComposing || isComposingRef.current) {
+      return;
+    }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSubmit();
@@ -69,6 +84,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             aria-label="연구 질문 입력"
             value={input}
             onChange={e => setInput(e.target.value)}
+            onCompositionStart={handleCompositionStart}
+            onCompositionEnd={handleCompositionEnd}
             onKeyDown={handleKeyDown}
             placeholder={
               currentMode === 'peer_review'

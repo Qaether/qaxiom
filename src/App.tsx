@@ -112,6 +112,7 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
   const [theoryDocumentId, setTheoryDocumentId] = useState<string | null>(null);
   const [documentDraft, setDocumentDraft] = useState<DocumentDraft | null>(null);
   const [incomingDraft, setIncomingDraft] = useState<IncomingDraftAction | null>(null);
+  const [activeChangeStatus, setActiveChangeStatus] = useState<'pending' | 'accepted' | 'rejected'>('pending');
   const [newDocumentToken, setNewDocumentToken] = useState(0);
   const [theoryDocuments, setTheoryDocuments] = useState<{ id: string; title: string; version: number }[]>([]);
   const [isReferencesOpen, setIsReferencesOpen] = useState(false);
@@ -488,6 +489,24 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
       setIsTheoryOpen(true);
     }
     setIncomingDraft({ text: content, mode: 'diff_review', token: Date.now() });
+    setActiveChangeStatus('pending');
+  };
+
+  const handleDirectAcceptToDocument = (content: string) => {
+    if (!isTheoryOpen && !theoryDocumentId) {
+      setIsTheoryOpen(true);
+    }
+    setIncomingDraft({ text: content, mode: 'direct_accept', token: Date.now() });
+    setActiveChangeStatus('accepted');
+  };
+
+  const handleRejectDocumentChange = () => {
+    setIncomingDraft(null);
+    setActiveChangeStatus('rejected');
+  };
+
+  const handleSuggestionSettled = (status: 'accepted' | 'rejected') => {
+    setActiveChangeStatus(status);
   };
 
   // Stop streaming
@@ -677,6 +696,7 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
                 if (finishedMsg?.content) {
                   const parsed = parseMessageFileChanges(finishedMsg.content);
                   if (parsed.fileChanges.length > 0) {
+                    setActiveChangeStatus('pending');
                     // Auto-stage in central workspace with Cursor/Antigravity inline diff
                     handleApplyToDocument(parsed.fileChanges[0].proposedContent);
                   }
@@ -861,6 +881,7 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
                 projectName={openedProject.name}
                 onOpenMobileMenu={() => setIsMobileSidebarOpen(true)}
                 onContextChange={setDocumentDraft}
+                onSuggestionSettled={handleSuggestionSettled}
                 onSaved={document => {
                   setTheoryDocumentId(document.id);
                   setTheoryDocuments(previous => previous.some(row => row.id === document.id)
@@ -1085,6 +1106,9 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
                           originalDocumentContent={documentDraft?.markdown || ''}
                           onOpenSource={setSourceEvidence}
                           onApplyToDocument={handleApplyToDocument}
+                          onDirectAcceptDocument={handleDirectAcceptToDocument}
+                          onRejectDocumentChange={handleRejectDocumentChange}
+                          changeStatus={index === currentSession.messages.length - 1 ? activeChangeStatus : undefined}
                           onRetry={
                             index === currentSession.messages.length - 1
                               && message.role === 'assistant'

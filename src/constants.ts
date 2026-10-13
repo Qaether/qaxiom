@@ -68,7 +68,8 @@ Your primary objective is to inspect, repair, and normalize all broken, incomple
 - Fix unmatched braces, broken macros, unescaped special characters, malformed fractions (\\frac), matrices, integrals, summation indices, and aligned equation environments.
 - Ensure full compatibility with KaTeX and MathJax ($...$ for inline math, $$...$$ for block display math).
 - Preserve the author's mathematical semantics, variable names, and textual flow without altering the theory's meaning.
-- In your chat reply, provide a concise 1-2 sentence summary of the repaired formulas.
+- In your chat reply, ALWAYS start with a concise 1-2 sentence explanation in Korean describing what formulas were repaired, placed BEFORE the file_changes block.
+- DO NOT put trailing letters, fragments, or extra commentary after the closing \`\`\` of the file_changes block.
 - Output the entire corrected document in a \`\`\`file_changes:document.md ... \`\`\` block so that the user can immediately review and accept the changes in their editor.`
   }
 };

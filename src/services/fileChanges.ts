@@ -46,13 +46,32 @@ export function parseMessageFileChanges(
   });
 
   if (hasSpecialBlock) {
+    const clean = strippedText.trim();
+    // 3자 이하 자투리 글자(예: '.', '다.') 방지 및 의미 있는 요약문 유지
+    const displayText = clean.length > 3 ? clean : '연구노트 본문의 수정 제안이 준비되었습니다.';
     return {
-      displayText: strippedText.trim(),
+      displayText,
       fileChanges,
     };
   }
 
-  // 2. 모델이 혹시 ```markdown filename=document.md 형태나 긴 markdown 코드블록으로 준 경우 보조 파싱
+  // 2. 스트리밍 중 아직 닫히지 않은 ```file_changes 블록 처리
+  const unclosedMatch = /```file_changes(?::([^\r\n]+))?(?:\r?\n([\s\S]*))?$/.exec(content);
+  if (unclosedMatch) {
+    const beforeBlock = content.slice(0, unclosedMatch.index).trim();
+    const filename = unclosedMatch[1]?.trim() || defaultFilename;
+    const streamingContent = unclosedMatch[2] || '';
+    return {
+      displayText: beforeBlock.length > 3 ? beforeBlock : '수정 제안을 생성하는 중입니다...',
+      fileChanges: [{
+        id: 'change-streaming',
+        filename,
+        proposedContent: streamingContent,
+      }],
+    };
+  }
+
+  // 3. 모델이 혹시 ```markdown filename=document.md 형태나 긴 markdown 코드블록으로 준 경우 보조 파싱
   const mdBlockRegex = /```(?:markdown|md)(?::([^\r\n]+))?\r?\n([\s\S]*?)\r?\n```/i;
   const mdMatch = mdBlockRegex.exec(content);
   if (mdMatch && mdMatch[2]?.trim().length >= 20) {
@@ -61,7 +80,8 @@ export function parseMessageFileChanges(
     const filename = mdMatch[1]?.trim() || defaultFilename;
     const beforeBlock = content.slice(0, mdMatch.index).trim();
     const afterBlock = content.slice(mdMatch.index + mdMatch[0].length).trim();
-    const displayText = [beforeBlock, afterBlock].filter(Boolean).join('\n\n').trim();
+    const rawDisplayText = [beforeBlock, afterBlock].filter(Boolean).join('\n\n').trim();
+    const displayText = rawDisplayText.length > 3 ? rawDisplayText : '연구노트 본문의 수정 제안이 준비되었습니다.';
 
     fileChanges.push({
       id: 'change-1',

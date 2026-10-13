@@ -17,8 +17,10 @@ interface ChatMessageProps {
   onRetry?: () => void;
   onOpenSource?: (evidence: ContextEvidence) => void;
   onApplyToDocument?: (content: string) => void;
+  onDirectAcceptDocument?: (content: string) => void;
   originalDocumentContent?: string;
   onRejectDocumentChange?: () => void;
+  changeStatus?: 'pending' | 'accepted' | 'rejected';
 }
 
 export const ChatMessage: React.FC<ChatMessageProps> = ({
@@ -26,13 +28,16 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   onRetry,
   onOpenSource,
   onApplyToDocument,
+  onDirectAcceptDocument,
   originalDocumentContent,
   onRejectDocumentChange,
+  changeStatus,
 }) => {
   const isUser = message.role === 'user';
   const [copied, setCopied] = useState(false);
   const [applied, setApplied] = useState(false);
-  const [changeStatus, setChangeStatus] = useState<'pending' | 'accepted' | 'rejected'>('pending');
+  const [localChangeStatus, setLocalChangeStatus] = useState<'pending' | 'accepted' | 'rejected'>('pending');
+  const currentStatus = changeStatus ?? localChangeStatus;
 
   const defaultFilename = message.documentContext?.title ? `${message.documentContext.title}.md` : 'document.md';
   const parsed = React.useMemo(() => {
@@ -47,10 +52,13 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   };
 
   const handleApply = (content: string) => {
-    if (!onApplyToDocument) return;
-    onApplyToDocument(content);
+    if (onDirectAcceptDocument) {
+      onDirectAcceptDocument(content);
+    } else if (onApplyToDocument) {
+      onApplyToDocument(content);
+    }
     setApplied(true);
-    setChangeStatus('accepted');
+    setLocalChangeStatus('accepted');
     setTimeout(() => setApplied(false), 2000);
   };
 
@@ -60,13 +68,16 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   };
 
   const handleAcceptChange = (change: FileChangeItem) => {
-    if (!onApplyToDocument) return;
-    onApplyToDocument(change.proposedContent);
-    setChangeStatus('accepted');
+    if (onDirectAcceptDocument) {
+      onDirectAcceptDocument(change.proposedContent);
+    } else if (onApplyToDocument) {
+      onApplyToDocument(change.proposedContent);
+    }
+    setLocalChangeStatus('accepted');
   };
 
   const handleRejectChange = () => {
-    setChangeStatus('rejected');
+    setLocalChangeStatus('rejected');
     if (onRejectDocumentChange) {
       onRejectDocumentChange();
     }
@@ -154,7 +165,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
             <FilesWithChanges
               changes={parsed.fileChanges}
               originalContent={message.documentContext?.markdown || originalDocumentContent || ''}
-              status={changeStatus}
+              status={currentStatus}
               onReview={handleReviewChange}
               onAccept={handleAcceptChange}
               onReject={handleRejectChange}

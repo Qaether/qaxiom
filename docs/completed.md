@@ -1,9 +1,15 @@
 # Qaxiom 완료 내역
 
-> 2026-10-13 'LaTeX 수식 복원 및 정규화' 전용 연구 모드 신설 (`src/constants.ts`, `src/types.ts`):
-> 1. **`latex_normalizer` 모드 구축**: 깨지거나 불완전한 LaTeX 수식 문법(\frac 괄호 불일치, aligned 환경 누락, 인덱스 누락, 특수문자 이스케이프 오류)을 KaTeX/MathJax 표준 규격으로 복원하도록 전용 페르소나 및 시스템 프롬프트를 탑재함.
-> 2. **Files with changes 위젯과 직결**: 복원된 전체 완성본 마크다운을 `file_changes:document.md` 블록으로 즉시 출력하여, 사용자가 오른쪽 모드 드롭다운에서 선택 후 간단한 지시만으로도 가운데 창에서 깨진 수식과 고쳐진 수식의 Diff를 한눈에 대조·수락할 수 있도록 완성함.
-> 검증: oxlint(0 errors), vitest 47개 파일 327개 테스트 전체 통과, production build 성공. OCR은 명시적 비목표다.
+> 2026-10-13 오른쪽 채팅창 프롬프트 입력/파싱 버그 수정 및 '단 1회 클릭' 본문 즉시 확정 반영 & 양방향 상태 동기화:
+> 1. **한국어 IME 및 입력/출력 텍스트 잘림 방지 (`ChatInput.tsx`, `fileChanges.ts`, `constants.ts`)**:
+>    - `ChatInput.tsx`에서 `onCompositionStart` 및 `onCompositionEnd`를 완벽히 연동하고, Enter 키 입력 시 조합 중복/유실을 방지하며 `textareaRef` DOM 버퍼와 React 상태를 즉시 동기화 및 리셋하도록 개선함.
+>    - `parseMessageFileChanges`에서 AI가 `file_changes` 블록 생성 후 끝에 마침표나 단일 음절 자투리 글자(`.` 또는 `다.`)만 남겨 화면에 덜렁 노출되던 현상을 원천 방지함. (3자 이하일 경우 의미 있는 요약문으로 fallback 처리 및 스트리밍 파서 보강)
+>    - `constants.ts`의 `latex_normalizer` 시스템 프롬프트에 `file_changes` 블록 앞 한국어 요약 배치 및 후미 자투리 글자 생성 금지 지침을 명문화함.
+> 2. **단 1회 클릭 본문 즉시 반영 확정 & 양방향 실시간 동기화 (`App.tsx`, `ChatMessage.tsx`, `TheoryWorkspace.tsx`)**:
+>    - 오른쪽 `Files with changes` 카드의 `[수락]`을 누르든, 왼쪽 중앙 에디터 상단 플로팅 바의 `[✓ 수락 (⌘↵)]`을 누르든 **단 한 번만 누르면 본문에 즉시 확정 반영**되도록 `mode: 'direct_accept'` 파이프라인을 구축함. (불필요한 2중 Staging/2회 클릭 완전 제거)
+>    - 중앙 에디터에서 수락/거절 시 `onSuggestionSettled` 콜백을 통해 오른쪽 카드의 상태(`accepted`/`rejected`)가 실시간으로 동기화되어 양쪽 모두 완료 상태로 전환됨.
+> 검증: oxlint(0 errors), vitest 48개 파일 329개 테스트 전체 통과, production build 성공. OCR은 명시적 비목표다.
+
 
 > 2026-10-13 Google Antigravity 스타일 'Files with changes' 위젯 및 중앙 에디터 자동 인라인 Diff 연동:
 > 1. **구조적 파일 변경 블록 프로토콜 및 파서 (`src/services/fileChanges.ts`, `fileChanges.test.ts`)**:

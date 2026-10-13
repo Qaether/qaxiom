@@ -49,4 +49,31 @@ $$i\\hbar\\frac{\\partial}{\\partial t}\\Psi = \\hat{H}\\Psi$$
     expect(result.fileChanges[0].filename).toBe('research.md');
     expect(result.displayText).toBe('수정된 내용입니다.');
   });
+
+  it('uses default fallback text when stripped displayText is empty or short trailing chars like a single dot', () => {
+    const rawMessage = `
+\`\`\`file_changes:document.md
+# Test content
+$$E = mc^2$$
+\`\`\`
+.
+    `.trim();
+
+    const result = parseMessageFileChanges(rawMessage);
+    expect(result.fileChanges).toHaveLength(1);
+    expect(result.displayText).toBe('연구노트 본문의 수정 제안이 준비되었습니다.');
+  });
+
+  it('handles unclosed streaming file_changes block gracefully', () => {
+    const streamingMessage = `
+수정 중입니다.
+\`\`\`file_changes:document.md
+# Test in progress
+    `.trim();
+
+    const result = parseMessageFileChanges(streamingMessage);
+    expect(result.fileChanges).toHaveLength(1);
+    expect(result.displayText).toBe('수정 중입니다.');
+    expect(result.fileChanges[0].proposedContent).toContain('# Test in progress');
+  });
 });

@@ -70,7 +70,7 @@ const ANALYSIS_PRESETS = [
 
 export interface IncomingDraftAction {
   text: string;
-  mode: 'replace' | 'append' | 'diff_review';
+  mode: 'replace' | 'append' | 'diff_review' | 'direct_accept';
   token: number;
 }
 
@@ -96,6 +96,7 @@ export default function TheoryWorkspace({
   onOpenMobileMenu,
   onContextChange,
   onSaved,
+  onSuggestionSettled,
 }: {
   onClose: () => void;
   assistantDraft?: string;
@@ -109,6 +110,7 @@ export default function TheoryWorkspace({
   onContextChange?: (draft: DocumentDraft) => void;
   onSaved?: (document: { id: string; title: string; version: number }) => void;
   onNewDocument?: () => void;
+  onSuggestionSettled?: (status: 'accepted' | 'rejected') => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const contractDetails = useRef<HTMLDetailsElement>(null);
@@ -161,12 +163,14 @@ export default function TheoryWorkspace({
     setMarkdown(pendingSuggestion.proposedText);
     setPendingSuggestion(null);
     setStatus('✓ AI 수정 제안을 수락하여 본문에 반영했습니다.');
+    onSuggestionSettled?.('accepted');
   };
 
   const handleRejectSuggestion = () => {
     if (!pendingSuggestion) return;
     setPendingSuggestion(null);
     setStatus('✕ AI 수정 제안을 거절하고 기존 본문을 유지했습니다.');
+    onSuggestionSettled?.('rejected');
   };
 
   // Keyboard shortcuts for accepting/rejecting suggestions
@@ -188,6 +192,15 @@ export default function TheoryWorkspace({
   useEffect(() => {
     if (!incomingDraft) return;
     const proposed = incomingDraft.text;
+    if (incomingDraft.mode === 'direct_accept') {
+      setMarkdown(proposed);
+      setPendingSuggestion(null);
+      setDiffViewMode('preview');
+      setStatus('✓ AI 수정 제안을 수락하여 본문에 반영했습니다.');
+      onSuggestionSettled?.('accepted');
+      return;
+    }
+
     if (!markdown.trim() || incomingDraft.mode === 'replace') {
       if (!markdown.trim()) {
         setMarkdown(proposed);
