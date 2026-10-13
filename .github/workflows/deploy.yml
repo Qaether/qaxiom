@@ -1,0 +1,73 @@
+name: Deploy to Amazon S3 & CloudFront
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: production-qaxiom-s3
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Build & Sync to S3
+    if: ${{ vars.AWS_DEPLOY_ROLE_ARN != '' || vars.AWS_ROLE_ARN != '' }}
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: ap-northeast-2
+      S3_BUCKET: qaxiom.qaether.com
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build production bundle
+        run: npm run build
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN || vars.AWS_ROLE_ARN }}
+          role-session-name: qaxiom-github-actions-deploy
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Sync static site to S3
+        run: |
+          # 1. Assets 동기화 (불변 장기 캐시 적용)
+          aws s3 sync dist/ "s3://${S3_BUCKET}" \
+            --delete \
+            --exclude "index.html" \
+            --cache-control "max-age=31536000,public,immutable" \
+            --only-show-errors
+
+          # 2. index.html 업로드 (항상 최신 버전을 조회하도록 no-cache)
+          aws s3 cp dist/index.html "s3://${S3_BUCKET}/index.html" \
+            --cache-control "no-cache,no-store,must-revalidate" \
+            --only-show-errors
+
+      - name: Verify deployment
+        run: aws s3api head-object --bucket "${S3_BUCKET}" --key index.html
+
+      - name: Invalidate CloudFront cache
+        if: ${{ vars.CLOUDFRONT_DISTRIBUTION_ID != '' }}
+        env:
+          DISTRIBUTION_ID: ${{ vars.CLOUDFRONT_DISTRIBUTION_ID }}
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id "${DISTRIBUTION_ID}" \
+            --paths "/*"

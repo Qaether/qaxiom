@@ -1,5 +1,10 @@
 # Qaxiom 완료 내역
 
+> 2026-10-13 GitHub Actions S3/CloudFront 자동 배포 워크플로 구축:
+> 1. **OIDC 기반 IAM Role 연동**: `arn:aws:iam::703805241779:role/QaxiomGitHubActionsDeploy` Role의 Trust Policy를 보강하고 GitHub Repository Variables(`AWS_DEPLOY_ROLE_ARN`, `AWS_ROLE_ARN`, `CLOUDFRONT_DISTRIBUTION_ID`)를 등록함.
+> 2. **GitHub Actions 배포 워크플로 신설 (`.github/workflows/deploy.yml`)**: `main` 브랜치 푸시 시 `npm ci` ➔ `npm run build` 후 S3 `qaxiom.qaether.com` 버킷에 정적 자산(assets 장기 캐시, index.html no-cache)을 동기화하고 CloudFront(`E2TEB5A74ZS2H2`) 캐시를 무효화하는 자동 배포 파이프라인 구축.
+> 검증: oxlint, vitest 단위 테스트(320건 통과), production build 성공, IAM AssumeRolePolicy 검증 완료.
+
 > 2026-10-13 사이드바 AI 대화 ➔ 중앙 연구노트 문맥 전송 버그 수정 및 답변 본문 반영(적용) 워크플로우 구현:
 > 1. **문서 컨텍스트 및 중단 시그널 누락 수정 (`App.tsx`)**: `handleSendMessage`에서 `route === 'research'` 시 `sendChatMessage`에 `documentContext`, `contextBundle`, `abortControllerRef.signal`을 정상 전달하도록 수정하여, 우측 대화창에서 지시 시 중앙에 열린 연구노트 본문(`documentContext`)이 LLM에 누락 없이 전송되도록 바로잡았다.
 > 2. **AI 답변/코드블록 연구노트 반영 버튼 (`ChatMessage.tsx`)**: 어시스턴트 완료 메시지 푸터에 `[노트에 적용]` 버튼, 마크다운 코드블록 헤더에 `[노트에 적용]` 버튼을 추가하여 대화형 답변이나 수정안을 가운데 연구노트에 1-클릭으로 전달할 수 있도록 구현했다.

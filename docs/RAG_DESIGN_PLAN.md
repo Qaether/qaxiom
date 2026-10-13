@@ -1,5 +1,7 @@
 # Qaxiom 연구노트 RAG 및 정합성 검토 계획
 
+> 2026-10-13 배포 계약: Qaxiom 정적 클라이언트는 S3 `qaxiom.qaether.com` 및 CloudFront `E2TEB5A74ZS2H2`를 통해 배포된다. 모든 RAG 색인·추출·저장은 사용자 브라우저 클라이언트 로컬(Dexie IndexedDB)에서 동작하며, 원격 서버나 클라우드 데이터베이스에 사용자 연구 데이터가 저장되지 않는 로컬 우선 계약을 유지한다.
+
 > 2026-10-13 연구 대화 문맥 및 본문 반영 계약: 우측 사이드바 대화(`route === 'research'`) 시 중앙에 열려 있는 연구노트 본문(`documentContext`)과 RAG 근거(`contextBundle`)를 `sendChatMessage`로 안전하게 전달한다. 어시스턴트 완료 메시지와 코드블록의 `노트에 적용` 액션은 사용자의 선택에 따라 중앙 에디터에 교체(`replace`) 또는 추가(`append`)로 전달되며, 자동 저장이 아닌 미저장 변경(`dirty`) 상태로 적용되어 사용자의 명시적 검토와 저장을 거치도록 보장한다. 대화 요약은 정본으로 승격하지 않는다.
 
 > 2026-10-09 AI 분석 출력 계약: OpenAI Responses의 `reasoning_summary_text.delta`, Gemini의 `thought` 파트, Anthropic의 요약 `thinking_delta`를 최종 JSON 텍스트와 분리해 진행 패널에만 표시한다. 요청 단계와 수신 글자 수는 앱에서 관찰한 사실만 사용한다. 분석 결과는 전체 응답을 모아 기존 JSON 검증과 원문 인용 확인을 통과한 뒤 표시한다. 실시간 요약은 정본·검토 의견·외부 증거가 아니며 저장하지 않는다. 결과 수식 표시는 Markdown/LaTeX 렌더링 선택일 뿐 문서 버전, 모델 응답, 수정안 적용 내용을 변경하지 않는다.
