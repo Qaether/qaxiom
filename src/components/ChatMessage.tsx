@@ -7,6 +7,8 @@ import type { ChatMessage as ChatMessageType } from '../types';
 import type { ContextEvidence } from '../services/retrieval/types';
 import { inspectCitations } from '../services/retrieval/context';
 import { spanLocation } from '../services/retrieval/pdfTypes';
+import { parseMessageFileChanges, type FileChangeItem } from '../services/fileChanges';
+import { FilesWithChanges } from './FilesWithChanges';
 import './References.css';
 import 'katex/dist/katex.min.css';
 
@@ -15,12 +17,28 @@ interface ChatMessageProps {
   onRetry?: () => void;
   onOpenSource?: (evidence: ContextEvidence) => void;
   onApplyToDocument?: (content: string) => void;
+  originalDocumentContent?: string;
+  onRejectDocumentChange?: () => void;
 }
 
-export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onRetry, onOpenSource, onApplyToDocument }) => {
+export const ChatMessage: React.FC<ChatMessageProps> = ({
+  message,
+  onRetry,
+  onOpenSource,
+  onApplyToDocument,
+  originalDocumentContent,
+  onRejectDocumentChange,
+}) => {
   const isUser = message.role === 'user';
   const [copied, setCopied] = useState(false);
   const [applied, setApplied] = useState(false);
+  const [changeStatus, setChangeStatus] = useState<'pending' | 'accepted' | 'rejected'>('pending');
+
+  const defaultFilename = message.documentContext?.title ? `${message.documentContext.title}.md` : 'document.md';
+  const parsed = React.useMemo(() => {
+    if (isUser) return { displayText: message.content, fileChanges: [] };
+    return parseMessageFileChanges(message.content, defaultFilename);
+  }, [isUser, message.content, defaultFilename]);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(message.content);
@@ -32,7 +50,26 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onRetry, onOp
     if (!onApplyToDocument) return;
     onApplyToDocument(content);
     setApplied(true);
+    setChangeStatus('accepted');
     setTimeout(() => setApplied(false), 2000);
+  };
+
+  const handleReviewChange = (change: FileChangeItem) => {
+    if (!onApplyToDocument) return;
+    onApplyToDocument(change.proposedContent);
+  };
+
+  const handleAcceptChange = (change: FileChangeItem) => {
+    if (!onApplyToDocument) return;
+    onApplyToDocument(change.proposedContent);
+    setChangeStatus('accepted');
+  };
+
+  const handleRejectChange = () => {
+    setChangeStatus('rejected');
+    if (onRejectDocumentChange) {
+      onRejectDocumentChange();
+    }
   };
 
   const citations = message.contextBundle ? inspectCitations(message.content, message.contextBundle) : null;
@@ -105,12 +142,24 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onRetry, onOp
                 }
               }}
             >
-              {message.content}
+              {parsed.displayText}
             </ReactMarkdown>
 
             {/* Streaming indicator */}
             {(message.status === 'streaming' || message.isStreaming) && <span className="streaming-cursor" />}
           </div>
+
+          {/* Google Antigravity Style Files with changes */}
+          {!isUser && parsed.fileChanges.length > 0 && (
+            <FilesWithChanges
+              changes={parsed.fileChanges}
+              originalContent={message.documentContext?.markdown || originalDocumentContent || ''}
+              status={changeStatus}
+              onReview={handleReviewChange}
+              onAccept={handleAcceptChange}
+              onReject={handleRejectChange}
+            />
+          )}
 
           {!isUser && message.contextBundle && citations && <section className="message-citations" aria-label="답변 근거">
             {message.contextBundle.retriever === 'graph-canonical-v1' && <p>정본 단독 문맥 · 레퍼런스 원문 0개. 자체 문서는 독립 외부 근거가 아니며 답변은 정합성 증명이 아닙니다.</p>}
@@ -168,7 +217,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onRetry, onOp
           )}
 
           {!isUser && <div className="assistant-message-footer">
-            {onApplyToDocument && message.status === 'complete' && message.content && (
+            {onApplyToDocument && message.status === 'complete' && message.content && parsed.fileChanges.length === 0 && (
               <button
                 type="button"
                 id={`apply-btn-${message.id}`}

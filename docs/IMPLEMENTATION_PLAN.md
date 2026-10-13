@@ -1,5 +1,9 @@
 # Qaxiom 구현 계획서
 
+> 2026-10-13 'LaTeX 수식 복원 및 정규화' 전용 연구 모드 신설: 연구노트 본문의 깨지거나 불완전한 수식 문법을 점검하여 KaTeX/MathJax 표준 규격으로 복원하는 `latex_normalizer` 모드를 신설하고, Antigravity 스타일의 'Files with changes' 및 인라인 Diff와 결합했다.
+
+> 2026-10-13 Google Antigravity 스타일 'Files with changes' 위젯 및 중앙 에디터 자동 인라인 Diff 연동: 룰베이스 키워드 검사를 전면 배제하고 구조화된 파일 변경 블록(`file_changes:document.md`) 프로토콜을 도입했다. 오른쪽 채팅창에는 도배 없이 1~3문장의 간결한 요약 설명과 함께 Antigravity 스타일의 'Files with changes' 카드를 표시하고, 스트리밍 완료 시 자동으로 중앙 에디터의 인라인 Diff 검토 모드로 직행하여 사용자가 즉시 수락(`⌘↵`)/거절(`Esc`)할 수 있도록 구현했다.
+
 > 2026-10-13 Cursor/Copilot 스타일 중앙 에디터 인라인 Diff 검토 및 수락/거절(Accept/Reject) 워크플로우 구현: 우측 대화창에서 AI 수정안을 노트에 적용할 때 브라우저 팝업 모달 대신 중앙 에디터 상단에 Cursor/Copilot 스타일의 플로팅 검토 바(`✦ AI 수정 제안 검토 (+N/-M)`, `[수락 ⌘↵]`, `[거절 Esc]`, `[미리보기/Diff 토글]`) 및 인라인 줄단위 Diff 뷰어를 표시하도록 구현했다. 사용자가 수락 시에만 편집 내용에 반영되어 `dirty` 상태가 되며, 이후 명시적 저장을 거쳐야 새 버전으로 확정된다.
 
 > 2026-10-13 GitHub Actions S3/CloudFront 자동 배포 워크플로 구축: AWS OIDC 기반 AssumeRole(`QaxiomGitHubActionsDeploy`) 연동 및 `.github/workflows/deploy.yml`을 신설했다. `main` 브랜치 푸시 시 프로덕션 빌드 후 S3 `qaxiom.qaether.com` 버킷에 정적 파일을 동기화하고 CloudFront 캐시를 무효화하여 자동 배포된다.

@@ -1,5 +1,22 @@
 # Qaxiom 완료 내역
 
+> 2026-10-13 'LaTeX 수식 복원 및 정규화' 전용 연구 모드 신설 (`src/constants.ts`, `src/types.ts`):
+> 1. **`latex_normalizer` 모드 구축**: 깨지거나 불완전한 LaTeX 수식 문법(\frac 괄호 불일치, aligned 환경 누락, 인덱스 누락, 특수문자 이스케이프 오류)을 KaTeX/MathJax 표준 규격으로 복원하도록 전용 페르소나 및 시스템 프롬프트를 탑재함.
+> 2. **Files with changes 위젯과 직결**: 복원된 전체 완성본 마크다운을 `file_changes:document.md` 블록으로 즉시 출력하여, 사용자가 오른쪽 모드 드롭다운에서 선택 후 간단한 지시만으로도 가운데 창에서 깨진 수식과 고쳐진 수식의 Diff를 한눈에 대조·수락할 수 있도록 완성함.
+> 검증: oxlint(0 errors), vitest 47개 파일 327개 테스트 전체 통과, production build 성공. OCR은 명시적 비목표다.
+
+> 2026-10-13 Google Antigravity 스타일 'Files with changes' 위젯 및 중앙 에디터 자동 인라인 Diff 연동:
+> 1. **구조적 파일 변경 블록 프로토콜 및 파서 (`src/services/fileChanges.ts`, `fileChanges.test.ts`)**:
+>    - 키워드 기반 룰베이스를 전면 배제하고, LLM이 문서를 수정할 때 정형화된 파일 변경 블록(\`\`\`file_changes:document.md ... \`\`\`)을 생성하도록 시스템 프롬프트(`DOCUMENT_FILE_CHANGES_INSTRUCTIONS`)를 구축함.
+>    - 메시지 파서 `parseMessageFileChanges`가 대화창에 도배되던 수백 줄의 긴 전체 마크다운 본문을 분리하고, 간결한 요약 설명 텍스트(`displayText`)와 파일 변경 항목(`fileChanges`)으로 완벽히 분리함.
+> 2. **오른쪽 대화창 'Files with changes' 위젯 카드 (`src/components/FilesWithChanges.tsx`, `FilesWithChanges.css`)**:
+>    - Google Antigravity와 동일한 미려한 다크 테마 카드 UI로 파일명, 라인 단위 변경 통계(`+N / -M`), 상태 뱃지(`검토 대기` / `수락됨` / `거절됨`), 액션 버튼(`[검토]`, `[수락]`, `[거절]`)을 렌더링.
+> 3. **중앙 에디터 인라인 Diff 자동 스테이징 (`App.tsx`, `ChatMessage.tsx`)**:
+>    - 모델 응답 생성 완료 시 파일 변경이 포함되어 있으면 수동 클릭 없이 **가운데 메인 에디터가 즉시 인라인 Diff 검토 모드로 자동 전환**됨.
+>    - 오른쪽 카드의 수락/거절 버튼과 가운데 에디터 상단 플로팅 바의 수락(`⌘↵`)/거절(`Esc`) 액션이 실시간 상호 동기화됨.
+>    - 수락 시 에디터 본문이 변경되고 `dirty` 플래그가 활성화되어 사용자의 명시적 저장으로만 정본 버전 스냅샷이 생성됨. (Qaxiom 정본 무결성 보존)
+> 검증: oxlint(0 errors), vitest 47개 파일 327개 테스트 전체 통과, production build 성공. 실제 API·원격 CI·배포·commit/push는 수행하지 않았고 OCR은 명시적 비목표다.
+
 > 2026-10-13 Cursor/Copilot 스타일 중앙 에디터 인라인 Diff 검토 및 수락/거절(Accept/Reject) 워크플로우 구현:
 > 1. **LCS 기반 라인 단위 Diff 엔진 (`src/services/diffUtils.ts`, `diffUtils.test.ts`)**: 추가/삭제/유지 라인 및 변경 통계(+N, -M)를 계산하는 순수 함수 `computeLineDiff` 및 단위 테스트 구현.
 > 2. **중앙 에디터 인라인 Diff 뷰어 및 플로팅 검토 바 (`TheoryWorkspace.tsx`, `TheoryWorkspace.css`)**:

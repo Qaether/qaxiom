@@ -3,7 +3,8 @@ export type ResearchMode =
   | 'peer_review' 
   | 'proofreader' 
   | 'math_proof' 
-  | 'literature_synth';
+  | 'literature_synth'
+  | 'latex_normalizer';
 
 export interface ResearchModeInfo {
   id: ResearchMode;

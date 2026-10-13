@@ -34,6 +34,7 @@ import {
 } from './services/workspace';
 
 import type { IncomingDraftAction } from './components/TheoryWorkspace';
+import { parseMessageFileChanges } from './services/fileChanges';
 
 const ChatMessage = React.lazy(() => import('./components/ChatMessage'));
 const TheoryWorkspace = React.lazy(() => import('./components/TheoryWorkspace'));
@@ -666,14 +667,22 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
           setSessions(prev =>
             prev.map(s => {
               if (s.id !== currentSession.id) return s;
-              return {
-                ...s,
-                messages: s.messages.map(m =>
-                  m.id === assistantMessageId
-                    ? settleAssistantMessage(m, { type: wasStopped ? 'stop' : 'finish' })
-                    : m
-                )
-              };
+              const nextMessages = s.messages.map(m =>
+                m.id === assistantMessageId
+                  ? settleAssistantMessage(m, { type: wasStopped ? 'stop' : 'finish' })
+                  : m
+              );
+              if (!wasStopped) {
+                const finishedMsg = nextMessages.find(m => m.id === assistantMessageId);
+                if (finishedMsg?.content) {
+                  const parsed = parseMessageFileChanges(finishedMsg.content);
+                  if (parsed.fileChanges.length > 0) {
+                    // Auto-stage in central workspace with Cursor/Antigravity inline diff
+                    handleApplyToDocument(parsed.fileChanges[0].proposedContent);
+                  }
+                }
+              }
+              return { ...s, messages: nextMessages };
             })
           );
         }
@@ -1073,6 +1082,7 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
                         <ChatMessage
                           key={message.id}
                           message={message}
+                          originalDocumentContent={documentDraft?.markdown || ''}
                           onOpenSource={setSourceEvidence}
                           onApplyToDocument={handleApplyToDocument}
                           onRetry={
