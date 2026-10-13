@@ -1,9 +1,50 @@
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import type { AnalysisFinding, AnalysisRun } from '../services/theory/analysis';
 import type { TheorySnapshot } from '../services/theory/types';
-import { Check, X, Clock, AlertCircle, RefreshCw, Trash2, CheckCircle2, RotateCcw } from 'lucide-react';
+import { Check, X, Clock, AlertCircle, RefreshCw, Trash2, CheckCircle2, RotateCcw, Sigma } from 'lucide-react';
+import { preprocessLatex } from './mathMarkdown';
 
 const MathJaxMarkdown = lazy(() => import('./MathJaxMarkdown'));
+
+export interface AnalysisProgress {
+  runId: string;
+  stage: string;
+  startedAt: number;
+  receivedChars: number;
+  reasoningSummary: string;
+  summaryTruncated?: boolean;
+}
+
+function AnalysisText({ content, renderMath }: { content: string; renderMath: boolean }) {
+  if (!renderMath) return <span className="analysis-source-text">{content}</span>;
+  return <Suspense fallback={<span>{content}</span>}><MathJaxMarkdown content={preprocessLatex(content)} /></Suspense>;
+}
+
+function ProgressDetails({ run, progress, elapsedSeconds }: {
+  run: AnalysisRun; progress: AnalysisProgress; elapsedSeconds: number;
+}) {
+  const details = useRef<HTMLDetailsElement>(null);
+  useEffect(() => { if (details.current) details.current.open = run.status === 'running'; }, [run.status]);
+  return (
+    <details ref={details} className="document-analysis-progress">
+      <summary>
+        {run.status === 'running' && <span className="spinner" aria-hidden="true" />}
+        <strong>분석 진행 · {progress.stage}</strong>
+        <span>{run.status === 'running' ? `${elapsedSeconds}초 경과` : '세부 내용 보기'}</span>
+      </summary>
+      <div className="document-analysis-progress-body">
+        <p role="status">{progress.stage}{progress.receivedChars > 0 ? ` · 결과 ${progress.receivedChars.toLocaleString()}자 수신` : ''}</p>
+        {progress.reasoningSummary ? (
+          <div className="document-analysis-reasoning">
+            <strong>모델이 제공한 추론 요약</strong>
+            <div className="analysis-source-text">{progress.reasoningSummary}</div>
+            {progress.summaryTruncated && <p className="document-analysis-progress-note">긴 요약은 최근 2만 자만 표시합니다.</p>}
+          </div>
+        ) : <p className="document-analysis-progress-note">이 모델에서 공개된 추론 요약이 없거나 아직 도착하지 않았습니다.</p>}
+      </div>
+    </details>
+  );
+}
 
 function changedSpan(before: string = '', after: string = '') {
   const b = before ?? '';
@@ -53,6 +94,7 @@ export default function DocumentAnalysisView({
   snapshot,
   run,
   history,
+  progress,
   onSelectHistory,
   onDecision,
   onApply,
@@ -64,6 +106,7 @@ export default function DocumentAnalysisView({
   snapshot: TheorySnapshot;
   run: AnalysisRun | null;
   history?: AnalysisRun[];
+  progress?: AnalysisProgress | null;
   onSelectHistory?: (run: AnalysisRun) => void;
   onDecision: (finding: AnalysisFinding, decision: AnalysisFinding['decision']) => void;
   onApply: (finding: AnalysisFinding) => void;
@@ -74,6 +117,14 @@ export default function DocumentAnalysisView({
 }) {
   const [filterMode, setFilterMode] = useState<'all' | 'pending' | 'completed'>('all');
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+  const [renderMath, setRenderMath] = useState(true);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+  useEffect(() => {
+    if (run?.status !== 'running' || progress?.runId !== run.id) return;
+    const timer = window.setInterval(() => setElapsedSeconds(Math.floor((Date.now() - progress.startedAt) / 1000)), 1000);
+    return () => window.clearInterval(timer);
+  }, [run?.id, run?.status, progress?.runId, progress?.startedAt]);
 
   const findings = run?.findings ?? [];
   const unchecked = run && Array.isArray(run.checkedBlockIds)
@@ -84,6 +135,7 @@ export default function DocumentAnalysisView({
   const pendingFindings = findings.filter(f => f.decision === 'open' || f.decision === 'later');
   const completedFindings = findings.filter(f => f.decision === 'applied' || f.decision === 'dismissed');
   const allCompleted = findings.length > 0 && pendingFindings.length === 0;
+  const visibleProgress = run && progress?.runId === run.id ? progress : null;
 
   const displayedFindings = filterMode === 'pending'
     ? pendingFindings
@@ -183,7 +235,9 @@ export default function DocumentAnalysisView({
         AI의 검토 의견이며 이론의 참·증명 또는 완전한 정합성을 보장하지 않습니다. 외부 문헌은 대조하지 않았습니다.
       </p>
 
-      {run?.status === 'running' && (
+      {run && visibleProgress && <ProgressDetails key={`${run.id}-${run.status}`} run={run} progress={visibleProgress} elapsedSeconds={elapsedSeconds} />}
+
+      {run?.status === 'running' && !visibleProgress && (
         <div className="document-analysis-running-banner" role="status">
           <div className="spinner" />
           <span>분석 요청을 처리하고 있습니다…</span>
@@ -249,6 +303,10 @@ export default function DocumentAnalysisView({
                   <span>처리 완료 ({completedFindings.length})</span>
                 </button>
               </div>
+              <button type="button" className="analysis-math-toggle" aria-pressed={renderMath} onClick={() => setRenderMath(value => !value)}>
+                <Sigma size={15} aria-hidden="true" />
+                <span>{renderMath ? '원문 보기' : '수식 보기'}</span>
+              </button>
             </div>
           )}
 
@@ -276,9 +334,7 @@ export default function DocumentAnalysisView({
               return (
                 <section key={block.id} className="document-analysis-block">
                   <div className="document-analysis-original">
-                    <Suspense fallback={<pre>{block.text}</pre>}>
-                      <MathJaxMarkdown content={block.text} />
-                    </Suspense>
+                    {renderMath ? <AnalysisText content={block.text} renderMath /> : <pre className="analysis-source-block">{block.text}</pre>}
                   </div>
                   {blockFindings.map(finding => {
                     const isApplied = finding.decision === 'applied';
@@ -293,9 +349,9 @@ export default function DocumentAnalysisView({
                       >
                         <span className="document-analysis-arrow" aria-hidden="true">==&gt;</span>
                         <div>
-                          <p><strong>AI 검토</strong> · 원문: <q>{finding.quote}</q></p>
-                          <p>{finding.explanation}</p>
-                          <p>확인할 조건: {finding.resolution}</p>
+                          <div className="analysis-finding-quote"><strong>AI 검토</strong> · 원문 인용:<div><AnalysisText content={finding.quote} renderMath={renderMath} /></div></div>
+                          <div className="analysis-finding-prose"><AnalysisText content={finding.explanation} renderMath={renderMath} /></div>
+                          <div className="analysis-finding-prose"><strong>확인할 조건</strong><AnalysisText content={finding.resolution} renderMath={renderMath} /></div>
                           {isApplied || isDismissed ? (
                             <div className={`analysis-status-badge ${finding.decision}`}>
                               <span className="status-text">
@@ -318,6 +374,7 @@ export default function DocumentAnalysisView({
                               {finding.replacement ? (
                                 <div className="inline-diff-box">
                                   <SuggestionDiffViewer before={block.text} after={finding.replacement} />
+                                  {renderMath && <div className="analysis-replacement-preview"><strong>수정안 수식 미리보기</strong><AnalysisText content={finding.replacement} renderMath /></div>}
                                   <button
                                     type="button"
                                     className="inline-apply-btn"

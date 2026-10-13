@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen, fireEvent } from '@testing-library/react';
+import { cleanup, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { afterEach, describe, it, expect, vi } from 'vitest';
 import DocumentAnalysisView from './DocumentAnalysisView';
 import type { TheorySnapshot } from '../services/theory/types';
@@ -124,6 +124,41 @@ describe('DocumentAnalysisView', () => {
 
     expect(handleApply).toHaveBeenCalledTimes(1);
     expect(handleApply).toHaveBeenCalledWith(mockRun.findings[0]);
+  });
+
+  it('renders analysis math by default and switches to source text without changing the diff', async () => {
+    const mathRun: AnalysisRun = {
+      ...mockRun,
+      findings: [{ ...mockRun.findings[0], explanation: '에너지 $E=mc^2$를 확인하세요.', replacement: '에너지 $E=mc^2$를 확인한다.' }]
+    };
+    const { container } = render(
+      <DocumentAnalysisView snapshot={mockSnapshot} run={mathRun} onDecision={vi.fn()} onApply={vi.fn()}
+        canApply onRetry={vi.fn()} onCancel={vi.fn()} />
+    );
+    await waitFor(() => expect(container.querySelectorAll('mjx-container.MathJax').length).toBeGreaterThan(0));
+    expect(screen.getByText('수정안 수식 미리보기')).toBeDefined();
+    expect(screen.getByLabelText('원문과 수정안 비교')).toBeDefined();
+    fireEvent.click(screen.getByRole('button', { name: '원문 보기' }));
+    expect(screen.getByRole('button', { name: '수식 보기' })).toBeDefined();
+    expect(screen.getByText('에너지 $E=mc^2$를 확인하세요.')).toBeDefined();
+    expect(screen.queryByText('수정안 수식 미리보기')).toBeNull();
+  });
+
+  it('shows live progress and a provider summary above the result, then collapses it on completion', () => {
+    const progress = { runId: mockRun.id, stage: '결과 수신 중', startedAt: Date.now(), receivedChars: 120, reasoningSummary: '전제와 수식을 확인 중입니다.' };
+    const { container, rerender } = render(
+      <DocumentAnalysisView snapshot={mockSnapshot} run={{ ...mockRun, status: 'running' }} progress={progress}
+        onDecision={vi.fn()} onApply={vi.fn()} canApply onRetry={vi.fn()} onCancel={vi.fn()} />
+    );
+    expect(container.querySelector('.document-analysis-progress')).toHaveProperty('open', true);
+    expect(screen.getByText('모델이 제공한 추론 요약')).toBeDefined();
+    expect(screen.getByText('전제와 수식을 확인 중입니다.')).toBeDefined();
+    rerender(
+      <DocumentAnalysisView snapshot={mockSnapshot} run={mockRun} progress={{ ...progress, stage: '분석 완료' }}
+        onDecision={vi.fn()} onApply={vi.fn()} canApply onRetry={vi.fn()} onCancel={vi.fn()} />
+    );
+    expect(container.querySelector('.document-analysis-progress')).toHaveProperty('open', false);
+    expect(screen.getByRole('button', { name: '원문 보기' })).toBeDefined();
   });
 
   it('renders history dropdown and notifies onSelectHistory when multiple runs exist', () => {

@@ -78,6 +78,19 @@ describe('provider streaming adapters', () => {
     });
   });
 
+  it('keeps OpenAI reasoning summaries separate from the final analysis JSON', async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(responseFromSSE(
+      'data: {"type":"response.reasoning_summary_text.delta","delta":"가정 검토 중"}\n\n',
+      'data: {"type":"response.output_text.delta","delta":"{\\"findings\\":[]}"}\n\n'
+    ));
+    vi.stubGlobal('fetch', fetchMock);
+    const handlers = { ...callbacks(), onReasoningSummary: vi.fn() };
+    await streamOpenAI(messages, model('gpt-6-astra'), 'system', 'key', handlers);
+    expect(handlers.onReasoningSummary).toHaveBeenCalledWith('가정 검토 중');
+    expect(handlers.onChunk.mock.calls.flat()).toEqual(['{"findings":[]}']);
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body)).reasoning).toEqual({ effort: 'medium', summary: 'auto' });
+  });
+
   it('surfaces typed OpenAI error events without provider details', async () => {
     vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValue(responseFromSSE(
       'data: {"type":"error","message":"rate limited"}\n\n'
@@ -114,6 +127,22 @@ describe('provider streaming adapters', () => {
     expect(JSON.parse(String(init?.body))).not.toHaveProperty('temperature');
   });
 
+  it('keeps Anthropic summarized thinking separate from final text', async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(responseFromSSE(
+      'data: {"type":"content_block_delta","delta":{"type":"thinking_delta","thinking":"검토 중"}}\n\n',
+      'data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"{\\"findings\\":[]}"}}\n\n'
+    ));
+    vi.stubGlobal('fetch', fetchMock);
+    const handlers = { ...callbacks(), onReasoningSummary: vi.fn() };
+    await streamAnthropic(messages, model('claude-sonnet-5'), 'system', 'key', 0.7, handlers);
+    expect(handlers.onReasoningSummary).toHaveBeenCalledWith('검토 중');
+    expect(handlers.onChunk.mock.calls.flat()).toEqual(['{"findings":[]}']);
+    const request = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
+    expect(request.thinking).toEqual({ type: 'adaptive', display: 'summarized' });
+    expect(request.max_tokens).toBe(16384);
+    expect(request).not.toHaveProperty('temperature');
+  });
+
   it('streams Gemini deltas and keeps supported temperature configuration', async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(responseFromSSE(
       'data: {"candidates":[{"content":{"parts":[{"text":"Gemini"}]}}]}'
@@ -129,5 +158,17 @@ describe('provider streaming adapters', () => {
     expect(JSON.parse(String(init?.body))).toMatchObject({
       generationConfig: { temperature: 0.3 }
     });
+  });
+
+  it('keeps Gemini thought summaries separate from the final analysis JSON', async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(responseFromSSE(
+      'data: {"candidates":[{"content":{"parts":[{"text":"전제 확인 중","thought":true},{"text":"{\\"findings\\":[]}"}]}}]}\n\n'
+    ));
+    vi.stubGlobal('fetch', fetchMock);
+    const handlers = { ...callbacks(), onReasoningSummary: vi.fn() };
+    await streamGemini(messages, model('gemini-3.8-flash'), 'system', 'key', 0.3, handlers);
+    expect(handlers.onReasoningSummary).toHaveBeenCalledWith('전제 확인 중');
+    expect(handlers.onChunk.mock.calls.flat()).toEqual(['{"findings":[]}']);
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body)).generationConfig.thinkingConfig).toEqual({ includeThoughts: true });
   });
 });

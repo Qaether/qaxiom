@@ -7,6 +7,8 @@ import './TheoryWorkspace.css';
 import NoteReferencesModal from './NoteReferencesModal';
 import NoteInlineSearchDrawer from './NoteInlineSearchDrawer';
 import DocumentAnalysisView from './DocumentAnalysisView';
+import type { AnalysisProgress } from './DocumentAnalysisView';
+import { preprocessLatex } from './mathMarkdown';
 import { applyAnalysisSuggestion, deleteAnalysisRun, parseDocumentAnalysis, prepareDocumentAnalysis, prepareChunkedDocumentAnalysis, parseChunkedDocumentAnalysis, setAnalysisDecision, type AnalysisFinding, type AnalysisRun } from '../services/theory/analysis';
 import { sendChatMessage } from '../services/llm';
 import ContractSuggestionAssistant from './ContractSuggestionAssistant';
@@ -25,29 +27,6 @@ import {
 } from 'lucide-react';
 
 const MathJaxMarkdown = lazy(() => import('./MathJaxMarkdown'));
-
-function preprocessLatex(content: string): string {
-  if (!content) return '';
-  let processed = content;
-  // 1. Replace \[ ... \] with $$ ... $$
-  processed = processed.replace(/\\\[([\s\S]*?)\\\]/g, (_match, math) => `\n\n$$\n${math.trim()}\n$$\n\n`);
-  // 2. Replace \( ... \) with $ ... $
-  processed = processed.replace(/\\\(([\s\S]*?)\\\)/g, (_match, math) => ` $${math.trim()}$ `);
-  // 3. Replace \begin{equation} ... \end{equation} with $$ ... $$
-  processed = processed.replace(/\\begin\{equation\*?\}([\s\S]*?)\\end\{equation\*?\}/g, (_match, math) => `\n\n$$\n${math.trim()}\n$$\n\n`);
-  // 4. Replace \begin{align} ... \end{align} with $$ \begin{aligned} ... \end{aligned} $$
-  processed = processed.replace(/\\begin\{align\*?\}([\s\S]*?)\\end\{align\*?\}/g, (_match, math) => `\n\n$$\\begin{aligned}\n${math.trim()}\n\\end{aligned}$$\n\n`);
-  // 5. Replace \begin{gather} ... \end{gather} with $$ \begin{gathered} ... \end{gathered} $$
-  processed = processed.replace(/\\begin\{gather\*?\}([\s\S]*?)\\end\{gather\*?\}/g, (_match, math) => `\n\n$$\\begin{gathered}\n${math.trim()}\n\\end{gathered}$$\n\n`);
-  // 6. Common LaTeX section commands if user pasted pure latex
-  processed = processed.replace(/^\\section\*?\{([^}]+)\}/gm, '# $1');
-  processed = processed.replace(/^\\subsection\*?\{([^}]+)\}/gm, '## $1');
-  processed = processed.replace(/^\\subsubsection\*?\{([^}]+)\}/gm, '### $1');
-  processed = processed.replace(/\\textbf\{([^}]+)\}/g, '**$1**');
-  processed = processed.replace(/\\textit\{([^}]+)\}/g, '*$1*');
-  processed = processed.replace(/\\emph\{([^}]+)\}/g, '*$1*');
-  return processed;
-}
 
 const contractLabels: Record<keyof ResearchContract, string> = {
   purpose: '연구 목적', assumptions: '가정·공리', definitions: '핵심 정의',
@@ -88,11 +67,18 @@ const ANALYSIS_PRESETS = [
   }
 ];
 
+export interface IncomingDraftAction {
+  text: string;
+  mode: 'replace' | 'append';
+  token: number;
+}
+
 type ActiveModal = 'contract' | 'history' | 'analysis' | null;
 
 export default function TheoryWorkspace({
   onClose,
   assistantDraft,
+  incomingDraft,
   settings,
   modelId,
   initialDocumentId,
@@ -104,6 +90,7 @@ export default function TheoryWorkspace({
 }: {
   onClose: () => void;
   assistantDraft?: string;
+  incomingDraft?: IncomingDraftAction | null;
   settings: UserSettings;
   modelId: string;
   initialDocumentId?: string | null;
@@ -128,6 +115,7 @@ export default function TheoryWorkspace({
   const [analysisHistory, setAnalysisHistory] = useState<AnalysisRun[]>([]);
   const [historicalAnalysisSnapshot, setHistoricalAnalysisSnapshot] = useState<TheorySnapshot | null>(null);
   const [analysisBusy, setAnalysisBusy] = useState(false);
+  const [analysisProgress, setAnalysisProgress] = useState<AnalysisProgress | null>(null);
   const analysisAbort = useRef<AbortController | null>(null);
   const [previewMathRenderer, setPreviewMathRenderer] = useState<'mathjax' | 'katex'>('katex');
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
@@ -155,6 +143,17 @@ export default function TheoryWorkspace({
     const timeout = window.setTimeout(() => setStatus(''), 4000);
     return () => window.clearTimeout(timeout);
   }, [status]);
+
+  useEffect(() => {
+    if (!incomingDraft) return;
+    if (incomingDraft.mode === 'append') {
+      setMarkdown(prev => prev ? `${prev}\n\n${incomingDraft.text}` : incomingDraft.text);
+      setStatus('대화 답변을 연구노트 끝에 추가했습니다.');
+    } else {
+      setMarkdown(incomingDraft.text);
+      setStatus('대화 답변으로 연구노트 본문을 교체했습니다.');
+    }
+  }, [incomingDraft]);
 
   const [isWikiPublished, setIsWikiPublished] = useState(false);
   const [publishBusy, setPublishBusy] = useState(false);
@@ -396,6 +395,7 @@ export default function TheoryWorkspace({
     let activeRun: AnalysisRun | null = null;
     const abort = new AbortController();
     analysisAbort.current = abort;
+    setAnalysisProgress(null);
     try {
       if (!title.trim() || !markdown.trim()) throw new Error('문서 제목과 본문을 입력해 주세요.');
       const target = dirty || !snapshot ? await persistDraft() : snapshot;
@@ -408,54 +408,92 @@ export default function TheoryWorkspace({
       };
       await qaxiomDatabase.analysis_runs.add(activeRun);
       setAnalysisRun(activeRun); setEditorTab('analysis');
+      setAnalysisProgress({ runId: activeRun.id, stage: '분석 요청 준비 중', startedAt: Date.now(), receivedChars: 0, reasoningSummary: '' });
       setAnalysisHistory(previous => [activeRun!, ...previous]);
+
+      const updateProgress = (changes: Partial<AnalysisProgress>) => {
+        setAnalysisProgress(previous => previous && previous.runId === activeRun?.id ? { ...previous, ...changes } : previous);
+      };
+      const appendReasoningSummary = (chunk: string) => {
+        setAnalysisProgress(previous => previous && previous.runId === activeRun?.id
+          ? {
+            ...previous,
+            reasoningSummary: (previous.reasoningSummary + chunk).slice(-20_000),
+            summaryTruncated: previous.summaryTruncated || previous.reasoningSummary.length + chunk.length > 20_000
+          }
+          : previous);
+      };
 
       if (useChunking) {
         // 분할 분석 (Chunking Mode)
         const chunks = await prepareChunkedDocumentAnalysis(target, { focusInstruction: overrideInstruction });
         const subRuns: AnalysisRun[] = [];
+        let receivedTotal = 0;
 
         for (let i = 0; i < chunks.length; i++) {
           if (abort.signal.aborted) throw new Error('분석을 취소했습니다.');
           const chunk = chunks[i];
-          setStatus(`분할 분석 진행 중 (${i + 1}/${chunks.length} 섹션 검토)...`);
+          updateProgress({ stage: `모델 응답 대기 중 · 섹션 ${i + 1}/${chunks.length}` });
 
-          let response = ''; let failure: Error | null = null;
+          let response = ''; let failure: Error | null = null; let reportedChars = 0;
           await sendChatMessage([{ id: crypto.randomUUID(), role: 'user', content: chunk.requestPrompt, timestamp: Date.now() }], targetModelId,
             'document_analysis', settings, {
-              onChunk: c => { response += c; if (response.length > 2_000_000) { failure = new Error('분석 응답이 너무 깁니다.'); abort.abort(); } },
-            onError: cause => { failure = cause; }, onFinish: () => { }
+              onChunk: c => {
+                response += c;
+                if (reportedChars === 0 || response.length - reportedChars >= 2048) {
+                  reportedChars = response.length;
+                  updateProgress({ stage: `결과 수신 중 · 섹션 ${i + 1}/${chunks.length}`, receivedChars: receivedTotal + response.length });
+                }
+                if (response.length > 2_000_000) { failure = new Error('분석 응답이 너무 깁니다.'); abort.abort(); }
+              },
+              onReasoningSummary: appendReasoningSummary,
+              onError: cause => { failure = cause; }, onFinish: () => { }
           }, abort.signal);
 
           if (failure) throw failure;
           if (abort.signal.aborted) throw new Error('분석을 취소했습니다.');
 
+          updateProgress({ stage: `응답 검증 중 · 섹션 ${i + 1}/${chunks.length}` });
           const chunkSnapshot: TheorySnapshot = { ...target, blocks: chunk.blocks };
           const subRun = parseDocumentAnalysis(response, chunkSnapshot, targetModelId);
           subRuns.push(subRun);
+          receivedTotal += response.length;
+          updateProgress({ receivedChars: receivedTotal });
         }
 
         const completed = parseChunkedDocumentAnalysis(subRuns, target, targetModelId);
         completed.id = activeRun.id; completed.createdAt = activeRun.createdAt;
         await qaxiomDatabase.analysis_runs.put(completed);
         setAnalysisRun(completed);
+        updateProgress({ stage: '분석 완료' });
         setAnalysisHistory(previous => previous.map(item => item.id === completed.id ? completed : item));
         setStatus('섹션별 분할 정합성 분석이 성공적으로 완료되었습니다.');
       } else {
         // 일반 통합 분석 (Single Context Mode)
         const request = await prepareDocumentAnalysis(target, { focusInstruction: overrideInstruction });
-        let response = ''; let failure: Error | null = null;
+        updateProgress({ stage: '모델 응답 대기 중' });
+        let response = ''; let failure: Error | null = null; let reportedChars = 0;
         await sendChatMessage([{ id: crypto.randomUUID(), role: 'user', content: request, timestamp: Date.now() }], targetModelId,
           'document_analysis', settings, {
-            onChunk: chunk => { response += chunk; if (response.length > 2_000_000) { failure = new Error('분석 응답이 너무 깁니다.'); abort.abort(); } },
-          onError: cause => { failure = cause; }, onFinish: () => { }
+            onChunk: chunk => {
+              response += chunk;
+              if (reportedChars === 0 || response.length - reportedChars >= 2048) {
+                reportedChars = response.length;
+                updateProgress({ stage: '결과 수신 중', receivedChars: response.length });
+              }
+              if (response.length > 2_000_000) { failure = new Error('분석 응답이 너무 깁니다.'); abort.abort(); }
+            },
+            onReasoningSummary: appendReasoningSummary,
+            onError: cause => { failure = cause; }, onFinish: () => { }
         }, abort.signal);
         if (failure) throw failure;
         if (abort.signal.aborted) throw new Error('분석을 취소했습니다.');
+        updateProgress({ stage: '응답 검증 중', receivedChars: response.length });
         const completed = parseDocumentAnalysis(response, target, targetModelId);
         completed.id = activeRun.id; completed.createdAt = activeRun.createdAt;
         await qaxiomDatabase.analysis_runs.put(completed);
         setAnalysisRun(completed);
+        updateProgress({ stage: '분석 완료' });
         setAnalysisHistory(previous => previous.map(item => item.id === completed.id ? completed : item));
         setStatus('전체 문서 정합성 분석이 성공적으로 완료되었습니다.');
       }
@@ -464,6 +502,7 @@ export default function TheoryWorkspace({
       setError(message);
       if (activeRun) {
         const failed: AnalysisRun = { ...activeRun, status: abort.signal.aborted ? 'stopped' : 'failed', error: message };
+        setAnalysisProgress(previous => previous?.runId === failed.id ? { ...previous, stage: failed.status === 'stopped' ? '분석 취소됨' : '분석 실패' } : previous);
         await qaxiomDatabase.analysis_runs.put(failed);
         setAnalysisRun(failed);
         setAnalysisHistory(previous => previous.map(item => item.id === failed.id ? failed : item));
@@ -807,6 +846,7 @@ export default function TheoryWorkspace({
               snapshot={analysisViewSnapshot ?? snapshot}
               run={analysisRun?.versionId === (analysisViewSnapshot ?? snapshot).version.id ? analysisRun : null}
               history={analysisHistory}
+              progress={analysisProgress}
               onSelectHistory={run => setAnalysisRun(run)}
               onDecision={(finding, decision) => { void decideAnalysisFinding(finding, decision); }}
               onApply={applyFinding}
@@ -836,13 +876,14 @@ export default function TheoryWorkspace({
             {dirty && <span className="theory-footer-dirty">● 미저장 변경 있음</span>}
           </div>
 
-          {!snapshot && assistantDraft && (
+          {assistantDraft && (
             <button
               type="button"
               className="theory-btn-draft-import"
               onClick={() => {
                 if (markdown && !window.confirm('현재 작성한 본문을 최근 AI 답변으로 바꿀까요?')) return;
                 setMarkdown(assistantDraft);
+                setStatus('최근 대화 답변을 본문으로 가져왔습니다.');
               }}
             >
               최근 대화 답변 본문에 가져오기

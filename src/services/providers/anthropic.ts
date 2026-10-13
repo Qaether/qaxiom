@@ -4,7 +4,7 @@ import { consumeJsonSSE } from '../sse';
 
 interface AnthropicStreamEvent {
   type?: string;
-  delta?: { text?: string };
+  delta?: { type?: string; text?: string; thinking?: string };
   error?: { message?: string };
 }
 
@@ -29,11 +29,15 @@ export async function streamAnthropic(
     model: model.id,
     system: systemPrompt,
     messages: anthropicMessages,
-    max_tokens: 4096,
+    max_tokens: callbacks.onReasoningSummary ? 16384 : 4096,
     stream: true
   };
 
-  if (model.supportsTemperature) {
+  if (callbacks.onReasoningSummary) {
+    requestBody.thinking = { type: 'adaptive', display: 'summarized' };
+  }
+
+  if (model.supportsTemperature && !callbacks.onReasoningSummary) {
     requestBody.temperature = temperature;
   }
 
@@ -58,7 +62,9 @@ export async function streamAnthropic(
 
   await consumeJsonSSE(response.body, payload => {
     const event = payload as AnthropicStreamEvent;
-    if (event.type === 'content_block_delta' && event.delta?.text) {
+    if (event.type === 'content_block_delta' && event.delta?.type === 'thinking_delta' && event.delta.thinking) {
+      callbacks.onReasoningSummary?.(event.delta.thinking);
+    } else if (event.type === 'content_block_delta' && event.delta?.text) {
       callbacks.onChunk(event.delta.text);
     } else if (event.type === 'error') {
       throw new Error(event.error?.message || 'Anthropic 스트리밍 처리 중 오류가 발생했습니다.');

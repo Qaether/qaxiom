@@ -1808,6 +1808,31 @@ body.resizing-col {
 .assistant-message-footer {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+}
+
+.apply-doc-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+}
+
+.apply-doc-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-main);
+}
+
+.apply-doc-btn.applied {
+  color: var(--accent-emerald);
 }
 
 .copy-btn {
@@ -1821,7 +1846,6 @@ body.resizing-col {
   font-size: 0.72rem;
   padding: 2px 6px;
   border-radius: 4px;
-  margin-left: auto;
   transition: all 0.15s ease;
 }
 
@@ -1983,6 +2007,31 @@ body.resizing-col {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--text-accent);
+}
+
+.code-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.code-apply-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+}
+
+.code-apply-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-main);
 }
 
 .code-copy-btn {

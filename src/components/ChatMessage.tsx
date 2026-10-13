@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
-import { AlertTriangle, BookOpen, Check, CircleStop, Copy, RotateCcw, User } from 'lucide-react';
+import { AlertTriangle, BookOpen, Check, CircleStop, Copy, FileDown, RotateCcw, User } from 'lucide-react';
 import type { ChatMessage as ChatMessageType } from '../types';
 import type { ContextEvidence } from '../services/retrieval/types';
 import { inspectCitations } from '../services/retrieval/context';
@@ -14,16 +14,25 @@ interface ChatMessageProps {
   message: ChatMessageType;
   onRetry?: () => void;
   onOpenSource?: (evidence: ContextEvidence) => void;
+  onApplyToDocument?: (content: string) => void;
 }
 
-export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onRetry, onOpenSource }) => {
+export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onRetry, onOpenSource, onApplyToDocument }) => {
   const isUser = message.role === 'user';
   const [copied, setCopied] = useState(false);
+  const [applied, setApplied] = useState(false);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(message.content);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleApply = (content: string) => {
+    if (!onApplyToDocument) return;
+    onApplyToDocument(content);
+    setApplied(true);
+    setTimeout(() => setApplied(false), 2000);
   };
 
   const citations = message.contextBundle ? inspectCitations(message.content, message.contextBundle) : null;
@@ -53,13 +62,27 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onRetry, onOp
                             {isBibtex && <BookOpen size={12} style={{ marginRight: 4 }} />}
                             {match[1]}
                           </span>
-                          <button
-                            className="code-copy-btn"
-                            onClick={() => navigator.clipboard.writeText(codeString)}
-                          >
-                            <Copy size={12} />
-                            <span>{isBibtex ? 'BibTeX 복사' : '코드 복사'}</span>
-                          </button>
+                          <div className="code-header-actions">
+                            {onApplyToDocument && (
+                              <button
+                                type="button"
+                                className="code-apply-btn"
+                                onClick={() => handleApply(codeString)}
+                                title="가운데 연구노트에 이 내용 적용"
+                                aria-label="노트에 적용"
+                              >
+                                <FileDown size={12} />
+                                <span>노트에 적용</span>
+                              </button>
+                            )}
+                            <button
+                              className="code-copy-btn"
+                              onClick={() => navigator.clipboard.writeText(codeString)}
+                            >
+                              <Copy size={12} />
+                              <span>{isBibtex ? 'BibTeX 복사' : '코드 복사'}</span>
+                            </button>
+                          </div>
                         </div>
                         <pre className={className}>
                           <code {...props}>{children}</code>
@@ -145,6 +168,19 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onRetry, onOp
           )}
 
           {!isUser && <div className="assistant-message-footer">
+            {onApplyToDocument && message.status === 'complete' && message.content && (
+              <button
+                type="button"
+                id={`apply-btn-${message.id}`}
+                className={`apply-doc-btn ${applied ? 'applied' : ''}`}
+                onClick={() => handleApply(message.content)}
+                title={applied ? '노트에 반영됨' : '가운데 연구노트에 이 답변 적용'}
+                aria-label={applied ? '노트에 반영됨' : '연구노트에 적용'}
+              >
+                {applied ? <Check size={14} className="copied-icon" /> : <FileDown size={14} />}
+                <span>{applied ? '반영됨' : '노트에 적용'}</span>
+              </button>
+            )}
             <button
               type="button"
               id={`copy-btn-${message.id}`}

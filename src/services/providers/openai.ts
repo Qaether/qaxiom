@@ -29,7 +29,10 @@ export async function streamOpenAI(
     input,
     stream: true,
     store: false,
-    ...(model.reasoningEffort ? { reasoning: { effort: model.reasoningEffort } } : {})
+    ...(model.reasoningEffort ? { reasoning: {
+      effort: model.reasoningEffort,
+      ...(callbacks.onReasoningSummary ? { summary: 'auto' } : {})
+    } } : {})
   };
 
   const response = await fetch('https://api.openai.com/v1/responses', {
@@ -53,6 +56,8 @@ export async function streamOpenAI(
     const event = payload as OpenAIStreamEvent;
     if (event.type === 'response.output_text.delta' && event.delta) {
       callbacks.onChunk(event.delta);
+    } else if (event.type === 'response.reasoning_summary_text.delta' && event.delta) {
+      callbacks.onReasoningSummary?.(event.delta);
     } else if (event.type === 'error') {
       throw new Error('OpenAI 스트리밍 처리 중 오류가 발생했습니다.');
     } else if (event.type === 'response.failed') {

@@ -56,4 +56,40 @@ describe('ChatMessage status feedback', () => {
 
     expect(screen.queryByRole('button', { name: '다시 시도' })).toBeNull();
   });
+
+  it('renders apply button in footer and triggers callback when clicked', async () => {
+    const onApply = vi.fn();
+    render(<ChatMessage
+      message={{
+        id: 'assistant-apply-footer',
+        role: 'assistant',
+        content: '수정 제안 본문',
+        timestamp: 1,
+        status: 'complete'
+      }}
+      onApplyToDocument={onApply}
+    />);
+
+    const footerApplyBtn = screen.getByRole('button', { name: '연구노트에 적용' });
+    await userEvent.click(footerApplyBtn);
+    expect(onApply).toHaveBeenCalledWith('수정 제안 본문');
+  });
+
+  it('renders apply button in code block header and triggers callback with code string when clicked', async () => {
+    const onApply = vi.fn();
+    render(<ChatMessage
+      message={{
+        id: 'assistant-apply-code',
+        role: 'assistant',
+        content: '```markdown\n# 수정된 이론\n```\n설명 텍스트',
+        timestamp: 1,
+        status: 'complete'
+      }}
+      onApplyToDocument={onApply}
+    />);
+
+    const codeApplyBtn = screen.getByRole('button', { name: '노트에 적용' });
+    await userEvent.click(codeApplyBtn);
+    expect(onApply).toHaveBeenCalledWith('# 수정된 이론');
+  });
 });

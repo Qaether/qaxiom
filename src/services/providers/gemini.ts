@@ -3,13 +3,14 @@ import { consumeJsonSSE } from '../sse';
 
 interface GeminiStreamEvent {
   candidates?: Array<{
-    content?: { parts?: Array<{ text?: string }> };
+    content?: { parts?: Array<{ text?: string; thought?: boolean }> };
   }>;
   error?: { message?: string };
 }
 
 export interface ProviderCallbacks {
   onChunk: (chunk: string) => void;
+  onReasoningSummary?: (chunk: string) => void;
   onError: (error: Error) => void;
   onFinish: () => void;
 }
@@ -41,9 +42,10 @@ export async function streamGemini(
     systemInstruction: {
       parts: [{ text: systemPrompt }]
     },
-    ...(model.supportsTemperature
-      ? { generationConfig: { temperature } }
-      : {})
+    generationConfig: {
+      ...(model.supportsTemperature ? { temperature } : {}),
+      ...(callbacks.onReasoningSummary ? { thinkingConfig: { includeThoughts: true } } : {})
+    }
   };
 
   const response = await fetch(url, {
@@ -76,8 +78,11 @@ export async function streamGemini(
     if (event.error?.message) {
       throw new Error(`Gemini 스트리밍 오류: ${event.error.message}`);
     }
-    const text = event.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (text) callbacks.onChunk(text);
+    for (const part of event.candidates?.[0]?.content?.parts ?? []) {
+      if (!part.text) continue;
+      if (part.thought) callbacks.onReasoningSummary?.(part.text);
+      else callbacks.onChunk(part.text);
+    }
   });
 
   callbacks.onFinish();

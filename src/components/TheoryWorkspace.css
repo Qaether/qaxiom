@@ -2489,7 +2489,66 @@
   margin: 12px 0;
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
 }
+
+.analysis-math-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 7px;
+  background: rgba(30, 41, 59, 0.7);
+  color: #e2e8f0;
+  padding: 6px 10px;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.analysis-math-toggle:hover,
+.analysis-math-toggle:focus-visible {
+  border-color: #a5b4fc;
+  color: #fff;
+}
+
+.document-analysis-progress {
+  margin: 16px 0;
+  border: 1px solid rgba(129, 140, 248, 0.35);
+  border-radius: 9px;
+  background: rgba(49, 46, 129, 0.12);
+}
+
+.document-analysis-progress summary {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 11px 14px;
+  cursor: pointer;
+  color: #e0e7ff;
+}
+
+.document-analysis-progress summary strong { flex: 1; }
+.document-analysis-progress summary > span:last-child { color: #a5b4fc; font-size: 0.78rem; }
+.document-analysis-progress-body { padding: 0 14px 14px; overflow-wrap: anywhere; }
+.document-analysis-progress-body p { margin: 5px 0 10px; }
+.document-analysis-progress-note { color: #94a3b8; font-size: 0.82rem; }
+.document-analysis-reasoning { border-top: 1px solid rgba(129, 140, 248, 0.2); padding-top: 10px; }
+.document-analysis-reasoning > strong,
+.analysis-replacement-preview > strong { color: #c7d2fe; font-size: 0.82rem; }
+.document-analysis-reasoning > div { max-height: 240px; overflow: auto; margin-top: 8px; font-size: 0.86rem; }
+.analysis-source-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.analysis-source-block { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
+.analysis-finding-quote,
+.analysis-finding-prose { margin-bottom: 9px; overflow-wrap: anywhere; }
+.analysis-finding-quote > div { margin-top: 4px; color: #cbd5e1; }
+.analysis-finding-prose > strong { display: block; margin-bottom: 4px; }
+.analysis-finding-quote p,
+.analysis-finding-prose p,
+.analysis-replacement-preview p { margin: 0 0 8px; }
+.analysis-replacement-preview { margin-top: 12px; padding: 10px 12px; border: 1px solid rgba(34, 197, 94, 0.28); border-radius: 7px; background: rgba(20, 83, 45, 0.1); overflow-wrap: anywhere; }
+.analysis-replacement-preview > div { margin-top: 8px; }
 
 .analysis-filter-tabs {
   display: inline-flex;
