@@ -2706,6 +2706,208 @@
   }
 }
 
+/* ==============================================================================
+   Cursor/Copilot-style Inline Diff Review and Floating Bar
+   ============================================================================== */
+.theory-inline-diff-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+  background: var(--bg-card, #171c2b);
+}
+
+.theory-review-floating-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 14px;
+  margin: 10px 14px 6px;
+  background: rgba(23, 28, 43, 0.95);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(129, 140, 248, 0.35);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35), 0 0 12px rgba(99, 102, 241, 0.15);
+  z-index: 15;
+  flex-shrink: 0;
+}
+
+.theory-review-bar-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.84rem;
+}
+
+.theory-review-sparkle {
+  color: #818cf8;
+  font-size: 1rem;
+}
+
+.theory-review-title {
+  font-weight: 600;
+  color: var(--text-main, #eee);
+}
+
+.theory-diff-stat-badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-family: var(--font-mono, monospace);
+}
+
+.theory-diff-stat-badge.added {
+  color: #34d399;
+  background: rgba(52, 211, 153, 0.12);
+  border: 1px solid rgba(52, 211, 153, 0.25);
+}
+
+.theory-diff-stat-badge.removed {
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.12);
+  border: 1px solid rgba(248, 113, 113, 0.25);
+}
+
+.theory-review-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.theory-review-btn-toggle {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.12));
+  color: var(--text-muted, #94a3b8);
+  font-size: 0.76rem;
+  padding: 5px 9px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.theory-review-btn-toggle:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-main, #eee);
+}
+
+.theory-review-btn-reject {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #fca5a5;
+  font-size: 0.78rem;
+  font-weight: 500;
+  padding: 5px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.theory-review-btn-reject:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: #ef4444;
+  color: #ffffff;
+}
+
+.theory-review-btn-accept {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: #059669;
+  border: 1px solid #10b981;
+  color: #ffffff;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 5px;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(5, 150, 105, 0.35);
+  transition: all 0.15s ease;
+}
+
+.theory-review-btn-accept:hover {
+  background: #10b981;
+  box-shadow: 0 4px 10px rgba(16, 185, 129, 0.45);
+}
+
+.theory-inline-diff-viewer {
+  flex: 1;
+  overflow-y: auto;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.85rem;
+  line-height: 1.55;
+  padding: 6px 14px 16px;
+}
+
+.theory-diff-lines-wrapper {
+  display: flex;
+  flex-direction: column;
+}
+
+.theory-diff-line-row {
+  display: flex;
+  align-items: flex-start;
+  min-height: 22px;
+  padding: 2px 0;
+  border-radius: 2px;
+}
+
+.theory-diff-line-num {
+  width: 38px;
+  text-align: right;
+  color: var(--text-dim, #64748b);
+  user-select: none;
+  padding-right: 8px;
+  font-size: 0.74rem;
+  flex-shrink: 0;
+}
+
+.theory-diff-line-sign {
+  width: 18px;
+  text-align: center;
+  font-weight: bold;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.theory-diff-line-text {
+  flex: 1;
+  white-space: pre-wrap;
+  word-break: break-word;
+  padding-right: 12px;
+}
+
+.theory-diff-line-row.added {
+  background: rgba(16, 185, 129, 0.14);
+  color: #a7f3d0;
+}
+
+.theory-diff-line-row.added .theory-diff-line-sign {
+  color: #34d399;
+}
+
+.theory-diff-line-row.removed {
+  background: rgba(239, 68, 68, 0.14);
+  color: #fca5a5;
+  text-decoration: line-through;
+  text-decoration-color: rgba(239, 68, 68, 0.6);
+}
+
+.theory-diff-line-row.removed .theory-diff-line-sign {
+  color: #f87171;
+}
+
+.theory-diff-line-row.unchanged {
+  color: var(--text-main, #eee);
+}
+
+
 
 
 

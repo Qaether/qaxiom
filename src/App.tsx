@@ -111,7 +111,6 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
   const [theoryDocumentId, setTheoryDocumentId] = useState<string | null>(null);
   const [documentDraft, setDocumentDraft] = useState<DocumentDraft | null>(null);
   const [incomingDraft, setIncomingDraft] = useState<IncomingDraftAction | null>(null);
-  const [applyTargetContent, setApplyTargetContent] = useState<string | null>(null);
   const [newDocumentToken, setNewDocumentToken] = useState(0);
   const [theoryDocuments, setTheoryDocuments] = useState<{ id: string; title: string; version: number }[]>([]);
   const [isReferencesOpen, setIsReferencesOpen] = useState(false);
@@ -487,18 +486,7 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
     if (!isTheoryOpen && !theoryDocumentId) {
       setIsTheoryOpen(true);
     }
-    if (!documentDraft?.markdown?.trim()) {
-      setIncomingDraft({ text: content, mode: 'replace', token: Date.now() });
-      return;
-    }
-    setApplyTargetContent(content);
-  };
-
-  const executeApply = (mode: 'replace' | 'append') => {
-    if (applyTargetContent) {
-      setIncomingDraft({ text: applyTargetContent, mode, token: Date.now() });
-    }
-    setApplyTargetContent(null);
+    setIncomingDraft({ text: content, mode: 'diff_review', token: Date.now() });
   };
 
   // Stop streaming
@@ -1230,76 +1218,6 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
         <React.Suspense fallback={<div role="status">원문 불러오는 중…</div>}>
           <ReferenceSource evidence={sourceEvidence} onClose={() => setSourceEvidence(null)} />
         </React.Suspense>
-      )}
-      {applyTargetContent && (
-        <div
-          className="modal-backdrop"
-          role="presentation"
-          onClick={() => setApplyTargetContent(null)}
-        >
-          <div
-            className="theory-modal-container"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="apply-modal-title"
-            onClick={e => e.stopPropagation()}
-            style={{ maxWidth: 460 }}
-          >
-            <div className="theory-modal-header">
-              <div className="theory-modal-title-group">
-                <h3 id="apply-modal-title" style={{ margin: 0, fontSize: '1rem', fontWeight: 600 }}>연구노트에 대화 내용 반영</h3>
-                <p className="theory-modal-subtitle" style={{ margin: '4px 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                  열려 있는 연구노트 본문에 대화 답변을 어떻게 반영할까요?
-                </p>
-              </div>
-              <button
-                type="button"
-                className="theory-modal-close-btn"
-                onClick={() => setApplyTargetContent(null)}
-                aria-label="닫기"
-              >
-                <X size={18} />
-              </button>
-            </div>
-            <div className="theory-modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '16px 20px' }}>
-              <button
-                type="button"
-                className="theory-modal-item-btn"
-                onClick={() => executeApply('replace')}
-                style={{
-                  display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 4,
-                  padding: '12px 14px', borderRadius: 6, border: '1px solid var(--border-subtle)',
-                  background: 'var(--bg-secondary)', color: 'var(--text-main)', cursor: 'pointer', textAlign: 'left'
-                }}
-              >
-                <strong style={{ fontSize: '0.88rem' }}>본문 전체 교체 (Replace)</strong>
-                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>현재 연구노트 본문을 이 답변 내용으로 완전히 대체합니다.</span>
-              </button>
-              <button
-                type="button"
-                className="theory-modal-item-btn"
-                onClick={() => executeApply('append')}
-                style={{
-                  display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 4,
-                  padding: '12px 14px', borderRadius: 6, border: '1px solid var(--border-subtle)',
-                  background: 'var(--bg-secondary)', color: 'var(--text-main)', cursor: 'pointer', textAlign: 'left'
-                }}
-              >
-                <strong style={{ fontSize: '0.88rem' }}>본문 끝에 추가 (Append)</strong>
-                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>현재 연구노트 본문 아래에 새 단락으로 이어 붙입니다.</span>
-              </button>
-            </div>
-            <div className="theory-modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', padding: '12px 20px' }}>
-              <button
-                type="button"
-                className="theory-btn-cancel"
-                onClick={() => setApplyTargetContent(null)}
-              >
-                취소
-              </button>
-            </div>
-          </div>
-        </div>
       )}
       <SettingsModal
         isOpen={isSettingsOpen}

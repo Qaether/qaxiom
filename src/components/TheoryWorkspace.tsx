@@ -14,6 +14,7 @@ import { sendChatMessage } from '../services/llm';
 import ContractSuggestionAssistant from './ContractSuggestionAssistant';
 import type { UserSettings } from '../types';
 import type { DocumentDraft } from '../services/documentChat';
+import { computeLineDiff, type DiffLine, type DiffStats } from '../services/diffUtils';
 
 import { AVAILABLE_MODELS, estimateTokenCount, formatTokenLimit } from '../constants';
 import ReactMarkdown from 'react-markdown';
@@ -69,8 +70,16 @@ const ANALYSIS_PRESETS = [
 
 export interface IncomingDraftAction {
   text: string;
-  mode: 'replace' | 'append';
+  mode: 'replace' | 'append' | 'diff_review';
   token: number;
+}
+
+export interface PendingSuggestion {
+  id: string;
+  originalText: string;
+  proposedText: string;
+  diffLines: DiffLine[];
+  stats: DiffStats;
 }
 
 type ActiveModal = 'contract' | 'history' | 'analysis' | null;
@@ -144,15 +153,66 @@ export default function TheoryWorkspace({
     return () => window.clearTimeout(timeout);
   }, [status]);
 
+  const [pendingSuggestion, setPendingSuggestion] = useState<PendingSuggestion | null>(null);
+  const [diffViewMode, setDiffViewMode] = useState<'diff' | 'preview'>('diff');
+
+  const handleAcceptSuggestion = () => {
+    if (!pendingSuggestion) return;
+    setMarkdown(pendingSuggestion.proposedText);
+    setPendingSuggestion(null);
+    setStatus('✓ AI 수정 제안을 수락하여 본문에 반영했습니다.');
+  };
+
+  const handleRejectSuggestion = () => {
+    if (!pendingSuggestion) return;
+    setPendingSuggestion(null);
+    setStatus('✕ AI 수정 제안을 거절하고 기존 본문을 유지했습니다.');
+  };
+
+  // Keyboard shortcuts for accepting/rejecting suggestions
+  useEffect(() => {
+    if (!pendingSuggestion) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        handleRejectSuggestion();
+      } else if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+        e.preventDefault();
+        handleAcceptSuggestion();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [pendingSuggestion]);
+
   useEffect(() => {
     if (!incomingDraft) return;
-    if (incomingDraft.mode === 'append') {
-      setMarkdown(prev => prev ? `${prev}\n\n${incomingDraft.text}` : incomingDraft.text);
-      setStatus('대화 답변을 연구노트 끝에 추가했습니다.');
-    } else {
-      setMarkdown(incomingDraft.text);
-      setStatus('대화 답변으로 연구노트 본문을 교체했습니다.');
+    const proposed = incomingDraft.text;
+    if (!markdown.trim() || incomingDraft.mode === 'replace') {
+      if (!markdown.trim()) {
+        setMarkdown(proposed);
+        setStatus('대화 답변으로 연구노트 본문을 작성했습니다.');
+        return;
+      }
     }
+    if (incomingDraft.mode === 'append') {
+      setMarkdown(prev => prev ? `${prev}\n\n${proposed}` : proposed);
+      setStatus('대화 답변을 연구노트 끝에 추가했습니다.');
+      return;
+    }
+
+    // Default or diff_review: enter Cursor-style inline diff review mode
+    const diffResult = computeLineDiff(markdown, proposed);
+    setPendingSuggestion({
+      id: String(incomingDraft.token),
+      originalText: markdown,
+      proposedText: proposed,
+      diffLines: diffResult.lines,
+      stats: diffResult.stats,
+    });
+    setDiffViewMode('diff');
+    setEditorTab('write');
+    setStatus('✦ AI 수정 제안이 도착했습니다. 상단 바에서 수락 또는 거절을 선택하세요.');
   }, [incomingDraft]);
 
   const [isWikiPublished, setIsWikiPublished] = useState(false);
@@ -807,16 +867,93 @@ export default function TheoryWorkspace({
         {/* 순수 편집기 본문: 화면 전체를 채움 */}
         <label htmlFor="theory-markdown" className="sr-only">문서 본문 (Markdown)</label>
         <div className="theory-editor-body vcs-editor-body">
-          <textarea
-            ref={textareaRef}
-            id="theory-markdown"
-            className={`theory-markdown-textarea vcs-textarea ${editorTab !== 'write' ? 'hidden' : ''}`}
-            value={markdown}
-            onChange={event => setMarkdown(event.target.value)}
-            onKeyDown={handleEditorKeyDown}
-            placeholder="아이디어, 연구 가설, 수식($...$, $$...$$), 설명을 자유롭게 적으세요. Markdown 문법이 지원됩니다."
-            aria-label="문서 본문 (Markdown)"
-          />
+          {pendingSuggestion && editorTab === 'write' ? (
+            <div className="theory-inline-diff-container">
+              {/* Floating Review Action Bar */}
+              <div className="theory-review-floating-bar" role="region" aria-label="AI 수정 제안 검토">
+                <div className="theory-review-bar-info">
+                  <span className="theory-review-sparkle">✦</span>
+                  <span className="theory-review-title">AI 수정 제안 검토</span>
+                  <span className="theory-diff-stat-badge added">+{pendingSuggestion.stats.added}줄</span>
+                  <span className="theory-diff-stat-badge removed">-{pendingSuggestion.stats.removed}줄</span>
+                </div>
+                <div className="theory-review-bar-actions">
+                  <button
+                    type="button"
+                    className="theory-review-btn-toggle"
+                    onClick={() => setDiffViewMode(m => m === 'diff' ? 'preview' : 'diff')}
+                    title="Diff 보기와 제안 결과 미리보기 전환"
+                  >
+                    {diffViewMode === 'diff' ? '결과 미리보기' : 'Diff 보기'}
+                  </button>
+                  <button
+                    type="button"
+                    className="theory-review-btn-reject"
+                    onClick={handleRejectSuggestion}
+                    title="수정 제안 거절 (Esc)"
+                    aria-label="제안 거절 (Esc)"
+                  >
+                    <X size={14} />
+                    <span>거절 (Esc)</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="theory-review-btn-accept"
+                    onClick={handleAcceptSuggestion}
+                    title="수정 제안 수락 (⌘+Enter)"
+                    aria-label="제안 수락 (Cmd+Enter)"
+                  >
+                    <Check size={14} />
+                    <span>수락 (⌘↵)</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Diff or Preview View */}
+              {diffViewMode === 'diff' ? (
+                <div className="theory-inline-diff-viewer">
+                  <div className="theory-diff-lines-wrapper">
+                    {pendingSuggestion.diffLines.map((line, idx) => (
+                      <div key={idx} className={`theory-diff-line-row ${line.type}`}>
+                        <span className="theory-diff-line-num old">
+                          {line.type === 'removed' || line.type === 'unchanged' ? line.oldLineNumber : ''}
+                        </span>
+                        <span className="theory-diff-line-num new">
+                          {line.type === 'added' || line.type === 'unchanged' ? line.newLineNumber : ''}
+                        </span>
+                        <span className="theory-diff-line-sign">
+                          {line.type === 'added' ? '+' : line.type === 'removed' ? '-' : ' '}
+                        </span>
+                        <span className="theory-diff-line-text">{line.text || ' '}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="theory-markdown-preview-pane vcs-preview-pane">
+                  <div className="theory-preview-content">
+                    <ReactMarkdown
+                      remarkPlugins={[remarkMath]}
+                      rehypePlugins={[[rehypeKatex, { throwOnError: false }]]}
+                    >
+                      {preprocessLatex(pendingSuggestion.proposedText)}
+                    </ReactMarkdown>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <textarea
+              ref={textareaRef}
+              id="theory-markdown"
+              className={`theory-markdown-textarea vcs-textarea ${editorTab !== 'write' ? 'hidden' : ''}`}
+              value={markdown}
+              onChange={event => setMarkdown(event.target.value)}
+              onKeyDown={handleEditorKeyDown}
+              placeholder="아이디어, 연구 가설, 수식($...$, $$...$$), 설명을 자유롭게 적으세요. Markdown 문법이 지원됩니다."
+              aria-label="문서 본문 (Markdown)"
+            />
+          )}
           {editorTab === 'preview' && (
             <div className="theory-markdown-preview-pane vcs-preview-pane">
               <div className="theory-preview-content">
@@ -876,17 +1013,30 @@ export default function TheoryWorkspace({
             {dirty && <span className="theory-footer-dirty">● 미저장 변경 있음</span>}
           </div>
 
-          {assistantDraft && (
+          {assistantDraft && !pendingSuggestion && (
             <button
               type="button"
               className="theory-btn-draft-import"
               onClick={() => {
-                if (markdown && !window.confirm('현재 작성한 본문을 최근 AI 답변으로 바꿀까요?')) return;
-                setMarkdown(assistantDraft);
-                setStatus('최근 대화 답변을 본문으로 가져왔습니다.');
+                if (!markdown.trim()) {
+                  setMarkdown(assistantDraft);
+                  setStatus('최근 대화 답변을 본문으로 가져왔습니다.');
+                  return;
+                }
+                const diffResult = computeLineDiff(markdown, assistantDraft);
+                setPendingSuggestion({
+                  id: String(Date.now()),
+                  originalText: markdown,
+                  proposedText: assistantDraft,
+                  diffLines: diffResult.lines,
+                  stats: diffResult.stats,
+                });
+                setDiffViewMode('diff');
+                setEditorTab('write');
+                setStatus('✦ 최근 대화 답변의 변경 사항을 검토 중입니다.');
               }}
             >
-              최근 대화 답변 본문에 가져오기
+              최근 대화 답변 변경 검토
             </button>
           )}
         </div>

@@ -1,5 +1,16 @@
 # Qaxiom 완료 내역
 
+> 2026-10-13 Cursor/Copilot 스타일 중앙 에디터 인라인 Diff 검토 및 수락/거절(Accept/Reject) 워크플로우 구현:
+> 1. **LCS 기반 라인 단위 Diff 엔진 (`src/services/diffUtils.ts`, `diffUtils.test.ts`)**: 추가/삭제/유지 라인 및 변경 통계(+N, -M)를 계산하는 순수 함수 `computeLineDiff` 및 단위 테스트 구현.
+> 2. **중앙 에디터 인라인 Diff 뷰어 및 플로팅 검토 바 (`TheoryWorkspace.tsx`, `TheoryWorkspace.css`)**:
+>    - 우측 사이드바 대화창에서 `[노트에 적용]` 또는 하단 바 `[최근 대화 답변 변경 검토]` 클릭 시 모달 팝업 없이 중앙 에디터가 즉시 Staging(보류) 모드로 전환됨.
+>    - 에디터 상단에 Cursor/Copilot 스타일의 플로팅 검토 바(`✦ AI 수정 제안 검토 (+N / -M)`, `[결과 미리보기 / Diff 비교]` 토글, `[✕ 거절 (Esc)]`, `[✓ 수락 (⌘↵)]`)를 렌더링.
+>    - 라인별 Diff 하이라이트(초록/빨강 줄바꿈 및 +/- 기호) 인라인 뷰어를 제공하며, 키보드 단축키 `⌘/Ctrl+Enter`(수락), `Escape`(거절) 지원.
+> 3. **Qaxiom 무결성 및 정본 원칙 준수**:
+>    - AI 대화 답변을 정본으로 취급하지 않음. 수락 시 에디터 본문이 변경되고 `dirty` 플래그가 활성화되어 사용자가 검토 후 명시적으로 `[저장]`해야만 새 버전 스냅샷으로 기록됨. 거절 시 기존 원본을 100% 온전히 보존함.
+>    - 빈 문서의 경우 불필요한 Diff 단계 없이 즉시 본문으로 작성됨.
+> 검증: oxlint(0 errors), vitest 단위 테스트 46개 파일 324개 전체 통과, production build 성공. 실제 LLM API·원격 CI·배포·commit/push는 수행하지 않았고 OCR은 명시적 비목표다.
+
 > 2026-10-13 GitHub Actions S3/CloudFront 자동 배포 워크플로 구축:
 > 1. **OIDC 기반 IAM Role 연동**: `arn:aws:iam::703805241779:role/QaxiomGitHubActionsDeploy` Role의 Trust Policy를 보강하고 GitHub Repository Variables(`AWS_DEPLOY_ROLE_ARN`, `AWS_ROLE_ARN`, `CLOUDFRONT_DISTRIBUTION_ID`)를 등록함.
 > 2. **GitHub Actions 배포 워크플로 신설 (`.github/workflows/deploy.yml`)**: `main` 브랜치 푸시 시 `npm ci` ➔ `npm run build` 후 S3 `qaxiom.qaether.com` 버킷에 정적 자산(assets 장기 캐시, index.html no-cache)을 동기화하고 CloudFront(`E2TEB5A74ZS2H2`) 캐시를 무효화하는 자동 배포 파이프라인 구축.

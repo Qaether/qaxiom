@@ -1,5 +1,7 @@
 # Qaxiom 구현 계획서
 
+> 2026-10-13 Cursor/Copilot 스타일 중앙 에디터 인라인 Diff 검토 및 수락/거절(Accept/Reject) 워크플로우 구현: 우측 대화창에서 AI 수정안을 노트에 적용할 때 브라우저 팝업 모달 대신 중앙 에디터 상단에 Cursor/Copilot 스타일의 플로팅 검토 바(`✦ AI 수정 제안 검토 (+N/-M)`, `[수락 ⌘↵]`, `[거절 Esc]`, `[미리보기/Diff 토글]`) 및 인라인 줄단위 Diff 뷰어를 표시하도록 구현했다. 사용자가 수락 시에만 편집 내용에 반영되어 `dirty` 상태가 되며, 이후 명시적 저장을 거쳐야 새 버전으로 확정된다.
+
 > 2026-10-13 GitHub Actions S3/CloudFront 자동 배포 워크플로 구축: AWS OIDC 기반 AssumeRole(`QaxiomGitHubActionsDeploy`) 연동 및 `.github/workflows/deploy.yml`을 신설했다. `main` 브랜치 푸시 시 프로덕션 빌드 후 S3 `qaxiom.qaether.com` 버킷에 정적 파일을 동기화하고 CloudFront 캐시를 무효화하여 자동 배포된다.
 
 > 2026-10-13 우측 대화창 ➔ 중앙 연구노트 문맥 전송 및 대화형 수정안 반영(적용) 연동: 우측 사이드바 대화 시 중앙 연구노트의 내용(`documentContext`)이 `sendChatMessage` 인자 누락으로 인해 LLM에 전송되지 않던 문제를 바로잡고, 대화 답변 및 코드블록을 중앙 에디터에 1-클릭으로 안전하게 반영(`replace` / `append`)할 수 있는 워크플로우를 구축했다. 에디터 하단의 최근 대화 답변 가져오기 버튼의 스냅샷 제약을 완화했다. 대화 답변은 정본이 아니며, 사용자가 검토 후 에디터에서 명시적으로 저장할 때만 새 버전으로 기록된다.
