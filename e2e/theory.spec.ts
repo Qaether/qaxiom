@@ -19,7 +19,7 @@ test('saves a document and starts AI analysis through the primary flow', async (
   await page.goto('/');
   await page.getByLabel('Google Gemini API Key').fill('analysis-fake-key');
   await page.getByRole('button', { name: '설정 저장' }).click();
-  await page.locator('#header-model-select').selectOption('gemini-3.1-pro-preview');
+  await page.locator('#header-model-select').selectOption('gemini-4-carbon');
   await page.getByRole('button', { name: '연구노트', exact: true }).click();
   const editor = page.getByRole('dialog', { name: '연구노트', exact: true });
   await editor.getByLabel('문서 제목', { exact: true }).fill('간단한 연구');
@@ -58,7 +58,7 @@ test('plans a long document into explicitly confirmed AI analysis segments', asy
   await page.goto('/');
   await page.getByLabel('Google Gemini API Key').fill('analysis-fake-key');
   await page.getByRole('button', { name: '설정 저장' }).click();
-  await page.locator('#header-model-select').selectOption('gemini-3.1-pro-preview');
+  await page.locator('#header-model-select').selectOption('gemini-4-carbon');
   await page.getByRole('button', { name: '연구노트', exact: true }).click();
   const editor = page.getByRole('dialog', { name: '연구노트', exact: true });
   await editor.getByLabel('문서 제목', { exact: true }).fill('긴 연구');
@@ -130,7 +130,7 @@ test('suggests grounded research criteria after explicit preview and saves only 
   await page.goto('/');
   await page.getByLabel('Google Gemini API Key').fill('criteria-fake-key');
   await page.getByRole('button', { name: '설정 저장' }).click();
-  await page.locator('#header-model-select').selectOption('gemini-3.1-pro-preview');
+  await page.locator('#header-model-select').selectOption('gemini-4-carbon');
   await page.getByRole('button', { name: '연구노트', exact: true }).click();
   const editor = page.getByRole('dialog', { name: '연구노트', exact: true });
   const assistant = editor.getByRole('region', { name: 'AI 연구 기준 제안' });
@@ -189,7 +189,7 @@ test('reviews every part of a long document before suggesting criteria', async (
   await page.goto('/');
   await page.getByLabel('Google Gemini API Key').fill('criteria-fake-key');
   await page.getByRole('button', { name: '설정 저장' }).click();
-  await page.locator('#header-model-select').selectOption('gemini-3.1-pro-preview');
+  await page.locator('#header-model-select').selectOption('gemini-4-carbon');
   await page.getByRole('button', { name: '연구노트', exact: true }).click();
   const editor = page.getByRole('dialog', { name: '연구노트', exact: true });
   const assistant = editor.getByRole('region', { name: 'AI 연구 기준 제안' });

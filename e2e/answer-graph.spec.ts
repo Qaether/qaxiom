@@ -13,7 +13,7 @@ test('approves graph premises in RAG, blocks stale previews, cites canonical ori
     await route.fulfill({ status: 200, contentType: 'text/event-stream', body: `data: ${JSON.stringify({ candidates: [{ content: { parts: [{ text: '원문 [[R1]]과 자체 정본 가정 [[G1]] 및 목표 [[G2]]를 구분한다. 이것은 정합성 증명이 아니다.' }] } }] })}\n\n` });
   });
   await page.goto('/'); await page.getByLabel('Google Gemini API Key').fill('answer-graph-fake');
-  await page.getByRole('button', { name: '설정 저장' }).click(); await page.locator('#header-model-select').selectOption('gemini-3.1-pro-preview');
+  await page.getByRole('button', { name: '설정 저장' }).click(); await page.locator('#header-model-select').selectOption('gemini-4-carbon');
   await page.getByRole('button', { name: '연구노트', exact: true }).click();
   const editor = page.getByRole('dialog', { name: '연구노트', exact: true });
   await editor.getByLabel('문서 제목', { exact: true }).fill('답변 그래프 연구');

@@ -18,6 +18,7 @@ import { computeLineDiff, type DiffLine, type DiffStats } from '../services/diff
 
 import { AVAILABLE_MODELS, estimateTokenCount, formatTokenLimit } from '../constants';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
@@ -209,8 +210,9 @@ export default function TheoryWorkspace({
       }
     }
     if (incomingDraft.mode === 'append') {
-      setMarkdown(prev => prev ? `${prev}\n\n${proposed}` : proposed);
-      setStatus('대화 답변을 연구노트 끝에 추가했습니다.');
+      setMarkdown(prev => prev.trimEnd() ? `${prev.trimEnd()}\n\n${proposed}` : proposed);
+      setPendingSuggestion(null);
+      setStatus('✓ 선택한 내용을 연구노트 끝에 추가했습니다.');
       return;
     }
 
@@ -946,7 +948,7 @@ export default function TheoryWorkspace({
                 <div className="theory-markdown-preview-pane vcs-preview-pane">
                   <div className="theory-preview-content">
                     <ReactMarkdown
-                      remarkPlugins={[remarkMath]}
+                      remarkPlugins={[remarkMath, remarkGfm]}
                       rehypePlugins={[[rehypeKatex, { throwOnError: false }]]}
                     >
                       {preprocessLatex(pendingSuggestion.proposedText)}
@@ -977,7 +979,7 @@ export default function TheoryWorkspace({
                     </Suspense>
                   ) : (
                     <ReactMarkdown
-                      remarkPlugins={[remarkMath]}
+                      remarkPlugins={[remarkMath, remarkGfm]}
                       rehypePlugins={[[rehypeKatex, { throwOnError: false }]]}
                     >
                       {preprocessLatex(markdown)}

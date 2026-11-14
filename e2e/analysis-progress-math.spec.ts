@@ -42,7 +42,7 @@ test('shows analysis progress and provider summary, then renders math with sourc
   await editor.getByLabel('문서 본문 (Markdown)').fill('# 이론\n\n에너지 $E=mc^2$를 검토한다.');
   await editor.getByRole('button', { name: '문서 저장' }).click();
   await editor.getByRole('button', { name: 'AI로 문서 분석' }).click();
-  await editor.locator('.theory-analysis-model-select').selectOption('gemini-3.1-pro-preview');
+  await editor.locator('.theory-analysis-model-select').selectOption('gemini-4-carbon');
   await editor.getByRole('button', { name: '정합성 분석 시작' }).click();
 
   const analysis = editor.getByRole('region', { name: 'AI 분석 결과' });

@@ -16,7 +16,7 @@ test('previews approved premises separately, sends only frozen selected graph an
   });
   await page.goto('/'); await page.getByLabel('Google Gemini API Key').fill('graph-test-key');
   await page.getByRole('button', { name: '설정 저장' }).click();
-  await page.locator('#header-model-select').selectOption('gemini-3.1-pro-preview');
+  await page.locator('#header-model-select').selectOption('gemini-4-carbon');
   await page.getByRole('button', { name: '연구노트', exact: true }).click();
   const editor = page.getByRole('dialog', { name: '연구노트', exact: true });
   await editor.getByLabel('문서 제목', { exact: true }).fill('전제 확장 검토');

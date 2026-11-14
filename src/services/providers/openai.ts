@@ -1,6 +1,7 @@
 import type { ChatMessage, ModelOption } from '../../types';
 import type { ProviderCallbacks } from './gemini';
 import { consumeJsonSSE } from '../sse';
+import { validateApiKeyFormat } from './apiKey';
 
 interface OpenAIStreamEvent {
   type?: string;
@@ -35,11 +36,13 @@ export async function streamOpenAI(
     } } : {})
   };
 
+  const cleanKey = validateApiKeyFormat(apiKey, 'OpenAI');
+
   const response = await fetch('https://api.openai.com/v1/responses', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`
+      'Authorization': `Bearer ${cleanKey}`
     },
     body: JSON.stringify(requestPayload),
     signal

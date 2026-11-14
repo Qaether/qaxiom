@@ -3,6 +3,7 @@ import { X, Key, Shield, ExternalLink, Save, CheckCircle2, Download, Upload } fr
 import type { UserSettings } from '../types';
 import { AVAILABLE_MODELS } from '../constants';
 import { workspaceDirectoryPicker } from '../services/folderExport';
+import { validateApiKeyFormat } from '../services/providers/apiKey';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -27,6 +28,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 }) => {
   const [formState, setFormState] = useState<UserSettings>(settings);
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [keyError, setKeyError] = useState<string | null>(null);
   const [workspaceStatus, setWorkspaceStatus] = useState<string | null>(null);
   const [isWorkspaceBusy, setIsWorkspaceBusy] = useState(false);
   const restoreInputRef = useRef<HTMLInputElement>(null);
@@ -67,7 +69,26 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    onSaveSettings(formState);
+    setKeyError(null);
+    const trimmedKeys = {
+      ...formState.apiKeys,
+      gemini: formState.apiKeys.gemini.trim(),
+      openai: formState.apiKeys.openai.trim(),
+      anthropic: formState.apiKeys.anthropic.trim(),
+      customUrl: formState.apiKeys.customUrl.trim(),
+      customKey: formState.apiKeys.customKey.trim()
+    };
+    try {
+      if (trimmedKeys.gemini) validateApiKeyFormat(trimmedKeys.gemini, 'Google Gemini');
+      if (trimmedKeys.openai) validateApiKeyFormat(trimmedKeys.openai, 'OpenAI');
+      if (trimmedKeys.anthropic) validateApiKeyFormat(trimmedKeys.anthropic, 'Anthropic');
+    } catch (error) {
+      setKeyError(error instanceof Error ? error.message : 'API 키 형식이 올바르지 않습니다.');
+      return;
+    }
+    const nextSettings: UserSettings = { ...formState, apiKeys: trimmedKeys };
+    setFormState(nextSettings);
+    onSaveSettings(nextSettings);
     setSavedSuccess(true);
     setTimeout(() => {
       setSavedSuccess(false);
@@ -364,6 +385,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
             {workspaceStatus && <div className="workspace-transfer-status" role="status">{workspaceStatus}</div>}
           </div>
+
+          {keyError && (
+            <div className="workspace-transfer-status" role="alert" style={{ color: '#fda4af', margin: '0 20px 10px' }}>
+              {keyError}
+            </div>
+          )}
 
           {/* Modal Footer */}
           <div className="modal-footer">

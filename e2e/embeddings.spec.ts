@@ -19,7 +19,7 @@ test('requires separate source/query embedding approval, filters unselected sour
   await page.goto('/'); await page.getByLabel('Google Gemini API Key').fill('mock-chat-key');
   await page.getByLabel('OpenAI API Key', { exact: true }).fill('mock-embedding-key');
   await page.getByRole('button', { name: '설정 저장' }).click();
-  await page.locator('#header-model-select').selectOption('gemini-3.1-pro-preview');
+  await page.locator('#header-model-select').selectOption('gemini-4-carbon');
   await page.getByRole('button', { name: '레퍼런스 검색', exact: true }).click();
   const library = page.getByRole('dialog', { name: '레퍼런스 검색', exact: true });
   await library.getByLabel('레퍼런스 파일', { exact: true }).setInputFiles({ name: 'excluded.txt', mimeType: 'text/plain', buffer: Buffer.from('UNSELECTED_PRIVATE_TEXT') });

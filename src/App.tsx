@@ -22,7 +22,7 @@ import {
 import { flushSessionWrites, loadSessionsFromDatabase } from './services/database';
 import { listTheories, loadTheory } from './services/theory/documents';
 import { deleteTheory, prepareTheoryDeletion, type TheoryDeletionPreview } from './services/theory/theoryDeletion';
-import { folderPermission, getActiveProjectFolder, listRecentProjectFolders, rememberProjectFolder, requestFolderPermission } from './services/projectFolder';
+import { deleteProjectFolder, folderPermission, getActiveProjectFolder, listRecentProjectFolders, rememberProjectFolder, renameProjectFolder, requestFolderPermission } from './services/projectFolder';
 import type { ContextBundle, ContextEvidence } from './services/retrieval/types';
 import { withReferenceContext } from './services/retrieval/context';
 import { captureDocumentContext, sessionsForDocument, verifyDocumentContext, withDocumentContext, type DocumentDraft } from './services/documentChat';
@@ -500,6 +500,13 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
     setActiveChangeStatus('accepted');
   };
 
+  const handleAppendToDocument = (content: string) => {
+    if (!isTheoryOpen && !theoryDocumentId) {
+      setIsTheoryOpen(true);
+    }
+    setIncomingDraft({ text: content, mode: 'append', token: Date.now() });
+  };
+
   const handleRejectDocumentChange = () => {
     setIncomingDraft(null);
     setActiveChangeStatus('rejected');
@@ -816,6 +823,20 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
       await refreshRecentProjects();
       setOpenedProject(project);
     }}
+    onRenameProject={async (oldName, newName) => {
+      await renameProjectFolder(oldName, newName);
+      await refreshRecentProjects();
+      if (rememberedProject && rememberedProject.name.trim().toLowerCase() === oldName.trim().toLowerCase()) {
+        setRememberedProject({ ...rememberedProject, name: newName.trim() });
+      }
+    }}
+    onDeleteProject={async project => {
+      await deleteProjectFolder(project.name);
+      await refreshRecentProjects();
+      if (rememberedProject && rememberedProject.name.trim().toLowerCase() === project.name.trim().toLowerCase()) {
+        setRememberedProject(null);
+      }
+    }}
     onReconnect={async () => {
       if (!rememberedProject || !await requestFolderPermission(rememberedProject.directory)) {
         throw new Error('폴더 접근 권한이 없어 프로젝트를 열 수 없습니다. 다시 허용하거나 다른 폴더를 지정해 주세요.');
@@ -1107,6 +1128,7 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
                           onOpenSource={setSourceEvidence}
                           onApplyToDocument={handleApplyToDocument}
                           onDirectAcceptDocument={handleDirectAcceptToDocument}
+                          onAppendToDocument={handleAppendToDocument}
                           onRejectDocumentChange={handleRejectDocumentChange}
                           changeStatus={index === currentSession.messages.length - 1 ? activeChangeStatus : undefined}
                           onRetry={

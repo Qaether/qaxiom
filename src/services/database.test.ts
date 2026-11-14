@@ -51,7 +51,7 @@ describe('IndexedDB session storage', () => {
     expect(localStorage.getItem(LEGACY_SESSIONS_KEY)).toBeNull();
     expect(await database.sessions.count()).toBe(1);
     expect(await database.messages.count()).toBe(2);
-    expect(sessions[0]?.selectedModel).toBe('gemini-3.1-pro-preview');
+    expect(sessions[0]?.selectedModel).toBe('gemini-4-carbon');
     expect(sessions[0]?.messages.map(message => message.content)).toEqual(['질문', '답변']);
   });
 

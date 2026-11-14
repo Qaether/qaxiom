@@ -171,4 +171,21 @@ describe('provider streaming adapters', () => {
     expect(handlers.onChunk.mock.calls.flat()).toEqual(['{"findings":[]}']);
     expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body)).generationConfig.thinkingConfig).toEqual({ includeThoughts: true });
   });
+
+  it('rejects non-ASCII or whitespace-containing API keys before fetch and trims valid keys', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(responseFromSSE(
+      'data: {"type":"response.output_text.delta","delta":"ok"}\n\n'
+    ));
+    vi.stubGlobal('fetch', fetchMock);
+    const handlers = { onChunk: vi.fn(), onError: vi.fn(), onFinish: vi.fn() };
+
+    await expect(
+      streamOpenAI(messages, model('gpt-6-luna'), 'system', 'sk-한글키', handlers)
+    ).rejects.toThrow('OpenAI API 키에 사용할 수 없는 문자');
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    await streamOpenAI(messages, model('gpt-6-luna'), 'system', '  sk-valid-key\n', handlers);
+    const headers = (fetchMock.mock.calls[0]?.[1]?.headers ?? {}) as Record<string, string>;
+    expect(headers.Authorization).toBe('Bearer sk-valid-key');
+  });
 });

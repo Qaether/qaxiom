@@ -44,7 +44,7 @@ async function fixture() {
   return { snapshot, run, a, b, relation, source, data, hits, graph, bundle };
 }
 async function storeBundle(bundle: ContextBundle) {
-  await db.sessions.add({ id: 's', position: 0, title: 'Session', createdAt: 1, updatedAt: 1, researchMode: 'general', selectedModel: 'gemini-3.1-pro-preview' });
+  await db.sessions.add({ id: 's', position: 0, title: 'Session', createdAt: 1, updatedAt: 1, researchMode: 'general', selectedModel: 'gemini-4-carbon' });
   await db.messages.add({ id: 'm', sessionId: 's', position: 0, role: 'assistant', content: 'Answer [[R1]] [[G1]].', timestamp: 1, contextBundle: bundle });
 }
 it('reserves all graph premises before parent expansion, separates canonical citations and excludes unselected material', async () => {
@@ -87,7 +87,7 @@ it('creates graph-only questions without references, preserves provenance and re
   expect(inspectCitations('[[G1]] [[R1]]', bundle)).toEqual({ valid: ['G1'], invalid: ['R1'] });
   await storeBundle(bundle); const backup = await createWorkspaceBundle(db); await restoreWorkspaceBundle(backup, target);
   expect((await target.messages.get(['s', 'm']))!.contextBundle).toEqual(bundle);
-  const markdown = sessionToMarkdown({ id: 's', title: 'Session', createdAt: 1, updatedAt: 1, researchMode: 'general', selectedModel: 'gemini-3.1-pro-preview', messages: backup.data.messages });
+  const markdown = sessionToMarkdown({ id: 's', title: 'Session', createdAt: 1, updatedAt: 1, researchMode: 'general', selectedModel: 'gemini-4-carbon', messages: backup.data.messages });
   expect(markdown).toContain('레퍼런스 원문 0개'); expect(markdown).toContain(graph.context.contextHash);
 });
 it('rejects empty graph-only questions, missing targets and reference mixing without sending', async () => {
@@ -119,7 +119,7 @@ it('imports genuine v11 graph answers and migrates populated v11 without requiri
   for (const table of db.tables) await legacy.table(table.name).bulkAdd(await table.toArray());
   legacy.close(); await target.open(); expect(target.verno).toBe(25); expect((await target.messages.get(['s', 'm']))!.contextBundle).toEqual(bundle);
 });
-it.each(['gemini-3.1-pro-preview', 'gpt-6-astra', 'claude-sonnet-5'])('routes a graph-only question without any reference payload to %s', async model => {
+it.each(['gemini-4-carbon', 'gpt-6-astra', 'claude-sonnet-5'])('routes a graph-only question without any reference payload to %s', async model => {
   const { snapshot, graph } = await fixture(); const bundle = assembleContext('Only theory', [], [], { references: [], referenceSpans: [] }, snapshot.version, graph);
   const actual = assertGraphContextCurrent; vi.spyOn(graphService, 'assertGraphContextCurrent').mockImplementation(value => actual(value, db));
   provider.mockImplementation(async (...args: unknown[]) => ((model.startsWith('gpt') ? args[4] : args[5]) as ProviderCallbacks).onFinish());
@@ -145,7 +145,7 @@ it('restores frozen graph answers after subsequent retraction, exports original 
   const { bundle, relation } = await fixture(); await storeBundle(bundle); await retractRelation(relation.id, 'Later retraction', db);
   const backup = await createWorkspaceBundle(db); expect(backup.version).toBe(24); await restoreWorkspaceBundle(backup, target);
   expect((await target.messages.get(['s', 'm']))!.contextBundle!.graph).toEqual(bundle.graph);
-  const report = sessionToMarkdown({ id: 's', title: 'Session', createdAt: 1, updatedAt: 1, researchMode: 'general', selectedModel: 'gemini-3.1-pro-preview', messages: backup.data.messages });
+  const report = sessionToMarkdown({ id: 's', title: 'Session', createdAt: 1, updatedAt: 1, researchMode: 'general', selectedModel: 'gemini-4-carbon', messages: backup.data.messages });
   expect(report).toContain(bundle.graph!.context.contextHash); expect(report).toContain('[[G1]]'); expect(report).not.toContain('PRIVATE');
   const original = (await createWorkspaceBundle(target)).data;
   for (const mutate of [
@@ -163,7 +163,7 @@ it('imports legacy v10 answers without inventing graph evidence and migrates a p
   for (const table of db.tables) await legacy.table(table.name).bulkAdd(await table.toArray());
   legacy.close(); await target.open(); expect(target.verno).toBe(25); expect(await target.messages.count()).toBe(1);
 });
-it.each(['gemini-3.1-pro-preview', 'gpt-6-astra', 'claude-sonnet-5'])('sends approved graph as untrusted citation data and defers completion validation for %s', async model => {
+it.each(['gemini-4-carbon', 'gpt-6-astra', 'claude-sonnet-5'])('sends approved graph as untrusted citation data and defers completion validation for %s', async model => {
   const { bundle } = await fixture(); const actual = assertGraphContextCurrent;
   vi.spyOn(graphService, 'assertGraphContextCurrent').mockImplementation(value => actual(value, db));
   const handlers = { onChunk: vi.fn(), onError: vi.fn(), onFinish: vi.fn() };
@@ -178,9 +178,9 @@ it('never invokes a provider with a stale graph and does not complete an answer 
   const handlers = { onChunk: vi.fn(), onError: vi.fn(), onFinish: vi.fn() };
   provider.mockImplementation(async (...args: unknown[]) => { await retractRelation(relation.id, 'Changed in flight', db); (args[5] as ProviderCallbacks).onFinish(); });
   const messages = [{ id: 'u', role: 'user' as const, content: 'needle', timestamp: 1 }];
-  await sendChatMessage(messages, 'gemini-3.1-pro-preview', 'general', { ...DEFAULT_SETTINGS, apiKeys: { ...DEFAULT_SETTINGS.apiKeys, gemini: 'fake' } }, handlers, undefined, bundle);
+  await sendChatMessage(messages, 'gemini-4-carbon', 'general', { ...DEFAULT_SETTINGS, apiKeys: { ...DEFAULT_SETTINGS.apiKeys, gemini: 'fake' } }, handlers, undefined, bundle);
   expect(provider).toHaveBeenCalledOnce(); expect(handlers.onFinish).not.toHaveBeenCalled(); expect(handlers.onError).toHaveBeenCalledOnce();
   provider.mockClear(); handlers.onError.mockClear();
-  await sendChatMessage(messages, 'gemini-3.1-pro-preview', 'general', { ...DEFAULT_SETTINGS, apiKeys: { ...DEFAULT_SETTINGS.apiKeys, gemini: 'fake' } }, handlers, undefined, bundle);
+  await sendChatMessage(messages, 'gemini-4-carbon', 'general', { ...DEFAULT_SETTINGS, apiKeys: { ...DEFAULT_SETTINGS.apiKeys, gemini: 'fake' } }, handlers, undefined, bundle);
   expect(provider).not.toHaveBeenCalled(); expect(handlers.onError).toHaveBeenCalledOnce();
 });

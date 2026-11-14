@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import { AlertTriangle, BookOpen, Check, CircleStop, Copy, FileDown, RotateCcw, User } from 'lucide-react';
@@ -9,6 +10,7 @@ import { inspectCitations } from '../services/retrieval/context';
 import { spanLocation } from '../services/retrieval/pdfTypes';
 import { parseMessageFileChanges, type FileChangeItem } from '../services/fileChanges';
 import { FilesWithChanges } from './FilesWithChanges';
+import { preprocessLatex } from './mathMarkdown';
 import './References.css';
 import 'katex/dist/katex.min.css';
 
@@ -18,6 +20,7 @@ interface ChatMessageProps {
   onOpenSource?: (evidence: ContextEvidence) => void;
   onApplyToDocument?: (content: string) => void;
   onDirectAcceptDocument?: (content: string) => void;
+  onAppendToDocument?: (content: string) => void;
   originalDocumentContent?: string;
   onRejectDocumentChange?: () => void;
   changeStatus?: 'pending' | 'accepted' | 'rejected';
@@ -29,6 +32,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   onOpenSource,
   onApplyToDocument,
   onDirectAcceptDocument,
+  onAppendToDocument,
   originalDocumentContent,
   onRejectDocumentChange,
   changeStatus,
@@ -52,7 +56,9 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   };
 
   const handleApply = (content: string) => {
-    if (onDirectAcceptDocument) {
+    if (onAppendToDocument) {
+      onAppendToDocument(content);
+    } else if (onDirectAcceptDocument) {
       onDirectAcceptDocument(content);
     } else if (onApplyToDocument) {
       onApplyToDocument(content);
@@ -94,8 +100,8 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
           {/* Content */}
           <div className="markdown-content">
             <ReactMarkdown
-              remarkPlugins={[remarkMath]}
-              rehypePlugins={[rehypeKatex]}
+              remarkPlugins={[remarkMath, remarkGfm]}
+              rehypePlugins={[[rehypeKatex, { throwOnError: false }]]}
               components={{
                 code({ node: _node, inline, className, children, ...props }: any) {
                   const match = /language-(\w+)/.exec(className || '');
@@ -153,7 +159,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
                 }
               }}
             >
-              {parsed.displayText}
+              {preprocessLatex(parsed.displayText)}
             </ReactMarkdown>
 
             {/* Streaming indicator */}

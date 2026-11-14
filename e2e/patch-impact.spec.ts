@@ -21,7 +21,7 @@ test('previews dependency impact before patch approval, nominates only successor
   });
   await page.goto('/'); await page.getByLabel('Google Gemini API Key').fill('impact-fake-key');
   await page.getByRole('button', { name: '설정 저장' }).click();
-  await page.locator('#header-model-select').selectOption('gemini-3.1-pro-preview');
+  await page.locator('#header-model-select').selectOption('gemini-4-carbon');
   await page.getByRole('button', { name: '연구노트', exact: true }).click();
   const editor = page.getByRole('dialog', { name: '연구노트', exact: true });
   await editor.getByLabel('문서 제목', { exact: true }).fill('의존 영향 재검사');

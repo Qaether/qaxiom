@@ -72,4 +72,29 @@ describe('onboarding flow', () => {
     await user.click(screen.getByRole('button', { name: '새로운 연구 대화 제목 수정' }));
     expect(await screen.findByRole('textbox', { name: '대화 제목 입력' })).toBeTruthy();
   });
+
+  it('renames and deletes a project from the Projects list', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await enterProject(user);
+    await user.click(await screen.findByRole('button', { name: '프로젝트 관리 / 전환 화면으로 이동' }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Projects' })).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: '테스트 프로젝트 이름 변경' }));
+    const renameInput = screen.getByRole('textbox', { name: '테스트 프로젝트 새 프로젝트 이름' });
+    await user.clear(renameInput);
+    await user.type(renameInput, '수정된 프로젝트');
+    await user.click(screen.getByRole('button', { name: '저장' }));
+
+    expect(await screen.findByText('수정된 프로젝트')).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: '수정된 프로젝트 삭제' }));
+    expect(screen.getByText('목록에서 제거할까요? (로컬 폴더 파일은 삭제되지 않습니다)')).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: '삭제 확인' }));
+
+    await waitFor(() => {
+      expect(screen.queryByText('수정된 프로젝트')).toBeNull();
+    });
+  });
 });

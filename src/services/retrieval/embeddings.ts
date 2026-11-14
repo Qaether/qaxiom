@@ -4,6 +4,7 @@ import { loadReferenceSelection } from './references';
 import { normalizeVector, validSpace, type EmbeddingSpace, type EmbeddingVector } from './embeddingTypes';
 import type { ReferenceData, ReferenceSpan } from './types';
 import { assertEmbeddingScopeCurrent, assertEmbeddingScopeInTransaction, captureEmbeddingScope, type EmbeddingProjectScope } from './embeddingScope';
+import { validateApiKeyFormat } from '../providers/apiKey';
 
 export const EMBEDDING_ENDPOINT = 'https://api.openai.com/v1/embeddings';
 export const embeddingVectorHash = (vector: Omit<EmbeddingVector, 'vectorHash'>) => hashText(JSON.stringify({ spaceId: vector.spaceId, sourceId: vector.sourceId,
@@ -18,8 +19,9 @@ export function embeddingBody(space: EmbeddingSpace, input: string[]) {
 export async function requestEmbeddings(space: EmbeddingSpace, input: string[], key: string, signal: AbortSignal) {
   const body = embeddingBody(space, input);
   if (!key.trim()) throw new Error('설정에 OpenAI API 키를 등록하세요.');
+  const cleanKey = validateApiKeyFormat(key, 'OpenAI');
   signal.throwIfAborted();
-  const response = await fetch(EMBEDDING_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key.trim()}` }, body: JSON.stringify(body), signal });
+  const response = await fetch(EMBEDDING_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cleanKey}` }, body: JSON.stringify(body), signal });
   // Do not propagate provider bodies: they can echo submitted text or credentials.
   if (!response.ok) throw new Error(`OpenAI 임베딩 요청 실패 (HTTP ${response.status}). 자동 재시도하지 않습니다.`);
   const raw = await response.text(); signal.throwIfAborted();

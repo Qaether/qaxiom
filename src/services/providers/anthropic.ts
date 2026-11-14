@@ -1,6 +1,7 @@
 import type { ChatMessage, ModelOption } from '../../types';
 import type { ProviderCallbacks } from './gemini';
 import { consumeJsonSSE } from '../sse';
+import { validateApiKeyFormat } from './apiKey';
 
 interface AnthropicStreamEvent {
   type?: string;
@@ -41,11 +42,13 @@ export async function streamAnthropic(
     requestBody.temperature = temperature;
   }
 
+  const cleanKey = validateApiKeyFormat(apiKey, 'Anthropic');
+
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-api-key': apiKey,
+      'x-api-key': cleanKey,
       'anthropic-version': '2023-06-01',
       'anthropic-dangerous-direct-browser-access': 'true'
     },

@@ -57,22 +57,28 @@ describe('ChatMessage status feedback', () => {
     expect(screen.queryByRole('button', { name: '다시 시도' })).toBeNull();
   });
 
-  it('renders apply button in footer and triggers callback when clicked', async () => {
+  it('renders apply button in footer and triggers append callback before replace callbacks', async () => {
     const onApply = vi.fn();
+    const onDirectAccept = vi.fn();
+    const onAppend = vi.fn();
     render(<ChatMessage
       message={{
         id: 'assistant-apply-footer',
         role: 'assistant',
-        content: '수정 제안 본문',
+        content: '추가할 내용',
         timestamp: 1,
         status: 'complete'
       }}
       onApplyToDocument={onApply}
+      onDirectAcceptDocument={onDirectAccept}
+      onAppendToDocument={onAppend}
     />);
 
     const footerApplyBtn = screen.getByRole('button', { name: '연구노트에 적용' });
     await userEvent.click(footerApplyBtn);
-    expect(onApply).toHaveBeenCalledWith('수정 제안 본문');
+    expect(onAppend).toHaveBeenCalledWith('추가할 내용');
+    expect(onDirectAccept).not.toHaveBeenCalled();
+    expect(onApply).not.toHaveBeenCalled();
   });
 
   it('renders apply button in code block header and triggers callback with code string when clicked', async () => {
@@ -91,5 +97,21 @@ describe('ChatMessage status feedback', () => {
     const codeApplyBtn = screen.getByRole('button', { name: '노트에 적용' });
     await userEvent.click(codeApplyBtn);
     expect(onApply).toHaveBeenCalledWith('# 수정된 이론');
+  });
+
+  it('renders GFM markdown tables with table elements and preserves LaTeX rendering', () => {
+    const { container } = render(<ChatMessage
+      message={{
+        id: 'assistant-table',
+        role: 'assistant',
+        content: '| 항목 | 값 |\n| --- | --- |\n| 노름 | $|x|$ |\n\n인라인 \\(a^2 + b^2 = c^2\\) 및 블록:\n\\[E = mc^2\\]',
+        timestamp: 1,
+        status: 'complete'
+      }}
+    />);
+
+    expect(screen.getByRole('table')).toBeTruthy();
+    expect(screen.getByRole('columnheader', { name: '항목' })).toBeTruthy();
+    expect(container.querySelectorAll('.katex').length).toBeGreaterThanOrEqual(3);
   });
 });

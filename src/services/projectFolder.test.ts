@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { QaxiomDatabase } from './database';
-import { folderPermission, getActiveProjectFolder, rememberProjectFolder, requestFolderPermission } from './projectFolder';
+import { deleteProjectFolder, folderPermission, getActiveProjectFolder, listRecentProjectFolders, rememberProjectFolder, renameProjectFolder, requestFolderPermission } from './projectFolder';
 import type { WorkspaceDirectoryHandle } from './folderExport';
 
 let database: QaxiomDatabase;
@@ -43,4 +43,42 @@ it('asks again when permission is not available and never treats denial as grant
   expect(await requestFolderPermission(directory)).toBe(true);
   expect(queryPermission).toHaveBeenCalledWith({ mode: 'readwrite' });
   expect(requestPermission).toHaveBeenCalledWith({ mode: 'readwrite' });
+});
+
+it('renames a project folder and updates active record when matching', async () => {
+  const dir1 = { name: 'dir-1' } as WorkspaceDirectoryHandle;
+  const dir2 = { name: 'dir-2' } as WorkspaceDirectoryHandle;
+  await rememberProjectFolder({ name: 'Alpha', folderName: 'dir-1', directory: dir1 }, database);
+  await rememberProjectFolder({ name: 'Beta', folderName: 'dir-2', directory: dir2 }, database);
+
+  await renameProjectFolder('Beta', '  Beta Prime  ', database);
+
+  const recent = await listRecentProjectFolders(database);
+  expect(recent.map(r => r.name)).toEqual(['Beta Prime', 'Alpha']);
+  const active = await getActiveProjectFolder(database);
+  expect(active?.name).toBe('Beta Prime');
+});
+
+it('rejects renaming to an already existing project name or missing source', async () => {
+  const dir1 = { name: 'dir-1' } as WorkspaceDirectoryHandle;
+  const dir2 = { name: 'dir-2' } as WorkspaceDirectoryHandle;
+  await rememberProjectFolder({ name: 'Alpha', folderName: 'dir-1', directory: dir1 }, database);
+  await rememberProjectFolder({ name: 'Beta', folderName: 'dir-2', directory: dir2 }, database);
+
+  await expect(renameProjectFolder('Beta', 'alpha', database)).rejects.toThrow('같은 이름의 프로젝트가 이미 있습니다.');
+  await expect(renameProjectFolder('Missing', 'Gamma', database)).rejects.toThrow('이름을 변경할 프로젝트를 찾을 수 없습니다.');
+});
+
+it('deletes a project folder and clears active record only when matching', async () => {
+  const dir1 = { name: 'dir-1' } as WorkspaceDirectoryHandle;
+  const dir2 = { name: 'dir-2' } as WorkspaceDirectoryHandle;
+  await rememberProjectFolder({ name: 'Alpha', folderName: 'dir-1', directory: dir1 }, database);
+  await rememberProjectFolder({ name: 'Beta', folderName: 'dir-2', directory: dir2 }, database);
+
+  await deleteProjectFolder('Beta', database);
+  expect((await listRecentProjectFolders(database)).map(r => r.name)).toEqual(['Alpha']);
+  expect(await getActiveProjectFolder(database)).toBeUndefined();
+
+  await deleteProjectFolder('Alpha', database);
+  expect(await listRecentProjectFolders(database)).toEqual([]);
 });

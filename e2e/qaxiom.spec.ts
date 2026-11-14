@@ -19,7 +19,7 @@ test('uses keyboard controls for model, title, settings dialog and sending', asy
   await model.focus();
   await expect(model).toBeFocused();
   await model.press('ArrowUp');
-  await expect(model).toHaveValue('gemini-3.1-pro-preview');
+  await expect(model).toHaveValue('gemini-4-hydrogen');
 
   const titleButton = page.getByRole('button', { name: '새로운 연구 대화 제목 수정' });
   await titleButton.focus();

@@ -135,15 +135,37 @@ export const AVAILABLE_MODELS: ModelOption[] = [
     contextWindowTokens: 200000
   },
   {
-    id: 'gemini-3.1-pro-preview',
-    name: 'Gemini 3.1 Pro Preview',
+    id: 'gemini-4-carbon',
+    name: 'Gemini 4 Carbon',
     provider: 'gemini',
-    description: '복잡한 이론 연구와 수학적 추론을 위한 Google preview 모델',
-    status: 'preview',
+    description: '고난도 과학·이론 연구와 장기 복합 추론을 위한 Google 최신 플래그십 모델',
+    status: 'active',
     api: 'generate-content',
     supportsTemperature: true,
-    verifiedAt: '2026-10-03',
-    contextWindowTokens: 2000000
+    verifiedAt: '2026-11-14',
+    contextWindowTokens: 1048576
+  },
+  {
+    id: 'gemini-4-argon',
+    name: 'Gemini 4 Argon',
+    provider: 'gemini',
+    description: '복잡한 수학·과학·코딩 추론에서 속도와 정밀도의 균형을 맞춘 Gemini 4 모델',
+    status: 'active',
+    api: 'generate-content',
+    supportsTemperature: true,
+    verifiedAt: '2026-11-14',
+    contextWindowTokens: 1048576
+  },
+  {
+    id: 'gemini-4-hydrogen',
+    name: 'Gemini 4 Hydrogen',
+    provider: 'gemini',
+    description: '컨텍스트 캐싱과 빠른 연구 응답에 최적화된 경량 Gemini 4 모델',
+    status: 'active',
+    api: 'generate-content',
+    supportsTemperature: true,
+    verifiedAt: '2026-11-14',
+    contextWindowTokens: 1048576
   },
   {
     id: 'gemini-3.8-flash',
@@ -153,7 +175,7 @@ export const AVAILABLE_MODELS: ModelOption[] = [
     status: 'active',
     api: 'generate-content',
     supportsTemperature: true,
-    verifiedAt: '2026-10-03',
+    verifiedAt: '2026-11-14',
     contextWindowTokens: 1000000
   }
 ];
@@ -161,7 +183,8 @@ export const AVAILABLE_MODELS: ModelOption[] = [
 const LEGACY_MODEL_IDS: Record<string, string> = {
   'claude-opus-5-5': 'claude-opus-5',
   'claude-sonnet-5-5': 'claude-sonnet-5',
-  'gemini-3.1-pro': 'gemini-3.1-pro-preview',
+  'gemini-3.1-pro': 'gemini-4-carbon',
+  'gemini-3.1-pro-preview': 'gemini-4-carbon',
   'gemini-2.5-flash': 'gemini-3.8-flash'
 };
 

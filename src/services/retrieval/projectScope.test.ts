@@ -53,7 +53,7 @@ it('enforces the full selected range before search and preview, and never sends 
 });
 it('denies pre-policy previews and empty research lists before any adapter call', async () => {
   const f = await fixture(); await saveProjectSources(f.snapshot, null, [f.a.id], db, 'research');
-  const cb = callbacks(); await sendChatMessage(messages, 'gemini-3.1-pro-preview', 'general', settings, cb, undefined, f.bundle);
+  const cb = callbacks(); await sendChatMessage(messages, 'gemini-4-carbon', 'general', settings, cb, undefined, f.bundle);
   expect(provider).not.toHaveBeenCalled(); expect(cb.onError).toHaveBeenCalled();
   await saveProjectSources(f.snapshot, 1, [], db, 'research');
   await expect(prepareRagProjectScope(f.bundle, db)).rejects.toThrow('허용 목록');
@@ -77,7 +77,7 @@ it('invalidates even still-allowed policy revisions, project moves and canonical
   await saveTheoryVersion(split.document.id, split.version.id, { title: 'Scope', markdown: 'New canonical.', contract: EMPTY_CONTRACT }, db);
   await expect(assertRagProjectScopeCurrent(beforeVersion, db)).rejects.toThrow('변경');
 });
-it.each(['gemini-3.1-pro-preview', 'gpt-6-astra', 'claude-sonnet-5'])('withholds successful completion after in-flight revocation for %s', async model => {
+it.each(['gemini-4-carbon', 'gpt-6-astra', 'claude-sonnet-5'])('withholds successful completion after in-flight revocation for %s', async model => {
   const f = await fixture(); await saveProjectSources(f.snapshot, null, [f.a.id], db, 'research');
   const prepared = await prepareRagProjectScope(f.bundle, db), cb = callbacks();
   provider.mockImplementationOnce(async (...args: unknown[]) => {
@@ -94,13 +94,13 @@ it('detects in-flight activation even for legacy bundles without scope metadata'
     await saveProjectSources(f.snapshot, null, [f.a.id], db, 'research');
     (args.find(a => !!a && typeof a === 'object' && 'onFinish' in a) as ProviderCallbacks).onFinish();
   });
-  await sendChatMessage(messages, 'gemini-3.1-pro-preview', 'general', settings, cb, undefined, f.bundle);
+  await sendChatMessage(messages, 'gemini-4-carbon', 'general', settings, cb, undefined, f.bundle);
   expect(cb.onFinish).not.toHaveBeenCalled(); expect(cb.onError).toHaveBeenCalled();
 });
 it('completes an unchanged approved scope and rejects tampered evidence/criteria', async () => {
   const f = await fixture(), prepared = await prepareRagProjectScope(f.bundle, db), cb = callbacks();
   provider.mockImplementationOnce(async (...args: unknown[]) => (args.find(a => !!a && typeof a === 'object' && 'onFinish' in a) as ProviderCallbacks).onFinish());
-  await sendChatMessage(messages, 'gemini-3.1-pro-preview', 'general', settings, cb, undefined, prepared);
+  await sendChatMessage(messages, 'gemini-4-carbon', 'general', settings, cb, undefined, prepared);
   expect(cb.onFinish).toHaveBeenCalledOnce(); expect(cb.onError).not.toHaveBeenCalled();
   const bad = structuredClone(prepared); bad.assembly!.research!.contract.scope = 'forged';
   await expect(assertRagProjectScopeCurrent(bad, db)).rejects.toThrow('연구');
@@ -110,7 +110,7 @@ it('completes an unchanged approved scope and rejects tampered evidence/criteria
 it('roundtrips frozen scope independently of later policy changes and preserves data on invalid restore', async () => {
   const f = await fixture(); await saveProjectSources(f.snapshot, null, [f.a.id], db, 'research');
   const prepared = await prepareRagProjectScope(f.bundle, db);
-  await db.sessions.add({ id: 's', title: 'Scope', position: 0, createdAt: 1, updatedAt: 1, researchMode: 'general', selectedModel: 'gemini-3.1-pro-preview' });
+  await db.sessions.add({ id: 's', title: 'Scope', position: 0, createdAt: 1, updatedAt: 1, researchMode: 'general', selectedModel: 'gemini-4-carbon' });
   await db.messages.add({ id: 'm', sessionId: 's', position: 0, role: 'assistant', content: 'Answer [[R1]]', timestamp: 1, contextBundle: prepared });
   await saveProjectSources(f.snapshot, 1, [], db, 'research');
   const backup = await createWorkspaceBundle(db); await restoreWorkspaceBundle(backup, target);
@@ -127,7 +127,7 @@ it('applies an explicit project without attaching a canonical contract or sendin
   await assertRagProjectScopeCurrent(prepared, db);
   const wire = withReferenceContext(messages, prepared)[0].content;
   expect(wire).not.toContain(f.b.id); expect(wire).not.toContain('PRIVATE'); expect(wire).not.toContain('Canonical theory');
-  await db.sessions.add({ id: 's', title: 'Project', position: 0, createdAt: 1, updatedAt: 1, researchMode: 'general', selectedModel: 'gemini-3.1-pro-preview' });
+  await db.sessions.add({ id: 's', title: 'Project', position: 0, createdAt: 1, updatedAt: 1, researchMode: 'general', selectedModel: 'gemini-4-carbon' });
   await db.messages.add({ id: 'm', sessionId: 's', position: 0, role: 'assistant', content: '[[R1]]', timestamp: 1, contextBundle: prepared });
   const backup = await createWorkspaceBundle(db); await restoreWorkspaceBundle(backup, target);
   expect((await target.messages.get(['s', 'm']))!.contextBundle!.projectScope).toEqual(prepared.projectScope);
@@ -165,7 +165,7 @@ it('does not finish a project-only answer when its policy is revoked during the 
     const handlers = args.find(a => !!a && typeof a === 'object' && 'onFinish' in a) as ProviderCallbacks;
     handlers.onChunk('unverified partial'); await saveProjectSources(f.snapshot, 1, [], db, 'research'); handlers.onFinish();
   });
-  await sendChatMessage(messages, 'gemini-3.1-pro-preview', 'general', settings, cb, undefined, bundle);
+  await sendChatMessage(messages, 'gemini-4-carbon', 'general', settings, cb, undefined, bundle);
   expect(provider).toHaveBeenCalledOnce(); expect(cb.onFinish).not.toHaveBeenCalled();
   expect(cb.onError).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringContaining('완료 처리하지 않습니다') }));
 });

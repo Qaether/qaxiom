@@ -12,7 +12,7 @@ test('asks with canonical context only, excludes selected references and restore
     await route.fulfill({ status: 200, contentType: 'text/event-stream', body: `data: ${JSON.stringify({ candidates: [{ content: { parts: [{ text: '자체 정본 [[G1]]을 사용한다. 외부 근거는 없다. [[R1]]은 유효하지 않다.' }] } }] })}\n\n` });
   });
   await page.goto('/'); await page.getByLabel('Google Gemini API Key').fill('canonical-question-fake');
-  await page.getByRole('button', { name: '설정 저장' }).click(); await page.locator('#header-model-select').selectOption('gemini-3.1-pro-preview');
+  await page.getByRole('button', { name: '설정 저장' }).click(); await page.locator('#header-model-select').selectOption('gemini-4-carbon');
   await page.getByRole('button', { name: '연구노트', exact: true }).click();
   const editor = page.getByRole('dialog', { name: '연구노트', exact: true });
   await editor.getByLabel('문서 제목', { exact: true }).fill('정본 단독 연구');

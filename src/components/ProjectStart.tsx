@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Cloud, FolderOpen } from 'lucide-react';
+import { Cloud, FolderOpen, Pencil, Trash2 } from 'lucide-react';
 import { chooseWorkspaceDirectory, workspaceDirectoryPicker, type WorkspaceDirectoryHandle } from '../services/folderExport';
 
 export interface OpenedProject {
@@ -8,10 +8,12 @@ export interface OpenedProject {
   directory: WorkspaceDirectoryHandle;
 }
 
-export default function ProjectStart({ onOpen, onReconnect, onSelectProject, remembered, projects, initialError }: {
+export default function ProjectStart({ onOpen, onReconnect, onSelectProject, onRenameProject, onDeleteProject, remembered, projects, initialError }: {
   onOpen: (project: OpenedProject) => Promise<void>;
   onReconnect: () => Promise<void>;
   onSelectProject?: (project: OpenedProject) => Promise<void>;
+  onRenameProject?: (oldName: string, newName: string) => Promise<void>;
+  onDeleteProject?: (project: OpenedProject) => Promise<void>;
   remembered?: OpenedProject | null;
   projects?: OpenedProject[];
   initialError?: string;
@@ -21,6 +23,9 @@ export default function ProjectStart({ onOpen, onReconnect, onSelectProject, rem
   const [folderName, setFolderName] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [editingName, setEditingName] = useState<string | null>(null);
+  const [draftName, setDraftName] = useState('');
+  const [confirmDeleteName, setConfirmDeleteName] = useState<string | null>(null);
   const supported = Boolean(workspaceDirectoryPicker());
 
   const projectList: OpenedProject[] = (projects && projects.length > 0)
@@ -67,25 +72,146 @@ export default function ProjectStart({ onOpen, onReconnect, onSelectProject, rem
       {projectList.length > 0 && <section className="project-start-section" aria-label="Projects">
         <h2>Projects</h2>
         <div className="projects-list">
-          {projectList.map((proj, idx) => (
-            <div key={proj.name + idx} className="project-list-item">
-              <div className="project-list-info">
-                <div className="project-list-title-row">
-                  <FolderOpen size={16} className="project-list-icon" />
-                  <strong className="project-list-title">{proj.name}</strong>
+          {projectList.map((proj, idx) => {
+            const isEditing = editingName === proj.name;
+            const isConfirmingDelete = confirmDeleteName === proj.name;
+            return (
+              <div key={proj.name + idx} className="project-list-item">
+                <div className="project-list-info">
+                  {isEditing ? (
+                    <div className="project-rename-row">
+                      <input
+                        type="text"
+                        aria-label={`${proj.name} 새 프로젝트 이름`}
+                        value={draftName}
+                        maxLength={200}
+                        disabled={busy}
+                        autoFocus
+                        onChange={event => setDraftName(event.target.value)}
+                        onKeyDown={event => {
+                          if (event.key === 'Enter' && draftName.trim() && onRenameProject) {
+                            event.preventDefault();
+                            void run(async () => {
+                              await onRenameProject(proj.name, draftName.trim());
+                              setEditingName(null);
+                              setDraftName('');
+                            });
+                          } else if (event.key === 'Escape') {
+                            setEditingName(null);
+                            setDraftName('');
+                          }
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    <div className="project-list-title-row">
+                      <FolderOpen size={16} className="project-list-icon" />
+                      <strong className="project-list-title">{proj.name}</strong>
+                    </div>
+                  )}
+                  <span className="project-list-folder">
+                    {isConfirmingDelete
+                      ? '목록에서 제거할까요? (로컬 폴더 파일은 삭제되지 않습니다)'
+                      : `선택한 폴더: ${proj.folderName}`}
+                  </span>
                 </div>
-                <span className="project-list-folder">선택한 폴더: {proj.folderName}</span>
+                <div className="project-list-actions">
+                  {isEditing ? (
+                    <>
+                      <button
+                        type="button"
+                        className="project-save-btn"
+                        disabled={busy || !draftName.trim()}
+                        onClick={() => void run(async () => {
+                          if (!onRenameProject) return;
+                          await onRenameProject(proj.name, draftName.trim());
+                          setEditingName(null);
+                          setDraftName('');
+                        })}
+                      >
+                        저장
+                      </button>
+                      <button
+                        type="button"
+                        className="project-secondary-btn"
+                        disabled={busy}
+                        onClick={() => { setEditingName(null); setDraftName(''); }}
+                      >
+                        취소
+                      </button>
+                    </>
+                  ) : isConfirmingDelete ? (
+                    <>
+                      <button
+                        type="button"
+                        className="project-danger-btn"
+                        disabled={busy}
+                        onClick={() => void run(async () => {
+                          if (!onDeleteProject) return;
+                          await onDeleteProject(proj);
+                          setConfirmDeleteName(null);
+                        })}
+                      >
+                        삭제 확인
+                      </button>
+                      <button
+                        type="button"
+                        className="project-secondary-btn"
+                        disabled={busy}
+                        onClick={() => setConfirmDeleteName(null)}
+                      >
+                        취소
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      {onRenameProject && (
+                        <button
+                          type="button"
+                          className="project-icon-btn"
+                          disabled={busy}
+                          aria-label={`${proj.name} 이름 변경`}
+                          title="이름 변경"
+                          onClick={() => {
+                            setError('');
+                            setConfirmDeleteName(null);
+                            setEditingName(proj.name);
+                            setDraftName(proj.name);
+                          }}
+                        >
+                          <Pencil size={14} />
+                        </button>
+                      )}
+                      {onDeleteProject && (
+                        <button
+                          type="button"
+                          className="project-icon-btn project-icon-danger"
+                          disabled={busy}
+                          aria-label={`${proj.name} 삭제`}
+                          title="목록에서 삭제"
+                          onClick={() => {
+                            setError('');
+                            setEditingName(null);
+                            setConfirmDeleteName(proj.name);
+                          }}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="project-open-btn"
+                        disabled={busy}
+                        onClick={() => void run(() => onSelectProject ? onSelectProject(proj) : onReconnect())}
+                      >
+                        열기
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
-              <button
-                type="button"
-                className="project-open-btn"
-                disabled={busy}
-                onClick={() => void run(() => onSelectProject ? onSelectProject(proj) : onReconnect())}
-              >
-                열기
-              </button>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>}
       <section className="project-start-section" aria-label="새 프로젝트 설정">

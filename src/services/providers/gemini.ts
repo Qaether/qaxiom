@@ -1,5 +1,6 @@
 import type { ChatMessage, ModelOption } from '../../types';
 import { consumeJsonSSE } from '../sse';
+import { validateApiKeyFormat } from './apiKey';
 
 interface GeminiStreamEvent {
   candidates?: Array<{
@@ -35,7 +36,8 @@ export async function streamGemini(
       parts: [{ text: m.content }]
     }));
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model.id}:streamGenerateContent?alt=sse&key=${apiKey}`;
+  const cleanKey = validateApiKeyFormat(apiKey, 'Gemini');
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model.id}:streamGenerateContent?alt=sse&key=${encodeURIComponent(cleanKey)}`;
 
   const requestBody = {
     contents,
