@@ -113,7 +113,7 @@ describe('versioned workspace bundles', () => {
     const first = await createTheory(input, source);
     const second = await saveTheoryVersion(first.document.id, first.version.id, { ...input, markdown: '# 가정\n\nx > 1' }, source);
     const bundle = await createWorkspaceBundle(source);
-    expect(bundle.version).toBe(24);
+    expect(bundle.version).toBe(25);
     await restoreWorkspaceBundle(JSON.parse(serializeWorkspaceBundle(bundle)), target);
     expect(await loadTheory(first.document.id, target)).toEqual(second);
     expect((await createWorkspaceBundle(target)).data).toEqual(bundle.data);

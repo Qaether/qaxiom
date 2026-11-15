@@ -153,7 +153,7 @@ it('drops external classifications on deadline and rolls back result/ownership o
 
 it('restores frozen external results and rejects quote/context hash/own-origin tampering atomically', async () => {
   const f = await start(); await finishReviewAttempt(f.campaign.id, f.attempt.token, f.run, db);
-  const bundle = await createWorkspaceBundle(db); expect(bundle.version).toBe(24); await restoreWorkspaceBundle(JSON.parse(JSON.stringify(bundle)), target);
+  const bundle = await createWorkspaceBundle(db); expect(bundle.version).toBe(25); await restoreWorkspaceBundle(JSON.parse(JSON.stringify(bundle)), target);
   expect((await target.review_runs.get(f.run.id))!.external).toEqual(f.run.external);
   for (const mutate of [
     (b: typeof bundle) => { b.data.reviewRuns[0].external!.context.contextHash = '0'.repeat(64); },
@@ -212,7 +212,7 @@ it('imports genuine v14 ledgers and upgrades populated v14 without fabricating e
   await target.delete(); const legacy = new Dexie(target.name);
   legacy.version(14).stores(Object.fromEntries(db.tables.map(t => [t.name, [t.schema.primKey.src, ...t.schema.indexes.map(i => i.src)].join(',')])));
   for (const t of db.tables) await legacy.table(t.name).bulkAdd(await t.toArray());
-  legacy.close(); await target.open(); expect(target.verno).toBe(25); expect(await target.document_versions.get(snapshot.version.id)).toEqual(snapshot.version);
+  legacy.close(); await target.open(); expect(target.verno).toBe(26); expect(await target.document_versions.get(snapshot.version.id)).toEqual(snapshot.version);
 });
 
 it('routes the same approved selected-pair request to all three existing provider adapters without extra conversation or real network calls', async () => {

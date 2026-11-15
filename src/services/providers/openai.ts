@@ -1,11 +1,19 @@
 import type { ChatMessage, ModelOption } from '../../types';
-import type { ProviderCallbacks } from './gemini';
 import { consumeJsonSSE } from '../sse';
 import { validateApiKeyFormat } from './apiKey';
+import { flattenSystemBlocks, type ProviderCallbacks, type ProviderUsage, type SystemBlock } from './types';
 
 interface OpenAIStreamEvent {
   type?: string;
   delta?: string;
+  response?: {
+    usage?: {
+      input_tokens?: number;
+      output_tokens?: number;
+      total_tokens?: number;
+      input_tokens_details?: { cached_tokens?: number };
+    };
+  };
 }
 
 /**
@@ -15,7 +23,7 @@ interface OpenAIStreamEvent {
 export async function streamOpenAI(
   messages: ChatMessage[],
   model: ModelOption,
-  systemPrompt: string,
+  systemPrompt: string | SystemBlock[],
   apiKey: string,
   callbacks: ProviderCallbacks,
   signal?: AbortSignal
@@ -26,7 +34,7 @@ export async function streamOpenAI(
 
   const requestPayload = {
     model: model.id,
-    instructions: systemPrompt,
+    instructions: flattenSystemBlocks(systemPrompt),
     input,
     stream: true,
     store: false,
@@ -55,12 +63,22 @@ export async function streamOpenAI(
 
   if (!response.body) throw new Error('응답 스트림을 읽을 수 없습니다.');
 
+  let latestUsage: ProviderUsage | undefined;
+
   await consumeJsonSSE(response.body, payload => {
     const event = payload as OpenAIStreamEvent;
     if (event.type === 'response.output_text.delta' && event.delta) {
       callbacks.onChunk(event.delta);
     } else if (event.type === 'response.reasoning_summary_text.delta' && event.delta) {
       callbacks.onReasoningSummary?.(event.delta);
+    } else if (event.type === 'response.completed' && event.response?.usage) {
+      const u = event.response.usage;
+      latestUsage = {
+        inputTokens: u.input_tokens,
+        outputTokens: u.output_tokens,
+        cacheReadTokens: u.input_tokens_details?.cached_tokens,
+        totalTokens: u.total_tokens
+      };
     } else if (event.type === 'error') {
       throw new Error('OpenAI 스트리밍 처리 중 오류가 발생했습니다.');
     } else if (event.type === 'response.failed') {
@@ -68,5 +86,6 @@ export async function streamOpenAI(
     }
   });
 
+  if (latestUsage) callbacks.onUsage?.(latestUsage);
   callbacks.onFinish();
 }

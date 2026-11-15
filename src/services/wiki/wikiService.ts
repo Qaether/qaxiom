@@ -1,5 +1,6 @@
 import { qaxiomDatabase, type QaxiomDatabase } from '../database';
-import type { WikiPage, WikiEntryType } from '../../types';
+import type { UserSettings, WikiPage, WikiEntryType } from '../../types';
+import { runTurn } from '../../harness/runTurn';
 import type { ReferenceDocument } from '../retrieval/types';
 import type { DocumentVersion, TheoryDocument } from '../theory/types';
 import { hashText } from '../theory/blocks';
@@ -206,4 +207,93 @@ export async function resolveSourceIdsFromWikiIds(
     }
   }
   return [...new Set(sourceIds)];
+}
+
+export interface CurateWikiEntryParams {
+  sourceId: string;
+  modelId: string;
+  settings: UserSettings;
+  title?: string;
+  signal?: AbortSignal;
+  db?: QaxiomDatabase;
+}
+
+/**
+ * Curates a structured WikiPage from a single user-approved ReferenceDocument
+ * via the unified `wiki_curate` harness task, preserving sourceId, contentHash,
+ * and strict internal-note vs external-paper separation.
+ */
+export async function curateWikiEntry(params: CurateWikiEntryParams): Promise<WikiPage> {
+  const db = params.db ?? qaxiomDatabase;
+  const ref = await db.references.get(params.sourceId);
+  if (!ref) {
+    throw new Error(`Reference source not found: ${params.sourceId}`);
+  }
+  const spans = await db.reference_spans.where('sourceId').equals(ref.id).sortBy('position');
+  const excerptText = spans.length > 0
+    ? spans.slice(0, 12).map(s => `[spanId=${s.id} hash=${s.contentHash}]\n${s.text}`).join('\n\n')
+    : ref.text.slice(0, 8000);
+
+  const prompt = [
+    `Curate a concise wiki card for source "${ref.name}" (role=${ref.role}).`,
+    params.title ? `Preferred title: ${params.title}` : '',
+    `<qaxiom_untrusted_source sourceId="${ref.id}" contentHash="${ref.contentHash}">\n${excerptText}\n</qaxiom_untrusted_source>`
+  ].filter(Boolean).join('\n\n');
+
+  const result = await runTurn(
+    {
+      kind: 'wiki_curate',
+      messages: [{ id: crypto.randomUUID(), role: 'user', content: prompt, timestamp: Date.now() }],
+      modelId: params.modelId,
+      researchMode: 'general',
+      settings: params.settings
+    },
+    { signal: params.signal }
+  );
+
+  if (result.aborted) {
+    throw new Error('Wiki curation was canceled.');
+  }
+
+  let parsed: Partial<{
+    title: string;
+    summary: string;
+    content: string;
+    tags: string[];
+    backlinks: string[];
+  }> = {};
+  try {
+    const cleaned = result.text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+    parsed = JSON.parse(cleaned) as typeof parsed;
+  } catch {
+    parsed = {
+      title: params.title || ref.name,
+      summary: result.text.trim().slice(0, 300),
+      content: result.text.trim(),
+      tags: [],
+      backlinks: []
+    };
+  }
+
+  const entryType: WikiEntryType =
+    ref.role === 'note' ? 'note' : ref.role === 'theory_snapshot' ? 'theory_snapshot' : 'paper';
+  const existing = await db.wiki_pages.get(`wiki-ref-${ref.id}`);
+  const now = Date.now();
+  const page: WikiPage = {
+    id: existing?.id ?? `wiki-ref-${ref.id}`,
+    title: (typeof parsed.title === 'string' && parsed.title.trim()) || params.title || ref.name,
+    summary: (typeof parsed.summary === 'string' && parsed.summary.trim()) || ref.text.slice(0, 300),
+    content: (typeof parsed.content === 'string' && parsed.content.trim()) || result.text.trim() || ref.text,
+    entryType,
+    sourceId: ref.id,
+    versionId: ref.originVersionId ?? undefined,
+    contentHash: ref.contentHash,
+    tags: Array.isArray(parsed.tags) ? parsed.tags.filter((t): t is string => typeof t === 'string') : [],
+    backlinks: Array.isArray(parsed.backlinks) ? parsed.backlinks.filter((b): b is string => typeof b === 'string') : [],
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now
+  };
+
+  await db.wiki_pages.put(page);
+  return page;
 }

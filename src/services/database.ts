@@ -12,6 +12,7 @@ import type { ResearchRelation } from './theory/relationTypes';
 import type { ExternalClaim } from './theory/externalClaims';
 import type { ExternalClaimLink } from './theory/externalClaimLinks';
 import type { WorkspaceDirectoryHandle } from './folderExport';
+import { projectSessionRecovery, sanitizeEventPayload } from '../harness/sessionEvents';
 
 export const DATABASE_NAME = 'qaxiom_workspace_v1';
 export const LEGACY_SESSIONS_KEY = 'qaxiom_chat_sessions_v1';
@@ -69,6 +70,9 @@ export interface JobRecord {
   createdAt: number;
   updatedAt: number;
   errorMessage?: string;
+  totalSteps?: number;
+  completedSteps?: number;
+  checkpoint?: Record<string, unknown>;
 }
 
 interface MetadataRecord {
@@ -83,6 +87,26 @@ export interface ProjectFolderRecord {
   folderName: string;
   directory: WorkspaceDirectoryHandle;
   updatedAt?: number;
+}
+
+export type SessionEventType =
+  | 'turn_started'
+  | 'turn_checkpoint'
+  | 'turn_completed'
+  | 'turn_failed'
+  | 'turn_cancelled'
+  | 'tool_called'
+  | 'tool_result';
+
+export interface SessionEventRecord {
+  id: string;
+  sessionId: string;
+  turnId: string;
+  messageId: string;
+  seq: number;
+  type: SessionEventType;
+  createdAt: number;
+  payload: Record<string, unknown>;
 }
 
 export class QaxiomDatabase extends Dexie {
@@ -112,6 +136,7 @@ export class QaxiomDatabase extends Dexie {
   external_claims!: Table<ExternalClaim, string>;
   external_claim_links!: Table<ExternalClaimLink, string>;
   project_folders!: Table<ProjectFolderRecord, string>;
+  session_events!: Table<SessionEventRecord, string>;
 
   constructor(name = DATABASE_NAME) {
     super(name);
@@ -168,6 +193,7 @@ export class QaxiomDatabase extends Dexie {
       });
     });
     this.version(25).stores({ analysis_runs: '&id, documentId, versionId, createdAt' });
+    this.version(26).stores({ session_events: '&id, sessionId, turnId, [sessionId+seq], createdAt' });
   }
 }
 
@@ -273,33 +299,61 @@ export async function migrateLegacySessions(
   return { migrated: legacySessions.length > 0, sourceCount: legacySessions.length };
 }
 
+export async function appendSessionEvent(
+  event: SessionEventRecord,
+  database: QaxiomDatabase = qaxiomDatabase
+): Promise<void> {
+  await database.session_events.put({
+    ...event,
+    payload: sanitizeEventPayload(event.payload)
+  });
+}
+
+export async function loadSessionEvents(
+  sessionId: string,
+  database: QaxiomDatabase = qaxiomDatabase
+): Promise<SessionEventRecord[]> {
+  return database.session_events.where('sessionId').equals(sessionId).sortBy('seq');
+}
+
 export async function loadSessionsFromDatabase(
   database: QaxiomDatabase = qaxiomDatabase
 ): Promise<ChatSession[]> {
-  const [sessionRecords, messageRecords] = await Promise.all([
+  const [sessionRecords, messageRecords, eventRecords] = await Promise.all([
     database.sessions.orderBy('position').toArray(),
-    database.messages.toArray()
+    database.messages.toArray(),
+    database.session_events.toArray()
   ]);
   const messagesBySession = new Map<string, MessageRecord[]>();
+  const eventsBySession = new Map<string, SessionEventRecord[]>();
 
   for (const message of messageRecords) {
     const existing = messagesBySession.get(message.sessionId) || [];
     existing.push(message);
     messagesBySession.set(message.sessionId, existing);
   }
+  for (const event of eventRecords) {
+    const existing = eventsBySession.get(event.sessionId) || [];
+    existing.push(event);
+    eventsBySession.set(event.sessionId, existing);
+  }
 
-  return sessionRecords.map(session => ({
-    id: session.id,
-    documentId: session.documentId ?? null,
-    title: session.title,
-    createdAt: session.createdAt,
-    updatedAt: session.updatedAt,
-    researchMode: session.researchMode,
-    selectedModel: resolveModelId(session.selectedModel),
-    messages: (messagesBySession.get(session.id) || [])
+  return sessionRecords.map(session => {
+    const sortedMessages = (messagesBySession.get(session.id) || [])
       .sort((left, right) => left.position - right.position)
-      .map(({ sessionId: _sessionId, position: _position, ...message }) => message)
-  }));
+      .map(({ sessionId: _sessionId, position: _position, ...message }) => message);
+    const sessionEvents = eventsBySession.get(session.id) || [];
+    return {
+      id: session.id,
+      documentId: session.documentId ?? null,
+      title: session.title,
+      createdAt: session.createdAt,
+      updatedAt: session.updatedAt,
+      researchMode: session.researchMode,
+      selectedModel: resolveModelId(session.selectedModel),
+      messages: sessionEvents.length > 0 ? projectSessionRecovery(sortedMessages, sessionEvents) : sortedMessages
+    };
+  });
 }
 
 const sessionCache = new Map<string, string>();

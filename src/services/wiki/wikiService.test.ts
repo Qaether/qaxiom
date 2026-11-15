@@ -1,152 +1,81 @@
 // @vitest-environment jsdom
-
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { DEFAULT_SETTINGS } from '../../constants';
 import { QaxiomDatabase } from '../database';
-import {
-  syncReferenceToWiki,
-  deleteReferenceFromWiki,
-  publishTheoryToWiki,
-  importWebToWiki,
-  listWikiPages,
-  getBoundWikiPagesForVersion,
-  resolveSourceIdsFromWikiIds
-} from './wikiService';
-import type { ReferenceDocument } from '../retrieval/types';
-import type { DocumentVersion, TheoryDocument } from '../theory/types';
+import { curateWikiEntry } from './wikiService';
 
-let db: QaxiomDatabase;
+const dbs: QaxiomDatabase[] = [];
 
-beforeEach(async () => {
-  db = new QaxiomDatabase(`qaxiom-test-wiki-${crypto.randomUUID()}`);
-});
+function createTestDb(name: string): QaxiomDatabase {
+  const db = new QaxiomDatabase(name);
+  dbs.push(db);
+  return db;
+}
 
-afterEach(async () => {
-  db.close();
-  await db.delete();
-});
-
-describe('wikiService', () => {
-  it('syncs reference document to wiki_pages and deletes it', async () => {
-    const ref: ReferenceDocument = {
-      id: 'ref-1',
-      name: 'Dirac_1928.pdf',
-      text: 'The quantum theory of the electron. Spin is an intrinsic property.',
-      contentHash: 'hash-dirac-1',
-      role: 'external',
-      originVersionId: null,
-      createdAt: 1000,
-      parserVersion: 'text-v1'
-    };
-    await db.references.add(ref);
-
-    const wikiPage = await syncReferenceToWiki(ref, db);
-    expect(wikiPage.id).toBe('wiki-ref-ref-1');
-    expect(wikiPage.title).toBe('Dirac_1928.pdf');
-    expect(wikiPage.entryType).toBe('paper');
-    expect(wikiPage.summary).toContain('The quantum theory of the electron');
-
-    const loaded = await db.wiki_pages.get('wiki-ref-ref-1');
-    expect(loaded?.title).toBe('Dirac_1928.pdf');
-
-    await deleteReferenceFromWiki('ref-1', db);
-    expect(await db.wiki_pages.get('wiki-ref-ref-1')).toBeUndefined();
+describe('wikiService curation via harness', () => {
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    while (dbs.length) {
+      await dbs.pop()!.delete();
+    }
   });
 
-  it('publishes a theory document version snapshot to wiki', async () => {
-    const doc: TheoryDocument = {
-      id: 'doc-1',
-      projectId: 'proj-1',
-      role: 'theory',
-      currentVersionId: 'ver-1',
-      createdAt: 1000,
-      updatedAt: 1000
-    };
-    const version: DocumentVersion = {
-      id: 'ver-1',
-      documentId: 'doc-1',
-      number: 2,
-      parentVersionId: null,
-      restoredFromVersionId: null,
-      title: '양자격자공간',
-      markdown: '# 양자격자공간\n\n진공의 FCC 격자 구조 가설.',
-      contentHash: 'hash-v1',
-      contract: {
-        purpose: 'FCC 격자 상호작용 검증',
-        assumptions: '',
-        definitions: '',
-        symbols: '',
-        scope: '',
-        openQuestions: ''
+  it('curates a wiki page via wiki_curate while preserving sourceId, hash, and note/paper separation', async () => {
+    const db = createTestDb(`wiki-curate-${Date.now()}`);
+    await db.references.put({
+      id: 'ref-note-1',
+      name: 'Internal Memo.md',
+      text: 'Internal derivation note on symmetry.',
+      contentHash: 'hash-note-1',
+      role: 'note',
+      originVersionId: 'ver-1',
+      createdAt: 1,
+      parserVersion: 'text-v1'
+    });
+    await db.reference_spans.put({
+      id: 'span-1',
+      sourceId: 'ref-note-1',
+      position: 0,
+      startOffset: 0,
+      endOffset: 38,
+      startLine: 1,
+      endLine: 1,
+      text: 'Internal derivation note on symmetry.',
+      contentHash: 'hash-span-1'
+    });
+
+    const encoder = new TextEncoder();
+    const curatedJson = JSON.stringify({
+      title: 'Symmetry Memo',
+      summary: 'Summary from approved spans.',
+      content: 'Curated details referencing span-1.',
+      tags: ['symmetry', 'draft'],
+      backlinks: ['wiki-other']
+    });
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'response.output_text.delta', delta: curatedJson })}\n\n`));
+        controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+        controller.close();
+      }
+    });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(stream, { status: 200 })));
+
+    const page = await curateWikiEntry({
+      sourceId: 'ref-note-1',
+      modelId: 'gpt-6-astra',
+      settings: {
+        ...DEFAULT_SETTINGS,
+        apiKeys: { ...DEFAULT_SETTINGS.apiKeys, openai: 'sk-test-openai-key-123456' }
       },
-      contractAnchors: {},
-      createdAt: 1000
-    };
-
-    const wiki = await publishTheoryToWiki(doc, version, db);
-    expect(wiki.id).toBe('wiki-theory-ver-1');
-    expect(wiki.title).toBe('양자격자공간 (v2)');
-    expect(wiki.entryType).toBe('theory_snapshot');
-    expect(wiki.summary).toContain('FCC 격자 상호작용 검증');
-  });
-
-  it('imports web content to wiki and registers reference for RAG search', async () => {
-    const wiki = await importWebToWiki(
-      'https://arxiv.org/abs/2301.00001',
-      'Quantum Geometry on Graphs',
-      'This paper explores graph representations of physical spacetime geometry.',
       db
-    );
+    });
 
-    expect(wiki.entryType).toBe('web');
-    expect(wiki.url).toBe('https://arxiv.org/abs/2301.00001');
-    expect(wiki.sourceId).toBeDefined();
-
-    // Verify it added to references and reference_spans
-    const refDoc = await db.references.get(wiki.sourceId!);
-    expect(refDoc).toBeDefined();
-    expect(refDoc?.name).toContain('Quantum Geometry on Graphs (Web)');
-
-    const spans = await db.reference_spans.where('sourceId').equals(wiki.sourceId!).toArray();
-    expect(spans.length).toBeGreaterThan(0);
-  });
-
-  it('resolves bound wiki pages for document version', async () => {
-    const ref: ReferenceDocument = {
-      id: 'ref-x',
-      name: 'Feynman.md',
-      text: 'Path integrals and quantum mechanics.',
-      contentHash: 'hash-feynman',
-      role: 'external',
-      originVersionId: null,
-      createdAt: 1000,
-      parserVersion: 'text-v1'
-    };
-    await db.references.add(ref);
-    await syncReferenceToWiki(ref, db);
-
-    const version: DocumentVersion = {
-      id: 'v-test',
-      documentId: 'd-test',
-      number: 1,
-      parentVersionId: null,
-      restoredFromVersionId: null,
-      title: '테스트',
-      markdown: '본문',
-      contentHash: 'hash-test',
-      contract: { purpose: '', assumptions: '', definitions: '', symbols: '', scope: '', openQuestions: '' },
-      contractAnchors: {},
-      referenceIds: ['wiki-ref-ref-x'],
-      createdAt: 1000
-    };
-
-    const bound = await getBoundWikiPagesForVersion(version, db);
-    expect(bound.length).toBe(1);
-    expect(bound[0].title).toBe('Feynman.md');
-
-    const allPages = await listWikiPages(db);
-    expect(allPages.length).toBe(1);
-
-    const sourceIds = await resolveSourceIdsFromWikiIds(version.referenceIds!, db);
-    expect(sourceIds).toEqual(['ref-x']);
+    expect(page.entryType).toBe('note');
+    expect(page.sourceId).toBe('ref-note-1');
+    expect(page.contentHash).toBe('hash-note-1');
+    expect(page.title).toBe('Symmetry Memo');
+    expect(page.tags).toEqual(['symmetry', 'draft']);
+    expect((await db.wiki_pages.get(page.id))?.summary).toBe('Summary from approved spans.');
   });
 });

@@ -188,4 +188,94 @@ describe('provider streaming adapters', () => {
     const headers = (fetchMock.mock.calls[0]?.[1]?.headers ?? {}) as Record<string, string>;
     expect(headers.Authorization).toBe('Bearer sk-valid-key');
   });
+
+  it('emits Anthropic cache_control for cacheable system blocks and reports usage', async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(responseFromSSE(
+      'data: {"type":"message_start","message":{"usage":{"input_tokens":100,"cache_read_input_tokens":80,"cache_creation_input_tokens":20}}}\n\n',
+      'data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"ok"}}\n\n',
+      'data: {"type":"message_delta","usage":{"output_tokens":15}}\n\n'
+    ));
+    vi.stubGlobal('fetch', fetchMock);
+    const onUsage = vi.fn();
+    const handlers = { ...callbacks(), onUsage };
+
+    await streamAnthropic(
+      messages,
+      model('claude-sonnet-5'),
+      [
+        { text: 'static prefix', cacheable: true },
+        { text: 'dynamic suffix', cacheable: false }
+      ],
+      'key',
+      0.5,
+      handlers
+    );
+
+    const request = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
+    expect(request.system).toEqual([
+      { type: 'text', text: 'static prefix', cache_control: { type: 'ephemeral' } },
+      { type: 'text', text: 'dynamic suffix' }
+    ]);
+    expect(onUsage).toHaveBeenCalledWith({
+      inputTokens: 100,
+      outputTokens: 15,
+      cacheReadTokens: 80,
+      cacheWriteTokens: 20,
+      totalTokens: 215
+    });
+  });
+
+  it('flattens SystemBlock[] for OpenAI and reports usage from response.completed', async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(responseFromSSE(
+      'data: {"type":"response.output_text.delta","delta":"hi"}\n\n',
+      'data: {"type":"response.completed","response":{"usage":{"input_tokens":50,"output_tokens":12,"total_tokens":62,"input_tokens_details":{"cached_tokens":30}}}}\n\n'
+    ));
+    vi.stubGlobal('fetch', fetchMock);
+    const onUsage = vi.fn();
+    const handlers = { ...callbacks(), onUsage };
+
+    await streamOpenAI(
+      messages,
+      model('gpt-6-astra'),
+      [{ text: 'part A', cacheable: true }, { text: 'part B' }],
+      'key',
+      handlers
+    );
+
+    const request = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
+    expect(request.instructions).toBe('part Apart B');
+    expect(onUsage).toHaveBeenCalledWith({
+      inputTokens: 50,
+      outputTokens: 12,
+      cacheReadTokens: 30,
+      totalTokens: 62
+    });
+  });
+
+  it('sends systemInstruction.parts for Gemini and reports usageMetadata', async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(responseFromSSE(
+      'data: {"candidates":[{"content":{"parts":[{"text":"gem"}]}}],"usageMetadata":{"promptTokenCount":40,"candidatesTokenCount":10,"cachedContentTokenCount":25,"totalTokenCount":50}}\n\n'
+    ));
+    vi.stubGlobal('fetch', fetchMock);
+    const onUsage = vi.fn();
+    const handlers = { ...callbacks(), onUsage };
+
+    await streamGemini(
+      messages,
+      model('gemini-3.8-flash'),
+      [{ text: 'prefix', cacheable: true }, { text: 'suffix' }],
+      'key',
+      0.3,
+      handlers
+    );
+
+    const request = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
+    expect(request.systemInstruction.parts).toEqual([{ text: 'prefix' }, { text: 'suffix' }]);
+    expect(onUsage).toHaveBeenCalledWith({
+      inputTokens: 40,
+      outputTokens: 10,
+      cacheReadTokens: 25,
+      totalTokens: 50
+    });
+  });
 });

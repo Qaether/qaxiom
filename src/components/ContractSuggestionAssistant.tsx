@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { Sparkles, Check, Loader2, AlertCircle, FileText, CheckSquare, XCircle, ArrowRight } from 'lucide-react';
-import { sendChatMessage } from '../services/llm';
+import { runTurn } from '../harness/runTurn';
 import { combineContractSuggestions, CONTRACT_KEYS, parseContractSuggestions, prepareContractSuggestionRequests, type ContractKey, type ContractSuggestions } from '../services/theory/contractSuggestions';
 import type { ResearchContract } from '../services/theory/types';
 import type { UserSettings } from '../types';
@@ -37,21 +37,20 @@ export default function ContractSuggestionAssistant({ title, markdown, contract,
       for (const [index, request] of preview.requests.entries()) {
         if (abort.signal.aborted) throw new Error('AI research criteria extraction was aborted.');
         setProgress(index + 1);
-        let response = '', failure: Error | null = null;
-        const timer = window.setTimeout(() => abort.abort(), 120000);
-        try {
-          await sendChatMessage([{ id: crypto.randomUUID(), role: 'user', content: request.prompt, timestamp: Date.now() }],
-            preview.source.modelId, 'general', settings, {
-              onChunk: chunk => {
-                response += chunk;
-                if (response.length > 20000) { failure = new Error('AI response is too long. Please try again.'); abort.abort(); }
-              },
-              onError: cause => { failure = cause; }, onFinish: () => {}
-            }, abort.signal);
-          if (failure) throw failure;
-          if (abort.signal.aborted) throw new Error('AI research criteria extraction was aborted or timed out.');
-          parts.push(parseContractSuggestions(response, preview.source.title, request.markdown));
-        } finally { window.clearTimeout(timer); }
+        const result = await runTurn(
+          {
+            kind: 'contract_suggestion',
+            messages: [{ id: crypto.randomUUID(), role: 'user', content: request.prompt, timestamp: Date.now() }],
+            modelId: preview.source.modelId,
+            researchMode: 'general',
+            settings
+          },
+          { signal: abort.signal }
+        );
+        if (result.aborted) {
+          throw new Error('AI research criteria extraction was aborted or timed out.');
+        }
+        parts.push(parseContractSuggestions(result.text, preview.source.title, request.markdown));
       }
       setSuggestions({ source: preview.source, values: combineContractSuggestions(parts) });
       setPreview(null);

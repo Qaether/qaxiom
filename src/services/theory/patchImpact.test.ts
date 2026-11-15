@@ -126,7 +126,7 @@ it('rolls back both impact approval and version creation on storage failure', as
 it('restores historical impact after retraction and rejects scope/hash/provenance corruption atomically', async () => {
   const { run, patch, relations } = await fixture(); const saved = await applyTheoryPatch(run.id, patch.id, db);
   await retractRelation(relations[0].id, '나중에 철회', db);
-  const bundle = await createWorkspaceBundle(db); expect(bundle.version).toBe(24); await restoreWorkspaceBundle(bundle, target);
+  const bundle = await createWorkspaceBundle(db); expect(bundle.version).toBe(25); await restoreWorkspaceBundle(bundle, target);
   const restored = (await target.review_runs.get(run.id))!;
   expect((await currentPatchImpactScope(run.id, patch.id, await loadTheory(saved.document.id, target), target)).blockIds).toHaveLength(5);
   for (const edit of [
@@ -158,7 +158,7 @@ it('imports genuine v13 applied patches and upgrades populated v13 without fabri
   await target.delete(); const legacy = new Dexie(target.name);
   legacy.version(13).stores(Object.fromEntries(db.tables.map(t => [t.name, [t.schema.primKey.src, ...t.schema.indexes.map(i => i.src)].join(',')])));
   for (const t of db.tables) await legacy.table(t.name).bulkAdd(await t.toArray());
-  legacy.close(); await target.open(); expect(target.verno).toBe(25);
+  legacy.close(); await target.open(); expect(target.verno).toBe(26);
   expect((await target.review_runs.get(run.id))!.patches[0].impact).toBeUndefined();
 });
 

@@ -6,6 +6,7 @@ import {
   type MessageRecord,
   QaxiomDatabase,
   qaxiomDatabase,
+  type SessionEventRecord,
   type SessionRecord,
   type SourceSpanRecord,
   loadSessionsFromDatabase,
@@ -34,9 +35,10 @@ import { parseExternalClaimLinkData, verifyExternalClaimLinkHashes, type Externa
 import { verifyDocumentContext } from './documentChat';
 import { EMPTY_CONTRACT } from './theory/types';
 import { parseAnalysisRuns, type AnalysisRun } from './theory/analysis';
+import { sanitizeEventPayload } from '../harness/sessionEvents';
 
 export const WORKSPACE_FORMAT = 'qaxiom-workspace';
-export const WORKSPACE_VERSION = 24;
+export const WORKSPACE_VERSION = 25;
 
 export interface WorkspaceMarkdownDocument {
   sessionId: string;
@@ -59,6 +61,7 @@ export interface WorkspaceBundle {
     pdfAssets: PdfAssetBackup[];
     reviewCampaigns: ReviewCampaign[];
     analysisRuns: AnalysisRun[];
+    sessionEvents: SessionEventRecord[];
   };
   markdown: WorkspaceMarkdownDocument[];
 }
@@ -161,7 +164,11 @@ export async function createWorkspaceBundle(
       embeddingActivations: await database.embedding_activations.toArray(),
       researchRelations: await database.research_relations.toArray(),
       externalClaims: await database.external_claims.toArray(),
-      externalClaimLinks: await database.external_claim_links.toArray()
+      externalClaimLinks: await database.external_claim_links.toArray(),
+      sessionEvents: (await database.session_events.toArray()).map(event => ({
+        ...event,
+        payload: sanitizeEventPayload(event.payload)
+      }))
     },
     markdown: hydratedSessions.map(session => ({
       sessionId: session.id,
@@ -225,7 +232,7 @@ function parseDocumentChatContext(value: unknown, theory: TheoryData): DocumentC
 }
 
 export function parseWorkspaceBundle(value: unknown): WorkspaceBundle {
-  if (!isRecord(value) || value.format !== WORKSPACE_FORMAT || ![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, WORKSPACE_VERSION].includes(Number(value.version)) || typeof value.version !== 'number') {
+  if (!isRecord(value) || value.format !== WORKSPACE_FORMAT || ![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, WORKSPACE_VERSION].includes(Number(value.version)) || typeof value.version !== 'number') {
     throw new Error('지원하지 않는 Qaxiom 작업공간 형식 또는 버전입니다.');
   }
   if (typeof value.exportedAt !== 'string' || !isRecord(value.data)) {
@@ -326,6 +333,19 @@ export function parseWorkspaceBundle(value: unknown): WorkspaceBundle {
     createdAt: requireNumber(record, 'createdAt'),
     updatedAt: requireNumber(record, 'updatedAt')
   } as JobRecord));
+  const sessionEventValues = Number(value.version) >= 25 && value.data.sessionEvents !== undefined
+    ? requireRecordArray(value.data.sessionEvents, 'sessionEvents')
+    : [];
+  const sessionEvents = sessionEventValues.map(record => ({
+    id: requireString(record, 'id'),
+    sessionId: requireString(record, 'sessionId'),
+    turnId: requireString(record, 'turnId'),
+    messageId: requireString(record, 'messageId'),
+    seq: requireNumber(record, 'seq'),
+    type: requireString(record, 'type') as SessionEventRecord['type'],
+    createdAt: requireNumber(record, 'createdAt'),
+    payload: isRecord(record.payload) ? sanitizeEventPayload(record.payload) : {}
+  }));
 
   assertUnique(sessions.map(record => record.id), '세션');
   assertUnique(messages.map(record => `${record.sessionId}\u0000${record.id}`), '메시지');
@@ -334,6 +354,7 @@ export function parseWorkspaceBundle(value: unknown): WorkspaceBundle {
   assertUnique(wikiPages.map(record => record.id), '위키');
   assertUnique(sourceSpans.map(record => record.id), '출처');
   assertUnique(jobs.map(record => record.id), '작업');
+  assertUnique(sessionEvents.map(record => record.id), '세션 이벤트');
 
   const sessionIds = new Set(sessions.map(record => record.id));
   const theoryIds = new Set(theory.theoryDocuments.map(record => record.id));
@@ -348,6 +369,9 @@ export function parseWorkspaceBundle(value: unknown): WorkspaceBundle {
   if (messages.some(record => !sessionIds.has(record.sessionId))) {
     throw new Error('존재하지 않는 세션을 참조하는 메시지가 있습니다.');
   }
+  if (sessionEvents.some(record => !sessionIds.has(record.sessionId))) {
+    throw new Error('존재하지 않는 세션을 참조하는 세션 이벤트가 있습니다.');
+  }
   if (documentChunks.some(record => !documentIds.has(record.documentId))) {
     throw new Error('존재하지 않는 문서를 참조하는 청크가 있습니다.');
   }
@@ -359,7 +383,7 @@ export function parseWorkspaceBundle(value: unknown): WorkspaceBundle {
     format: WORKSPACE_FORMAT,
     version: WORKSPACE_VERSION,
     exportedAt: value.exportedAt,
-    data: { sessions, messages, documents, documentChunks, wikiPages, sourceSpans, jobs, ...theory, ...references, ...review, ...embeddings, ...relations, ...externalClaims, ...externalClaimLinks, reviewCampaigns, analysisRuns, pdfAssets: pdfAssets.map(encodePdfAsset) },
+    data: { sessions, messages, documents, documentChunks, wikiPages, sourceSpans, jobs, ...theory, ...references, ...review, ...embeddings, ...relations, ...externalClaims, ...externalClaimLinks, reviewCampaigns, analysisRuns, sessionEvents, pdfAssets: pdfAssets.map(encodePdfAsset) },
     markdown: []
   };
 }
@@ -427,7 +451,8 @@ export async function restoreWorkspaceBundle(
     database.embedding_activations,
     database.research_relations,
     database.external_claims,
-    database.external_claim_links
+    database.external_claim_links,
+    database.session_events
   ];
 
   await database.transaction('rw', tables, async () => {
@@ -456,6 +481,7 @@ export async function restoreWorkspaceBundle(
     if (bundle.data.researchRelations.length) await database.research_relations.bulkAdd(bundle.data.researchRelations);
     if (bundle.data.externalClaims.length) await database.external_claims.bulkAdd(bundle.data.externalClaims);
     if (bundle.data.externalClaimLinks.length) await database.external_claim_links.bulkAdd(bundle.data.externalClaimLinks);
+    if (bundle.data.sessionEvents.length) await database.session_events.bulkAdd(bundle.data.sessionEvents);
   });
 
   resetPersistenceState();

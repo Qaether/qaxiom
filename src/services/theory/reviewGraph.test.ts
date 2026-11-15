@@ -55,7 +55,7 @@ it('records actual checked scope separately, keeps frozen approvals after retrac
   await finishReviewAttempt(campaign.id, attempt.token, run, db);
   expect(run.checkedBlockIds).toEqual([b.blockId]); expect(run.graph).toEqual(prepared.graph);
   await retractRelation(relation.id, 'Later retraction', db);
-  const bundle = await createWorkspaceBundle(db); expect(bundle.version).toBe(24); await restoreWorkspaceBundle(bundle, target);
+  const bundle = await createWorkspaceBundle(db); expect(bundle.version).toBe(25); await restoreWorkspaceBundle(bundle, target);
   expect((await target.review_runs.get(run.id))!.graph).toEqual(prepared.graph);
   expect(reviewToMarkdown(run, snapshot.version, snapshot.blocks)).toContain(prepared.graph.contextHash);
   const tampered = structuredClone(bundle); tampered.data.reviewRuns.find(r => r.id === run.id)!.graph!.contextHash = '0'.repeat(64);
@@ -87,7 +87,7 @@ it('imports genuine v9 backups and upgrades populated v9 without inventing graph
   await target.delete(); const legacy = new Dexie(target.name);
   legacy.version(9).stores(Object.fromEntries(db.tables.map(t => [t.name, [t.schema.primKey.src, ...t.schema.indexes.map(i => i.src)].join(',')])));
   for (const t of db.tables) await legacy.table(t.name).bulkAdd(await t.toArray());
-  legacy.close(); await target.open(); expect(target.verno).toBe(25); expect(await target.document_versions.get(snapshot.version.id)).toEqual(snapshot.version);
+  legacy.close(); await target.open(); expect(target.verno).toBe(26); expect(await target.document_versions.get(snapshot.version.id)).toEqual(snapshot.version);
 });
 it('previews long mandatory premises without truncation, transmission or budget reservation', async () => {
   const snapshot = await createTheory({ title: 'Large graph', markdown: `# 가정\n\nA ${'x'.repeat(23000)}\n\n# 결과\n\nB needs A.`, contract: { ...EMPTY_CONTRACT } }, db);

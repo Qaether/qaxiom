@@ -17,6 +17,7 @@ import * as graphService from './graphContext';
 import * as projectScopeService from './projectScope';
 import { DEFAULT_SETTINGS } from '../../constants';
 import type { ProviderCallbacks } from '../providers/gemini';
+import { flattenSystemBlocks } from '../providers/types';
 import type { ContextBundle } from './types';
 
 const provider = vi.hoisted(() => vi.fn());
@@ -117,7 +118,7 @@ it('imports genuine v11 graph answers and migrates populated v11 without requiri
   await target.delete(); const legacy = new Dexie(target.name);
   legacy.version(11).stores(Object.fromEntries(db.tables.map(t => [t.name, [t.schema.primKey.src, ...t.schema.indexes.map(i => i.src)].join(',')])));
   for (const table of db.tables) await legacy.table(table.name).bulkAdd(await table.toArray());
-  legacy.close(); await target.open(); expect(target.verno).toBe(25); expect((await target.messages.get(['s', 'm']))!.contextBundle).toEqual(bundle);
+  legacy.close(); await target.open(); expect(target.verno).toBe(26); expect((await target.messages.get(['s', 'm']))!.contextBundle).toEqual(bundle);
 });
 it.each(['gemini-4-carbon', 'gpt-6-astra', 'claude-sonnet-5'])('routes a graph-only question without any reference payload to %s', async model => {
   const { snapshot, graph } = await fixture(); const bundle = assembleContext('Only theory', [], [], { references: [], referenceSpans: [] }, snapshot.version, graph);
@@ -143,7 +144,7 @@ it('invalidates changed relations, accepted claims, selected reference provenanc
 });
 it('restores frozen graph answers after subsequent retraction, exports original context and rejects tampering atomically', async () => {
   const { bundle, relation } = await fixture(); await storeBundle(bundle); await retractRelation(relation.id, 'Later retraction', db);
-  const backup = await createWorkspaceBundle(db); expect(backup.version).toBe(24); await restoreWorkspaceBundle(backup, target);
+  const backup = await createWorkspaceBundle(db); expect(backup.version).toBe(25); await restoreWorkspaceBundle(backup, target);
   expect((await target.messages.get(['s', 'm']))!.contextBundle!.graph).toEqual(bundle.graph);
   const report = sessionToMarkdown({ id: 's', title: 'Session', createdAt: 1, updatedAt: 1, researchMode: 'general', selectedModel: 'gemini-4-carbon', messages: backup.data.messages });
   expect(report).toContain(bundle.graph!.context.contextHash); expect(report).toContain('[[G1]]'); expect(report).not.toContain('PRIVATE');
@@ -161,7 +162,7 @@ it('imports legacy v10 answers without inventing graph evidence and migrates a p
   await target.delete(); const legacy = new Dexie(target.name);
   legacy.version(10).stores(Object.fromEntries(db.tables.map(t => [t.name, [t.schema.primKey.src, ...t.schema.indexes.map(i => i.src)].join(',')])));
   for (const table of db.tables) await legacy.table(table.name).bulkAdd(await table.toArray());
-  legacy.close(); await target.open(); expect(target.verno).toBe(25); expect(await target.messages.count()).toBe(1);
+  legacy.close(); await target.open(); expect(target.verno).toBe(26); expect(await target.messages.count()).toBe(1);
 });
 it.each(['gemini-4-carbon', 'gpt-6-astra', 'claude-sonnet-5'])('sends approved graph as untrusted citation data and defers completion validation for %s', async model => {
   const { bundle } = await fixture(); const actual = assertGraphContextCurrent;
@@ -170,7 +171,7 @@ it.each(['gemini-4-carbon', 'gpt-6-astra', 'claude-sonnet-5'])('sends approved g
   provider.mockImplementation(async (...args: unknown[]) => { const callbacks = (model.startsWith('gpt') ? args[4] : args[5]) as ProviderCallbacks; callbacks.onFinish(); expect(handlers.onFinish).not.toHaveBeenCalled(); });
   await sendChatMessage([{ id: 'u', role: 'user', content: 'needle', timestamp: 1 }], model, 'general', { ...DEFAULT_SETTINGS, apiKeys: { ...DEFAULT_SETTINGS.apiKeys, openai: 'fake', anthropic: 'fake', gemini: 'fake' } }, handlers, undefined, bundle);
   expect(provider).toHaveBeenCalledOnce(); expect(handlers.onFinish).toHaveBeenCalledOnce(); expect(handlers.onError).not.toHaveBeenCalled();
-  expect(provider.mock.calls[0][0][0].content).toContain('G1'); expect(provider.mock.calls[0][2]).toContain('독립 외부 증거나 증명이 아니다');
+  expect(provider.mock.calls[0][0][0].content).toContain('G1'); expect(flattenSystemBlocks(provider.mock.calls[0][2])).toContain('독립 외부 증거나 증명이 아니다');
 });
 it('never invokes a provider with a stale graph and does not complete an answer when graph changes while streaming', async () => {
   const { bundle, relation } = await fixture(); const actual = assertGraphContextCurrent;

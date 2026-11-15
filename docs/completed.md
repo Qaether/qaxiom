@@ -1,5 +1,14 @@
 # Qaxiom 완료 내역
 
+> 2026-11-15 Qaxiom 통합 하네스(`src/harness/*`) 및 LLM Wiki 큐레이션 전면 재구성 완료:
+> 1. **Phase 1 — 통합 하네스 & 프로바이더 어댑터 정규화**: `runTurn` 단일 실행 진입점, `invokeProvider` (`src/services/providers/adapter.ts`), `SystemBlock[]` 캐싱, `ProviderUsage` 정규화, 미사용 고아 UI 4종 및 구형 `e2e/` 정리 완료.
+> 2. **Phase 2 — 경량 `session_events` 및 `useHarnessSession`**: Dexie v26 `session_events`, 400ms/512자 체크포인트(`CheckpointTracker`), `projectSessionRecovery` 복구, v25 백업/복원(`v1..v24` 역호환) 및 민감정보 필터링 완료.
+> 3. **Phase 3 — 계층형 컨텍스트 어셈블러 (`contextAssembler.ts`)**: 캐싱 프리픽스, 무손실 `contentHash` 중복 제거, 모델별 예산 관리 및 트리밍 완료.
+> 4. **Phase 4 — 스코프 로컬 도구 & `propose_patch` (`tools.ts`, `fileChanges.ts`)**: 승인된 `sourceIds` 범위 내 최대 3홉 도구 루프 및 hunk 기반 부분 수정 패치(`file_changes` fallback 유지) 완료.
+> 5. **Phase 5 — `harness_jobs` (`jobs.ts`)**: `TheoryWorkspace` 분할 분석 단계별 체크포인트·완료·취소/실패 영속화 연동 완료.
+> 6. **Phase 6 — LLM Wiki 큐레이션 (`wiki_curate`, `curateWikiEntry`)**: 사용자 승인 원문 기반 Wiki 카드 생성 및 `note`/`theory_snapshot` vs `paper` 분리 유지 완료.
+> 7. **제한 및 경계**: 실제 유료 LLM API 호출·원격 CI·배포·commit/push는 수행하지 않았으며, OCR은 명시적 비목표다.
+
 > 2026-10-13 오른쪽 채팅창 프롬프트 입력/파싱 버그 수정 및 '단 1회 클릭' 본문 즉시 확정 반영 & 양방향 상태 동기화:
 > 1. **한국어 IME 및 입력/출력 텍스트 잘림 방지 (`ChatInput.tsx`, `fileChanges.ts`, `constants.ts`)**:
 >    - `ChatInput.tsx`에서 `onCompositionStart` 및 `onCompositionEnd`를 완벽히 연동하고, Enter 키 입력 시 조합 중복/유실을 방지하며 `textareaRef` DOM 버퍼와 React 상태를 즉시 동기화 및 리셋하도록 개선함.

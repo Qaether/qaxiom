@@ -1,11 +1,13 @@
 /**
  * Google Antigravity 스타일의 'Files with changes' 블록 파서 및 유틸리티
  */
+import { applyPatchHunks, type PatchHunkProposal } from '../harness/tools';
 
 export interface FileChangeItem {
   id: string;
   filename: string;
   proposedContent: string;
+  hunks?: PatchHunkProposal[];
 }
 
 export interface ParsedMessageContent {
@@ -19,13 +21,51 @@ export interface ParsedMessageContent {
  */
 export function parseMessageFileChanges(
   content: string,
-  defaultFilename: string = 'document.md'
+  defaultFilename: string = 'document.md',
+  baseMarkdown?: string
 ): ParsedMessageContent {
   if (!content || typeof content !== 'string') {
     return { displayText: '', fileChanges: [] };
   }
 
   const fileChanges: FileChangeItem[] = [];
+
+  // 0. ```propose_patch ... ``` JSON hunk proposal block
+  const proposePatchRegex = /```propose_patch(?::([^\r\n]+))?\r?\n([\s\S]*?)\r?\n```/g;
+  let hasPatchBlock = false;
+  const strippedPatchText = content.replace(proposePatchRegex, (_match, rawFilename, rawJson) => {
+    try {
+      const parsed = JSON.parse(rawJson.trim()) as { hunks?: PatchHunkProposal[] };
+      if (parsed && Array.isArray(parsed.hunks) && parsed.hunks.length > 0) {
+        hasPatchBlock = true;
+        const filename = rawFilename?.trim() || defaultFilename;
+        const applied = baseMarkdown !== undefined
+          ? applyPatchHunks(baseMarkdown, parsed.hunks)
+          : { appliedMarkdown: '', appliedCount: 0, unmatchedHunks: parsed.hunks.length };
+        const proposedContent = applied.appliedCount > 0
+          ? applied.appliedMarkdown
+          : parsed.hunks.map(h => h.replacementText).join('\n\n');
+        fileChanges.push({
+          id: `patch-${fileChanges.length + 1}`,
+          filename,
+          proposedContent,
+          hunks: parsed.hunks
+        });
+        return '';
+      }
+    } catch {
+      // Ignore invalid JSON propose_patch blocks and fall back
+    }
+    return _match;
+  });
+
+  if (hasPatchBlock) {
+    const clean = strippedPatchText.trim();
+    return {
+      displayText: clean.length > 3 ? clean : '연구노트 본문의 부분 수정(hunk patch) 제안이 준비되었습니다.',
+      fileChanges
+    };
+  }
 
   // 1. ```file_changes:<filename> ... ``` 블록 파싱
   const fileChangeRegex = /```file_changes(?::([^\r\n]+))?\r?\n([\s\S]*?)\r?\n```/g;

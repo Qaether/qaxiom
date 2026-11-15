@@ -1,5 +1,10 @@
 # Qaxiom 연구노트 RAG 및 정합성 검토 계획
 
+> 2026-11-15 통합 하네스 컨텍스트 조립 및 LLM Wiki 탐색 계약:
+> 1. **승인 범위 격리(Approved Source Scope)**: `runTurn`의 로컬 도구(`search_selected_references`, `get_wiki_links`)는 현재 턴에 사용자가 승인한 `selectedSourceIds` 내부의 `reference_spans`만 조회하며 미선택 자료에는 접근하지 않는다.
+> 2. **계층형 프리픽스 및 무손실 해시 중복 제거**: `assembleTurnContext`는 정적 지침/ResearchContract를 캐싱 가능한 `SystemBlock[]`에 배치하고, 이전 턴의 동일한 `<qaxiom_research_document>` 반복 본문은 `contentHash` 참조로 압축하여 최신 턴의 정본 무결성을 유지한 채 토큰 낭비를 줄인다.
+> 3. **LLM Wiki 큐레이션 및 원본 연결 계약**: `wiki_curate` 작업과 `curateWikiEntry`는 사용자 승인 원문 스팬(`spanId`, `contentHash`)만 요약·연결하며, `note`·`theory_snapshot`을 외부 `paper` 증거로 승격하지 않는다. OCR은 명시적 비목표다.
+
 > 2026-10-13 LaTeX 수식 복원 및 정규화 계약: `latex_normalizer` 모드는 연구노트의 깨진 수식 문법을 KaTeX/MathJax 호환 형식으로 복원하여 `file_changes` 블록으로 산출하며, 변경 수식은 사용자의 명시적 수락 전까지 미반영 상태를 유지한다.
 
 > 2026-10-13 Google Antigravity 스타일 파일 변경 계약: 룰베이스 키워드 검사를 배제하고 정형 파일 변경 블록(`file_changes:document.md`)을 통해 문서를 수정한다. 대화창에는 1~3문장 요약 설명과 'Files with changes' 카드를 표시하고, 스트리밍 완료 시 가운데 에디터에 자동으로 인라인 Diff를 스테이징한다. 사용자의 명시적 수락(`[✓ 수락]` / `⌘↵`) 및 저장 전에는 정본 문서가 변조되지 않는다.

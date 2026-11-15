@@ -1,19 +1,21 @@
 import type { ChatMessage, ModelOption } from '../../types';
 import { consumeJsonSSE } from '../sse';
 import { validateApiKeyFormat } from './apiKey';
+import type { ProviderCallbacks, ProviderUsage, SystemBlock } from './types';
+
+export type { ProviderCallbacks, ProviderUsage, SystemBlock };
 
 interface GeminiStreamEvent {
   candidates?: Array<{
     content?: { parts?: Array<{ text?: string; thought?: boolean }> };
   }>;
+  usageMetadata?: {
+    promptTokenCount?: number;
+    candidatesTokenCount?: number;
+    cachedContentTokenCount?: number;
+    totalTokenCount?: number;
+  };
   error?: { message?: string };
-}
-
-export interface ProviderCallbacks {
-  onChunk: (chunk: string) => void;
-  onReasoningSummary?: (chunk: string) => void;
-  onError: (error: Error) => void;
-  onFinish: () => void;
 }
 
 /**
@@ -23,7 +25,7 @@ export interface ProviderCallbacks {
 export async function streamGemini(
   messages: ChatMessage[],
   model: ModelOption,
-  systemPrompt: string,
+  systemPrompt: string | SystemBlock[],
   apiKey: string,
   temperature: number,
   callbacks: ProviderCallbacks,
@@ -39,10 +41,14 @@ export async function streamGemini(
   const cleanKey = validateApiKeyFormat(apiKey, 'Gemini');
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model.id}:streamGenerateContent?alt=sse&key=${encodeURIComponent(cleanKey)}`;
 
+  const systemParts = typeof systemPrompt === 'string'
+    ? [{ text: systemPrompt }]
+    : systemPrompt.filter(block => block.text.length > 0).map(block => ({ text: block.text }));
+
   const requestBody = {
     contents,
     systemInstruction: {
-      parts: [{ text: systemPrompt }]
+      parts: systemParts.length ? systemParts : [{ text: '' }]
     },
     generationConfig: {
       ...(model.supportsTemperature ? { temperature } : {}),
@@ -60,7 +66,7 @@ export async function streamGemini(
   if (!response.ok) {
     const errorJson = await response.json().catch(() => ({}));
     const rawMessage = errorJson.error?.message || `상태 코드 ${response.status}`;
-    
+
     if (rawMessage.includes('API_KEY_INVALID') || rawMessage.includes('API key not valid')) {
       throw new Error('Google Gemini API 키가 유효하지 않습니다. Google AI Studio에서 올바른 API 키를 복사하여 [설정]에 입력해 주세요.');
     }
@@ -75,10 +81,20 @@ export async function streamGemini(
 
   if (!response.body) throw new Error('스트리밍 응답 스트림을 읽을 수 없습니다.');
 
+  let latestUsage: ProviderUsage | undefined;
+
   await consumeJsonSSE(response.body, payload => {
     const event = payload as GeminiStreamEvent;
     if (event.error?.message) {
       throw new Error(`Gemini 스트리밍 오류: ${event.error.message}`);
+    }
+    if (event.usageMetadata) {
+      latestUsage = {
+        inputTokens: event.usageMetadata.promptTokenCount,
+        outputTokens: event.usageMetadata.candidatesTokenCount,
+        cacheReadTokens: event.usageMetadata.cachedContentTokenCount,
+        totalTokens: event.usageMetadata.totalTokenCount
+      };
     }
     for (const part of event.candidates?.[0]?.content?.parts ?? []) {
       if (!part.text) continue;
@@ -87,5 +103,6 @@ export async function streamGemini(
     }
   });
 
+  if (latestUsage) callbacks.onUsage?.(latestUsage);
   callbacks.onFinish();
 }

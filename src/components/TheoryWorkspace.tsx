@@ -10,7 +10,8 @@ import DocumentAnalysisView from './DocumentAnalysisView';
 import type { AnalysisProgress } from './DocumentAnalysisView';
 import { preprocessLatex } from './mathMarkdown';
 import { applyAnalysisSuggestion, deleteAnalysisRun, parseDocumentAnalysis, prepareDocumentAnalysis, prepareChunkedDocumentAnalysis, parseChunkedDocumentAnalysis, setAnalysisDecision, type AnalysisFinding, type AnalysisRun } from '../services/theory/analysis';
-import { sendChatMessage } from '../services/llm';
+import { runTurn } from '../harness/runTurn';
+import { checkpointHarnessJob, completeHarnessJob, failHarnessJob, startHarnessJob } from '../harness/jobs';
 import ContractSuggestionAssistant from './ContractSuggestionAssistant';
 import type { UserSettings } from '../types';
 import type { DocumentDraft } from '../services/documentChat';
@@ -504,6 +505,12 @@ export default function TheoryWorkspace({
         limitations: [], checkedBlockIds: [], error: ''
       };
       await qaxiomDatabase.analysis_runs.add(activeRun);
+      await startHarnessJob({
+        id: activeRun.id,
+        type: 'document_analysis',
+        totalSteps: useChunking ? undefined : 1,
+        checkpoint: { documentId: target.document.id, versionId: target.version.id }
+      });
       setAnalysisRun(activeRun); setEditorTab('analysis');
       setAnalysisProgress({ runId: activeRun.id, stage: 'Preparing analysis request', startedAt: Date.now(), receivedChars: 0, reasoningSummary: '' });
       setAnalysisHistory(previous => [activeRun!, ...previous]);
@@ -532,35 +539,49 @@ export default function TheoryWorkspace({
           const chunk = chunks[i];
           updateProgress({ stage: `Waiting for model response · Section ${i + 1}/${chunks.length}` });
 
-          let response = ''; let failure: Error | null = null; let reportedChars = 0;
-          await sendChatMessage([{ id: crypto.randomUUID(), role: 'user', content: chunk.requestPrompt, timestamp: Date.now() }], targetModelId,
-            'document_analysis', settings, {
-              onChunk: c => {
-                response += c;
-                if (reportedChars === 0 || response.length - reportedChars >= 2048) {
-                  reportedChars = response.length;
-                  updateProgress({ stage: `Receiving results · Section ${i + 1}/${chunks.length}`, receivedChars: receivedTotal + response.length });
-                }
-                if (response.length > 2_000_000) { failure = new Error('Analysis response is too long.'); abort.abort(); }
-              },
-              onReasoningSummary: appendReasoningSummary,
-              onError: cause => { failure = cause; }, onFinish: () => { }
-          }, abort.signal);
+          let reportedChars = 0;
+          const result = await runTurn(
+            {
+              kind: 'document_analysis',
+              messages: [{ id: crypto.randomUUID(), role: 'user', content: chunk.requestPrompt, timestamp: Date.now() }],
+              modelId: targetModelId,
+              researchMode: 'document_analysis',
+              settings
+            },
+            {
+              signal: abort.signal,
+              callbacks: {
+                onChunk: (_chunk, accumulated) => {
+                  if (reportedChars === 0 || accumulated.length - reportedChars >= 2048) {
+                    reportedChars = accumulated.length;
+                    updateProgress({ stage: `Receiving results · Section ${i + 1}/${chunks.length}`, receivedChars: receivedTotal + accumulated.length });
+                  }
+                },
+                onReasoningSummary: appendReasoningSummary
+              }
+            }
+          );
 
-          if (failure) throw failure;
-          if (abort.signal.aborted) throw new Error('Analysis was canceled.');
+          if (result.aborted) throw new Error('Analysis was canceled.');
 
           updateProgress({ stage: `Validating response · Section ${i + 1}/${chunks.length}` });
           const chunkSnapshot: TheorySnapshot = { ...target, blocks: chunk.blocks };
-          const subRun = parseDocumentAnalysis(response, chunkSnapshot, targetModelId);
+          const subRun = parseDocumentAnalysis(result.text, chunkSnapshot, targetModelId);
           subRuns.push(subRun);
-          receivedTotal += response.length;
+          receivedTotal += result.text.length;
           updateProgress({ receivedChars: receivedTotal });
+          await checkpointHarnessJob(activeRun.id, i + 1, {
+            documentId: target.document.id,
+            versionId: target.version.id,
+            totalChunks: chunks.length,
+            lastCompletedChunk: i + 1
+          });
         }
 
         const completed = parseChunkedDocumentAnalysis(subRuns, target, targetModelId);
         completed.id = activeRun.id; completed.createdAt = activeRun.createdAt;
         await qaxiomDatabase.analysis_runs.put(completed);
+        await completeHarnessJob(activeRun.id);
         setAnalysisRun(completed);
         updateProgress({ stage: 'Analysis complete' });
         setAnalysisHistory(previous => previous.map(item => item.id === completed.id ? completed : item));
@@ -569,26 +590,34 @@ export default function TheoryWorkspace({
         // Unified Single-Context Analysis (Single Context Mode)
         const request = await prepareDocumentAnalysis(target, { focusInstruction: overrideInstruction });
         updateProgress({ stage: 'Waiting for model response' });
-        let response = ''; let failure: Error | null = null; let reportedChars = 0;
-        await sendChatMessage([{ id: crypto.randomUUID(), role: 'user', content: request, timestamp: Date.now() }], targetModelId,
-          'document_analysis', settings, {
-            onChunk: chunk => {
-              response += chunk;
-              if (reportedChars === 0 || response.length - reportedChars >= 2048) {
-                reportedChars = response.length;
-                updateProgress({ stage: 'Receiving results', receivedChars: response.length });
-              }
-              if (response.length > 2_000_000) { failure = new Error('Analysis response is too long.'); abort.abort(); }
-            },
-            onReasoningSummary: appendReasoningSummary,
-            onError: cause => { failure = cause; }, onFinish: () => { }
-        }, abort.signal);
-        if (failure) throw failure;
-        if (abort.signal.aborted) throw new Error('Analysis was canceled.');
-        updateProgress({ stage: 'Validating response', receivedChars: response.length });
-        const completed = parseDocumentAnalysis(response, target, targetModelId);
+        let reportedChars = 0;
+        const result = await runTurn(
+          {
+            kind: 'document_analysis',
+            messages: [{ id: crypto.randomUUID(), role: 'user', content: request, timestamp: Date.now() }],
+            modelId: targetModelId,
+            researchMode: 'document_analysis',
+            settings
+          },
+          {
+            signal: abort.signal,
+            callbacks: {
+              onChunk: (_chunk, accumulated) => {
+                if (reportedChars === 0 || accumulated.length - reportedChars >= 2048) {
+                  reportedChars = accumulated.length;
+                  updateProgress({ stage: 'Receiving results', receivedChars: accumulated.length });
+                }
+              },
+              onReasoningSummary: appendReasoningSummary
+            }
+          }
+        );
+        if (result.aborted) throw new Error('Analysis was canceled.');
+        updateProgress({ stage: 'Validating response', receivedChars: result.text.length });
+        const completed = parseDocumentAnalysis(result.text, target, targetModelId);
         completed.id = activeRun.id; completed.createdAt = activeRun.createdAt;
         await qaxiomDatabase.analysis_runs.put(completed);
+        await completeHarnessJob(activeRun.id);
         setAnalysisRun(completed);
         updateProgress({ stage: 'Analysis complete' });
         setAnalysisHistory(previous => previous.map(item => item.id === completed.id ? completed : item));
@@ -601,6 +630,7 @@ export default function TheoryWorkspace({
         const failed: AnalysisRun = { ...activeRun, status: abort.signal.aborted ? 'stopped' : 'failed', error: message };
         setAnalysisProgress(previous => previous?.runId === failed.id ? { ...previous, stage: failed.status === 'stopped' ? 'Analysis canceled' : 'Analysis failed' } : previous);
         await qaxiomDatabase.analysis_runs.put(failed);
+        await failHarnessJob(activeRun.id, message, abort.signal.aborted);
         setAnalysisRun(failed);
         setAnalysisHistory(previous => previous.map(item => item.id === failed.id ? failed : item));
       }

@@ -10,14 +10,11 @@ import { SettingsModal } from './components/SettingsModal';
 import { chooseWorkspaceDirectory, writeTheoryDocumentsToDirectory, writeWorkspaceBackupToDirectory } from './services/folderExport';
 import type { ChatSession, UserSettings, ResearchMode } from './types';
 import { saveSessions, createNewSession, loadSettings, saveSettings } from './services/storage';
-import { sendChatMessage } from './services/llm';
 import { AVAILABLE_MODELS, resolveModelId } from './constants';
 import {
-  appendAssistantChunk,
   createAssistantMessage,
   createUserMessage,
-  getRetryContext,
-  settleAssistantMessage
+  getRetryContext
 } from './services/chatState';
 import { flushSessionWrites, loadSessionsFromDatabase } from './services/database';
 import { listTheories, loadTheory } from './services/theory/documents';
@@ -26,7 +23,7 @@ import { deleteProjectFolder, folderPermission, getActiveProjectFolder, listRece
 import type { ContextBundle, ContextEvidence } from './services/retrieval/types';
 import { withReferenceContext } from './services/retrieval/context';
 import { captureDocumentContext, sessionsForDocument, verifyDocumentContext, withDocumentContext, type DocumentDraft } from './services/documentChat';
-import { classifyChatRoute, internalLightModel, LIGHT_CHAT_MODELS } from './services/chatRouting';
+import { internalLightModel, LIGHT_CHAT_MODELS, obviousLightGreeting } from './services/chatRouting';
 import {
   createWorkspaceBundle,
   restoreWorkspaceBundle,
@@ -34,7 +31,7 @@ import {
 } from './services/workspace';
 
 import type { IncomingDraftAction } from './components/TheoryWorkspace';
-import { parseMessageFileChanges } from './services/fileChanges';
+import { useHarnessSession } from './hooks/useHarnessSession';
 
 const ChatMessage = React.lazy(() => import('./components/ChatMessage'));
 const TheoryWorkspace = React.lazy(() => import('./components/TheoryWorkspace'));
@@ -101,7 +98,7 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
   const [currentSessionId, setCurrentSessionId] = useState(initialState.currentSessionId);
   const [settings, setSettings] = useState<UserSettings>(initialState.settings);
   const [isSettingsOpen, setIsSettingsOpen] = useState(initialState.isSettingsOpen);
-  const [isStreaming, setIsStreaming] = useState(false);
+  const { isStreaming, stopStreaming, executeChatTurn } = useHarnessSession(setSessions);
   const [persistenceError, setPersistenceError] = useState<string | null>(null);
   const [isTheoryOpen, setIsTheoryOpen] = useState(false);
   const [openedProject, setOpenedProject] = useState<OpenedProject | null>(null);
@@ -154,7 +151,6 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
   const [isDeletingDocument, setIsDeletingDocument] = useState(false);
   const documentDeleteCancelRef = useRef<HTMLButtonElement>(null);
   const documentDeleteTriggerRef = useRef<HTMLButtonElement | null>(null);
-  const routingRef = useRef(false);
 
   useEffect(() => {
     if (pendingDeleteSessionId) deleteDialogCancelRef.current?.focus();
@@ -228,9 +224,6 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
     requestAnimationFrame(() => mobileMenuButtonRef.current?.focus());
   };
 
-  const abortControllerRef = useRef<AbortController | null>(null);
-  const activeStreamRef = useRef<{ sessionId: string; messageId: string } | null>(null);
-  const stoppedMessageIdsRef = useRef(new Set<string>());
   const deletingSessionRef = useRef(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -517,34 +510,14 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
   };
 
   // Stop streaming
-  const handleStopStreaming = () => {
-    const activeStream = activeStreamRef.current;
-    if (activeStream) {
-      stoppedMessageIdsRef.current.add(activeStream.messageId);
-      setSessions(prev => prev.map(session => {
-        if (session.id !== activeStream.sessionId) return session;
-        return {
-          ...session,
-          messages: session.messages.map(message =>
-            message.id === activeStream.messageId
-              ? settleAssistantMessage(message, { type: 'stop' })
-              : message
-          )
-        };
-      }));
-    }
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
-    }
-  };
+  const handleStopStreaming = stopStreaming;
 
   // Send message
   const handleSendMessage = async (
     userPrompt: string,
     options?: { retryAssistantMessageId?: string; contextBundle?: ContextBundle }
   ) => {
-    if (!currentSession || isStreaming || routingRef.current || deletingSessionRef.current) return;
+    if (!currentSession || isStreaming || deletingSessionRef.current) return;
     if (!theoryDocumentId || currentSession.documentId !== theoryDocumentId) return;
 
     const retryContext = options?.retryAssistantMessageId
@@ -580,15 +553,11 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
       ? currentSession.messages.find(message => message.id === options.retryAssistantMessageId)?.contextBundle : undefined);
     const priorAnswer = options?.retryAssistantMessageId
       ? currentSession.messages.find(message => message.id === options.retryAssistantMessageId) : undefined;
-    routingRef.current = true;
-    let route: 'light' | 'research';
-    try {
-      route = contextBundle || currentSession.researchMode !== 'general' ? 'research'
-        : priorAnswer ? internalLightModel(priorAnswer.model ?? '') ? 'light' : 'research'
-          : await classifyChatRoute(userPrompt, model.provider, apiKey);
-    } finally {
-      routingRef.current = false;
-    }
+    const route: 'light' | 'research' = contextBundle || currentSession.researchMode !== 'general'
+      ? 'research'
+      : priorAnswer
+        ? (internalLightModel(priorAnswer.model ?? '') ? 'light' : 'research')
+        : (obviousLightGreeting(userPrompt) ? 'light' : 'research');
     const responseModel = route === 'light' ? LIGHT_CHAT_MODELS[model.provider] ?? model : model;
     const assistantMessage = createAssistantMessage(responseModel.name, currentSession.researchMode);
     if (contextBundle) assistantMessage.contextBundle = contextBundle;
@@ -637,87 +606,20 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
       )
     );
 
-    setIsStreaming(true);
-    abortControllerRef.current = new AbortController();
-    activeStreamRef.current = { sessionId: currentSession.id, messageId: assistantMessageId };
-
-    await sendChatMessage(
-      route === 'light' ? [updatedMessages.at(-1)!] : updatedMessages,
-      responseModel.id,
-      currentSession.researchMode,
+    await executeChatTurn({
+      sessionId: currentSession.id,
+      assistantMessageId,
+      modelId: responseModel.id,
+      researchMode: currentSession.researchMode,
       settings,
-      {
-        onChunk: (chunk: string) => {
-          if (stoppedMessageIdsRef.current.has(assistantMessageId)) return;
-          setSessions(prev =>
-            prev.map(s => {
-              if (s.id !== currentSession.id) return s;
-              return {
-                ...s,
-                messages: s.messages.map(m =>
-                  m.id === assistantMessageId
-                    ? appendAssistantChunk(m, chunk)
-                    : m
-                )
-              };
-            })
-          );
-        },
-        onError: (err: Error) => {
-          if (activeStreamRef.current?.messageId === assistantMessageId) {
-            setIsStreaming(false);
-            activeStreamRef.current = null;
-            abortControllerRef.current = null;
-          }
-          setSessions(prev =>
-            prev.map(s => {
-              if (s.id !== currentSession.id) return s;
-              return {
-                ...s,
-                messages: s.messages.map(m =>
-                  m.id === assistantMessageId
-                    ? settleAssistantMessage(m, { type: 'error', message: err.message })
-                    : m
-                )
-              };
-            })
-          );
-        },
-        onFinish: () => {
-          const wasStopped = stoppedMessageIdsRef.current.delete(assistantMessageId);
-          if (activeStreamRef.current?.messageId === assistantMessageId) {
-            setIsStreaming(false);
-            activeStreamRef.current = null;
-            abortControllerRef.current = null;
-          }
-          setSessions(prev =>
-            prev.map(s => {
-              if (s.id !== currentSession.id) return s;
-              const nextMessages = s.messages.map(m =>
-                m.id === assistantMessageId
-                  ? settleAssistantMessage(m, { type: wasStopped ? 'stop' : 'finish' })
-                  : m
-              );
-              if (!wasStopped) {
-                const finishedMsg = nextMessages.find(m => m.id === assistantMessageId);
-                if (finishedMsg?.content) {
-                  const parsed = parseMessageFileChanges(finishedMsg.content);
-                  if (parsed.fileChanges.length > 0) {
-                    setActiveChangeStatus('pending');
-                    // Auto-stage in central workspace with Cursor/Antigravity inline diff
-                    handleApplyToDocument(parsed.fileChanges[0].proposedContent);
-                  }
-                }
-              }
-              return { ...s, messages: nextMessages };
-            })
-          );
-        }
-      },
-      abortControllerRef.current.signal,
-      route === 'research' ? contextBundle : undefined,
-      route === 'research' ? documentContext : undefined
-    );
+      messages: route === 'light' ? [updatedMessages.at(-1)!] : updatedMessages,
+      contextBundle: route === 'research' ? contextBundle : undefined,
+      documentContext: route === 'research' ? documentContext : undefined,
+      onProposedChange: proposedContent => {
+        setActiveChangeStatus('pending');
+        handleApplyToDocument(proposedContent);
+      }
+    });
   };
 
   const handleRetryMessage = (assistantMessageId: string) => {

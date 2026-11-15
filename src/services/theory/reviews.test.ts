@@ -30,7 +30,7 @@ it('migrates populated v4 without altering canonical documents and references', 
   legacy.version(4).stores(Object.fromEntries(tables.map(table => [table.name, [table.schema.primKey.src, ...table.schema.indexes.map(index => index.src)].join(',')])));
   for (const table of tables) await legacy.table(table.name).bulkAdd(await db.table(table.name).toArray());
   legacy.close(); await target.open();
-  expect(target.verno).toBe(25);
+  expect(target.verno).toBe(26);
   expect((await loadTheory(snapshot.document.id, target)).version).toEqual(snapshot.version);
   expect(await target.review_runs.count()).toBe(0);
 });
@@ -111,7 +111,7 @@ it('restores review/claim/issue/patch references and genuine v4 data, refusing c
   const { run } = await fixture(); await storeReview(run, db);
   await applyTheoryPatch(run.id, run.patches[0].id, db);
   const backup = await createWorkspaceBundle(db);
-  expect(backup.version).toBe(24);
+  expect(backup.version).toBe(25);
   await restoreWorkspaceBundle(JSON.parse(JSON.stringify(backup)), target);
   expect((await createWorkspaceBundle(target)).data).toEqual(backup.data);
   const invalid = structuredClone(backup); invalid.data.reviewRuns[0].patches[0].beforeHash = 'changed';

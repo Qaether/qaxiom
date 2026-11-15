@@ -24,7 +24,7 @@ it('appends schema v6 and preserves populated v5 workspaces', async () => {
   legacy.version(5).stores(Object.fromEntries(tables.map(t => [t.name, [t.schema.primKey.src, ...t.schema.indexes.map(i => i.src)].join(',')])));
   for (const table of tables) await legacy.table(table.name).bulkAdd(await table.toArray());
   legacy.close(); await target.open();
-  expect(target.verno).toBe(25); expect(await target.document_versions.get(snapshot.version.id)).toEqual(snapshot.version);
+  expect(target.verno).toBe(26); expect(await target.document_versions.get(snapshot.version.id)).toEqual(snapshot.version);
   expect(await target.review_campaigns.count()).toBe(0);
 });
 

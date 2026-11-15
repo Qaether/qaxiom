@@ -1,5 +1,11 @@
 # Qaxiom 구현 계획서
 
+> 2026-11-15 Qaxiom 통합 하네스(`src/harness/*`) 및 LLM Wiki 큐레이션 재구성:
+> 1. **단일 실행 루프(`runTurn`) 및 프로바이더 정규화**: 기존 분산된 `sendChatMessage` 호출을 통합 하네스 `runTurn`으로 일원화하고, 미사용 고아 UI 컴포넌트(`TheoryReview`, `ExternalReview`, `ExternalRelationApproval`, `PatchImpact`)를 제거했다. `src/services/providers/adapter.ts` 및 `SystemBlock[]`를 통해 OpenAI/Gemini/Anthropic의 프롬프트 캐싱 힌트와 토큰 사용량(`ProviderUsage`)을 정규화했다.
+> 2. **경량 세션 이벤트 로그 및 새로고침 복구**: Dexie v26에 `session_events` 테이블과 `useHarnessSession` 훅을 추가하고, 400ms/512자 단위 체크포인트(`CheckpointTracker`)로 스트리밍 중단·새로고침 복구(`projectSessionRecovery`)를 지원한다. 백업 번들 v25는 `v1..v24` 이전 백업 역호환성을 유지하며 API 키·원본 PDF 바이트를 절대 저장하지 않는다.
+> 3. **계층형 컨텍스트 어셈블러 및 로컬 스코프 도구**: `contextAssembler.ts`가 캐싱 가능한 정적 프리픽스, 이전 턴 중복 스냅샷의 무손실 해시 참조 치환, 모델별 컨텍스트 예산 관리를 수행한다. `tools.ts`는 승인된 `sourceIds` 범위 내의 bounded tool loop(`get_block`, `get_definition`, `search_selected_references`, `list_wiki_index`, `get_wiki_links`, `propose_patch`, 최대 3홉)와 부분 수정 hunk 패치(`propose_patch`)를 제공한다.
+> 4. **장기 작업(`harness_jobs`) 및 LLM Wiki 큐레이션(`wiki_curate`)**: `jobs.ts`로 분할 문서 분석 체크포인트를 관리하며, `curateWikiEntry`가 사용자 승인 원문 기반 Wiki 카드 큐레이션(내부 노트/이론 스냅샷과 외부 문헌 분리 유지)을 수행한다. OCR은 명시적 비목표다.
+
 > 2026-10-13 'LaTeX 수식 복원 및 정규화' 전용 연구 모드 신설: 연구노트 본문의 깨지거나 불완전한 수식 문법을 점검하여 KaTeX/MathJax 표준 규격으로 복원하는 `latex_normalizer` 모드를 신설하고, Antigravity 스타일의 'Files with changes' 및 인라인 Diff와 결합했다.
 
 > 2026-10-13 Google Antigravity 스타일 'Files with changes' 위젯 및 중앙 에디터 자동 인라인 Diff 연동: 룰베이스 키워드 검사를 전면 배제하고 구조화된 파일 변경 블록(`file_changes:document.md`) 프로토콜을 도입했다. 오른쪽 채팅창에는 도배 없이 1~3문장의 간결한 요약 설명과 함께 Antigravity 스타일의 'Files with changes' 카드를 표시하고, 스트리밍 완료 시 자동으로 중앙 에디터의 인라인 Diff 검토 모드로 직행하여 사용자가 즉시 수락(`⌘↵`)/거절(`Esc`)할 수 있도록 구현했다.

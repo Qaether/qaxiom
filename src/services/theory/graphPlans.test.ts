@@ -102,7 +102,7 @@ it('round trips frozen plans after later retraction and rejects hash/scope/appro
   const { snapshot, b, relations, campaign } = await fixture(10, 10);
   const saved = await saveReviewPlan(campaign.id, snapshot, [b.blockId], db, true);
   await retractRelation(relations[0].id, '나중에 철회', db);
-  const bundle = await createWorkspaceBundle(db); expect(bundle.version).toBe(24);
+  const bundle = await createWorkspaceBundle(db); expect(bundle.version).toBe(25);
   await restoreWorkspaceBundle(bundle, target);
   expect((await target.review_campaigns.get(campaign.id))!.plan).toEqual(saved.plan);
   for (const mutate of [
@@ -125,6 +125,6 @@ it('imports genuine v12 plans and upgrades populated v12 without inventing graph
   await target.delete(); const legacy = new Dexie(target.name);
   legacy.version(12).stores(Object.fromEntries(db.tables.map(t => [t.name, [t.schema.primKey.src, ...t.schema.indexes.map(i => i.src)].join(',')])));
   for (const t of db.tables) await legacy.table(t.name).bulkAdd(await t.toArray());
-  legacy.close(); await target.open(); expect(target.verno).toBe(25);
+  legacy.close(); await target.open(); expect(target.verno).toBe(26);
   expect((await target.review_campaigns.get(campaign.id))!.plan).toEqual(bundle.data.reviewCampaigns[0].plan);
 });
