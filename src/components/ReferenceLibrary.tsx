@@ -7,7 +7,7 @@ import { MAX_PDF_BYTES, type PdfAsset } from '../services/retrieval/pdfTypes';
 import './References.css';
 import { deleteUnlinkedPdfAsset, deleteUnusedReference } from '../services/retrieval/referenceDeletion';
 import {
-  FileText, Globe, BookOpen, Trash2, Eye, Plus, Search, Upload, X, Folder
+  FileText, Globe, BookOpen, Trash2, Eye, Plus, Upload, X, Folder
 } from 'lucide-react';
 
 const referenceRoleLabel: Record<ReferenceRole, string> = {
@@ -45,7 +45,6 @@ export default function ReferenceLibrary({ onClose, canDelete }: {
   const [pdfs, setPdfs] = useState<PdfSummary[]>([]);
   const [original, setOriginal] = useState<{ id: string; name: string } | null>(null);
   const [sources, setSources] = useState<ReferenceDocument[]>([]);
-  const [filterQuery, setFilterQuery] = useState('');
   const [isUploadCardOpen, setIsUploadCardOpen] = useState(false);
   const [role, setRole] = useState<ReferenceRole>('external');
   const [busy, setBusy] = useState(false);
@@ -119,8 +118,8 @@ export default function ReferenceLibrary({ onClose, canDelete }: {
     finally { setBusy(false); }
   };
 
-  const filteredSources = sources.filter(source =>
-    source.name.toLowerCase().includes(filterQuery.toLowerCase())
+  const pendingOrIssuePdfs = pdfs.filter(
+    asset => asset.status !== 'ready' || !sources.some(source => source.pdf?.assetId === asset.id)
   );
 
   return (
@@ -138,42 +137,30 @@ export default function ReferenceLibrary({ onClose, canDelete }: {
           </h2>
           <p>List of reference materials (PDFs, papers, web documents, research notes) available in the current project.</p>
         </div>
-        <button type="button" className="reference-dialog-close-btn" onClick={close} disabled={busy}>
-          <X size={16} /> Close
+        <button
+          type="button"
+          className="reference-dialog-close-btn"
+          onClick={close}
+          disabled={busy}
+          aria-label="Close"
+          title="Close"
+        >
+          <X size={16} />
         </button>
       </header>
 
       {error && <p role="alert">{error}</p>}
       {status && <p role="status">{status}</p>}
 
-      {/* Search & Upload Toolbar */}
+      {/* Upload Toolbar */}
       <div className="ref-catalog-toolbar">
-        <div className="ref-search-bar">
-          <Search size={16} />
-          <input
-            type="text"
-            placeholder="Search registered reference filenames..."
-            value={filterQuery}
-            onChange={e => setFilterQuery(e.target.value)}
-          />
-          {filterQuery && (
-            <button
-              type="button"
-              style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer' }}
-              onClick={() => setFilterQuery('')}
-            >
-              <X size={14} />
-            </button>
-          )}
-        </div>
-
         <button
           type="button"
           className="ref-add-toggle-btn"
           onClick={() => setIsUploadCardOpen(prev => !prev)}
         >
           {isUploadCardOpen ? <X size={16} /> : <Plus size={16} />}
-          <span>{isUploadCardOpen ? 'Close Registration' : 'Add Reference'}</span>
+          <span>{isUploadCardOpen ? 'Close' : 'Add'}</span>
         </button>
       </div>
 
@@ -214,12 +201,12 @@ export default function ReferenceLibrary({ onClose, canDelete }: {
         </div>
       )}
 
-      {/* PDF Extraction Status Card */}
-      {!!pdfs.length && (
+      {/* PDF Extraction Status Card (only shown while processing, incomplete, or unlinked) */}
+      {!!pendingOrIssuePdfs.length && (
         <section aria-label="PDF Processing Status" style={{ marginBottom: '20px' }}>
           <h4 style={{ fontSize: '0.9rem', color: '#cbd5e1', marginBottom: '10px' }}>PDF Processing & Extraction Status</h4>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {pdfs.map(asset => (
+            {pendingOrIssuePdfs.map(asset => (
               <div key={asset.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(255,255,255,0.03)', padding: '10px 14px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)' }}>
                 <span style={{ fontSize: '0.85rem', color: '#e2e8f0' }}>
                   <strong>{asset.name}</strong> · {pdfStatusLabel[asset.status]} ({asset.completedPages}/{asset.pageCount || '?'} pages)
@@ -250,10 +237,10 @@ export default function ReferenceLibrary({ onClose, canDelete }: {
 
       {/* Main Reference Catalog List (Card Style) */}
       <h3 style={{ fontSize: '0.95rem', fontWeight: 600, color: '#f1f5f9', marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span>Registered Project References ({filteredSources.length})</span>
+        <span>Registered Project References ({sources.length})</span>
       </h3>
 
-      {filteredSources.length === 0 ? (
+      {sources.length === 0 ? (
         <div className="ref-empty-box">
           <Folder size={36} style={{ color: '#64748b', opacity: 0.6 }} />
           <h4>No Registered References</h4>
@@ -263,12 +250,12 @@ export default function ReferenceLibrary({ onClose, canDelete }: {
             className="ref-add-toggle-btn"
             onClick={() => setIsUploadCardOpen(true)}
           >
-            <Plus size={16} /> Add Reference File
+            <Plus size={16} /> Add
           </button>
         </div>
       ) : (
         <div className="ref-card-list">
-          {filteredSources.map(source => {
+          {sources.map(source => {
             const isPdf = Boolean(source.pdf);
             const isTheory = source.role === 'theory_snapshot';
             const isNote = source.role === 'note';
