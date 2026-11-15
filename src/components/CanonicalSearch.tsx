@@ -15,31 +15,31 @@ export default function CanonicalSearch({ snapshot, query, selected, onSelect }:
     cancel(); setCandidates([]); setSearched(false); setError(''); setBusy(true);
     const abort = new AbortController(); controller.current = abort;
     const fail = (message: string) => { if (abort.signal.aborted) return; cancel(); setError(message); };
-    timer.current = window.setTimeout(() => fail('정본 검색이 30초 한도를 넘었습니다. 자동 재시도하지 않습니다.'), 30000);
+    timer.current = window.setTimeout(() => fail('Canonical search exceeded the 30-second limit. It will not retry automatically.'), 30000);
     try {
       const engine = new Worker(new URL('../services/retrieval/canonical.worker.ts', import.meta.url), { type: 'module' }); worker.current = engine;
       engine.onmessage = (event: MessageEvent<{ hits?: CanonicalHit[]; error?: string }>) => {
         engine.terminate(); worker.current = null;
-        if (event.data.error || !event.data.hits) { fail(event.data.error ?? '정본 후보 응답이 없습니다.'); return; }
+        if (event.data.error || !event.data.hits) { fail(event.data.error ?? 'No canonical candidate response received.'); return; }
         void describeCanonicalCandidates(snapshot, event.data.hits, undefined, abort.signal).then(result => {
           if (abort.signal.aborted) return; window.clearTimeout(timer.current); setCandidates(result); setSearched(true); setBusy(false);
-        }).catch(cause => { if (!abort.signal.aborted) fail(cause instanceof Error ? cause.message : '정본 후보 확인 실패'); });
+        }).catch(cause => { if (!abort.signal.aborted) fail(cause instanceof Error ? cause.message : 'Failed to verify canonical candidates.'); });
       };
-      engine.onerror = () => fail('정본 검색 Worker 실행에 실패했습니다.');
+      engine.onerror = () => fail('Failed to run the canonical search worker.');
       engine.postMessage({ blocks: snapshot.blocks, query });
-    } catch (cause) { fail(cause instanceof Error ? cause.message : '정본 검색 실패'); }
+    } catch (cause) { fail(cause instanceof Error ? cause.message : 'Canonical search failed.'); }
   };
-  return <section aria-label="정본 목표 후보">
-    <p>선택 정본에서 질문 용어로 BM25 후보를 찾고 승인된 전제·정의 범위를 확인합니다. 외부 자료/다른 정본은 검색하지 않습니다. 점수는 의미적 지지나 정합성 확률이 아니며 후보를 자동 선택·전송하지 않습니다.</p>
-    <button type="button" disabled={busy || !query.trim() || query.length > 2000} onClick={search}>질문으로 정본 목표 후보 찾기</button>
-    {busy && <><p role="status">정본 후보/승인 전제 확인 중…</p><button type="button" onClick={() => { cancel(); setError('정본 검색을 중단했습니다.'); }}>정본 후보 검색 중단</button></>}
+  return <section aria-label="Canonical Target Candidates">
+    <p>Finds BM25 candidates in the selected canonical document using query terms and checks approved premise/definition scopes. External sources and other canonical documents are not searched. Scores do not represent semantic support or consistency probability, and candidates are not auto-selected or sent.</p>
+    <button type="button" disabled={busy || !query.trim() || query.length > 2000} onClick={search}>Find Canonical Target Candidates</button>
+    {busy && <><p role="status">Checking canonical candidates and approved premises…</p><button type="button" onClick={() => { cancel(); setError('Canonical search was cancelled.'); }}>Cancel Candidate Search</button></>}
     {error && <p role="alert">{error}</p>}
-    {searched && !candidates.length && <p>일치하는 정본 용어가 없습니다. 용어를 바꾸거나 아래에서 목표를 직접 선택하세요. 관련 관계가 없다는 판정은 아닙니다.</p>}
-    {candidates.map(candidate => <article key={candidate.block.id} aria-label={`정본 후보 블록 ${candidate.block.position + 1}`}>
-      <p>블록 {candidate.block.position + 1} · BM25 {candidate.score.toFixed(3)} · 추가 전제 {candidate.premiseBlockIds.length} · 승인 관계 {candidate.relationCount} · proof 순환 후보 {candidate.proofCycleCount} · 외부 관계 미전송 {candidate.excludedExternalCount}</p>
+    {searched && !candidates.length && <p>No matching canonical terms found. Try different terms or select a target manually below. This does not mean no relation exists.</p>}
+    {candidates.map(candidate => <article key={candidate.block.id} aria-label={`Canonical candidate block ${candidate.block.position + 1}`}>
+      <p>Block {candidate.block.position + 1} · BM25 {candidate.score.toFixed(3)} · Extra premises {candidate.premiseBlockIds.length} · Approved relations {candidate.relationCount} · Proof cycle candidates {candidate.proofCycleCount} · Excluded external relations {candidate.excludedExternalCount}</p>
       <pre>{candidate.block.text}</pre>
-      <button type="button" onClick={() => onSelect(candidate.block.id)}>{selected.includes(candidate.block.id) ? '후보 목표 선택 해제' : '이 후보를 목표에 추가'}</button>
-      <p>추가 전제는 최종 원문 미리보기에서 확인하세요. 선택 후 변경된 정본/관계는 전송 전에 다시 검사합니다.</p>
+      <button type="button" onClick={() => onSelect(candidate.block.id)}>{selected.includes(candidate.block.id) ? 'Deselect Candidate Target' : 'Add Candidate to Targets'}</button>
+      <p>Review additional premises in the final source preview. Any canonical document or relation changes after selection will be re-checked before sending.</p>
     </article>)}
   </section>;
 }

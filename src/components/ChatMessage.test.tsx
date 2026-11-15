@@ -11,7 +11,7 @@ afterEach(cleanup);
 describe('ChatMessage status feedback', () => {
   it('shows an unframed assistant answer without avatar or model badges and places icon-only copy last', () => {
     const { container } = render(<ChatMessage message={{
-      id: 'assistant-simple', role: 'assistant', content: '연구 답변', timestamp: 1,
+      id: 'assistant-simple', role: 'assistant', content: 'Research answer', timestamp: 1,
       model: 'Gemini 3.8 Flash', researchMode: 'general', status: 'complete'
     }} />);
 
@@ -21,8 +21,8 @@ describe('ChatMessage status feedback', () => {
     expect(container.textContent).not.toContain('General');
     const body = container.querySelector('.message-body');
     expect(body?.lastElementChild?.classList.contains('assistant-message-footer')).toBe(true);
-    expect(screen.getByRole('button', { name: '답변 복사' }).textContent).toBe('');
-    expect(container.querySelector('.markdown-content')?.textContent).toContain('연구 답변');
+    expect(screen.getByRole('button', { name: 'Copy response' }).textContent).toBe('');
+    expect(container.querySelector('.markdown-content')?.textContent).toContain('Research answer');
   });
 
   it('keeps partial output visible and exposes an explicit retry action', async () => {
@@ -30,17 +30,17 @@ describe('ChatMessage status feedback', () => {
     const message: ChatMessageType = {
       id: 'assistant-1',
       role: 'assistant',
-      content: '보존된 부분 응답',
+      content: 'Preserved partial response',
       timestamp: 1,
       status: 'error',
-      errorMessage: '네트워크 연결이 끊어졌습니다.'
+      errorMessage: 'Network connection lost.'
     };
 
     render(<ChatMessage message={message} onRetry={onRetry} />);
 
-    expect(screen.getByText('보존된 부분 응답')).toBeTruthy();
-    expect(screen.getByRole('alert').textContent).toContain('네트워크 연결이 끊어졌습니다.');
-    await userEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+    expect(screen.getByText('Preserved partial response')).toBeTruthy();
+    expect(screen.getByRole('alert').textContent).toContain('Network connection lost.');
+    await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(onRetry).toHaveBeenCalledOnce();
   });
 
@@ -51,10 +51,10 @@ describe('ChatMessage status feedback', () => {
       content: '',
       timestamp: 1,
       status: 'stopped',
-      errorMessage: '중단됨'
+      errorMessage: 'Stopped'
     }} />);
 
-    expect(screen.queryByRole('button', { name: '다시 시도' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
   });
 
   it('renders apply button in footer and triggers append callback before replace callbacks', async () => {
@@ -65,7 +65,7 @@ describe('ChatMessage status feedback', () => {
       message={{
         id: 'assistant-apply-footer',
         role: 'assistant',
-        content: '추가할 내용',
+        content: 'Content to append',
         timestamp: 1,
         status: 'complete'
       }}
@@ -74,9 +74,9 @@ describe('ChatMessage status feedback', () => {
       onAppendToDocument={onAppend}
     />);
 
-    const footerApplyBtn = screen.getByRole('button', { name: '연구노트에 적용' });
+    const footerApplyBtn = screen.getByRole('button', { name: 'Apply to research note' });
     await userEvent.click(footerApplyBtn);
-    expect(onAppend).toHaveBeenCalledWith('추가할 내용');
+    expect(onAppend).toHaveBeenCalledWith('Content to append');
     expect(onDirectAccept).not.toHaveBeenCalled();
     expect(onApply).not.toHaveBeenCalled();
   });
@@ -87,16 +87,16 @@ describe('ChatMessage status feedback', () => {
       message={{
         id: 'assistant-apply-code',
         role: 'assistant',
-        content: '```markdown\n# 수정된 이론\n```\n설명 텍스트',
+        content: '```markdown\n# Revised Theory\n```\nExplanation text',
         timestamp: 1,
         status: 'complete'
       }}
       onApplyToDocument={onApply}
     />);
 
-    const codeApplyBtn = screen.getByRole('button', { name: '노트에 적용' });
+    const codeApplyBtn = screen.getByRole('button', { name: 'Apply to note' });
     await userEvent.click(codeApplyBtn);
-    expect(onApply).toHaveBeenCalledWith('# 수정된 이론');
+    expect(onApply).toHaveBeenCalledWith('# Revised Theory');
   });
 
   it('renders GFM markdown tables with table elements and preserves LaTeX rendering', () => {
@@ -104,14 +104,14 @@ describe('ChatMessage status feedback', () => {
       message={{
         id: 'assistant-table',
         role: 'assistant',
-        content: '| 항목 | 값 |\n| --- | --- |\n| 노름 | $|x|$ |\n\n인라인 \\(a^2 + b^2 = c^2\\) 및 블록:\n\\[E = mc^2\\]',
+        content: '| Item | Value |\n| --- | --- |\n| Norm | $|x|$ |\n\nInline \\(a^2 + b^2 = c^2\\) and block:\n\\[E = mc^2\\]',
         timestamp: 1,
         status: 'complete'
       }}
     />);
 
     expect(screen.getByRole('table')).toBeTruthy();
-    expect(screen.getByRole('columnheader', { name: '항목' })).toBeTruthy();
+    expect(screen.getByRole('columnheader', { name: 'Item' })).toBeTruthy();
     expect(container.querySelectorAll('.katex').length).toBeGreaterThanOrEqual(3);
   });
 });

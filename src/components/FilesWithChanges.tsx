@@ -32,9 +32,9 @@ export const FilesWithChanges: React.FC<FilesWithChangesProps> = ({
           <span className="files-count">({changes.length})</span>
         </div>
         <span className={`files-status-badge status-${status}`}>
-          {status === 'pending' && '검토 대기'}
-          {status === 'accepted' && '✓ 수락됨'}
-          {status === 'rejected' && '✕ 거절됨'}
+          {status === 'pending' && 'Pending review'}
+          {status === 'accepted' && '✓ Accepted'}
+          {status === 'rejected' && '✕ Rejected'}
         </span>
       </div>
 
@@ -65,11 +65,11 @@ export const FilesWithChanges: React.FC<FilesWithChangesProps> = ({
                         type="button"
                         className="file-action-btn btn-review"
                         onClick={() => onReview(change)}
-                        title="가운데 에디터에서 인라인 Diff 검토"
-                        aria-label="가운데 창에서 검토"
+                        title="Review inline diff in the center editor"
+                        aria-label="Review in center pane"
                       >
                         <Eye size={13} />
-                        <span>검토</span>
+                        <span>Review</span>
                       </button>
                     )}
                     {onAccept && (
@@ -77,11 +77,11 @@ export const FilesWithChanges: React.FC<FilesWithChangesProps> = ({
                         type="button"
                         className="file-action-btn btn-accept"
                         onClick={() => onAccept(change)}
-                        title="변경 사항 본문에 수락 반영 (⌘↵)"
-                        aria-label="수락"
+                        title="Accept and apply changes to document (⌘↵)"
+                        aria-label="Accept"
                       >
                         <Check size={13} />
-                        <span>수락</span>
+                        <span>Accept</span>
                       </button>
                     )}
                     {onReject && (
@@ -89,20 +89,20 @@ export const FilesWithChanges: React.FC<FilesWithChangesProps> = ({
                         type="button"
                         className="file-action-btn btn-reject"
                         onClick={() => onReject(change)}
-                        title="변경 사항 거절 (Esc)"
-                        aria-label="거절"
+                        title="Reject changes (Esc)"
+                        aria-label="Reject"
                       >
                         <X size={13} />
-                        <span>거절</span>
+                        <span>Reject</span>
                       </button>
                     )}
                   </>
                 )}
                 {status === 'accepted' && (
-                  <span className="file-settled-text text-accepted">본문에 적용됨</span>
+                  <span className="file-settled-text text-accepted">Applied to document</span>
                 )}
                 {status === 'rejected' && (
-                  <span className="file-settled-text text-rejected">제안 기각됨</span>
+                  <span className="file-settled-text text-rejected">Proposal rejected</span>
                 )}
               </div>
             </div>

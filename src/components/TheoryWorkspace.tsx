@@ -31,41 +31,41 @@ import {
 const MathJaxMarkdown = lazy(() => import('./MathJaxMarkdown'));
 
 const contractLabels: Record<keyof ResearchContract, string> = {
-  purpose: '연구 목적', assumptions: '가정·공리', definitions: '핵심 정의',
-  symbols: '기호표', scope: '적용 범위', openQuestions: '미해결 문제'
+  purpose: 'Purpose', assumptions: 'Assumptions & Axioms', definitions: 'Key Definitions',
+  symbols: 'Symbols', scope: 'Scope', openQuestions: 'Open Questions'
 };
 const changeLabels: Record<string, string> = {
-  added: '추가', changed: '변경', removed: '삭제', moved: '이동', unchanged: '동일'
+  added: 'Added', changed: 'Changed', removed: 'Removed', moved: 'Moved', unchanged: 'Unchanged'
 };
 
 const ANALYSIS_PRESETS = [
   {
     id: 'comprehensive',
-    title: '종합 정합성 검토',
-    badge: '기본 추천',
-    desc: '주장 간 충돌, 누락된 가정, 정의 불일치, 추론 비약, 적용 범위, 반례 후보 전수 확인',
+    title: 'Comprehensive Consistency Review',
+    badge: 'Recommended',
+    desc: 'Exhaustively checks claim conflicts, missing assumptions, definition mismatches, reasoning leaps, scope, and counterexample candidates',
     instruction: ''
   },
   {
     id: 'math',
-    title: '수식 유도 & 기호 체계 검증',
-    badge: '수학/물리',
-    desc: '수식 유도의 연산 정합성, 차원/지수 일관성, 기호 정의 및 텐서/벡터 표기 일치 여부 집중 검토',
-    instruction: '수식 유도 과정의 엄밀성, 차원 분석, 기호 정의의 불일치 및 LaTeX 표기 오류를 집중적으로 검토해 주세요.'
+    title: 'Equation Derivation & Symbol Verification',
+    badge: 'Math/Physics',
+    desc: 'Focuses on operational consistency of derivations, dimensional/index consistency, symbol definitions, and tensor/vector notation',
+    instruction: 'Focus on the rigor of equation derivations, dimensional analysis, symbol definition inconsistencies, and LaTeX notation errors.'
   },
   {
     id: 'assumptions',
-    title: '숨은 가정 & 반례 탐색',
-    badge: '공리/가정',
-    desc: '공리와 전제에 명시되지 않은 은연중 가정, 경계 조건의 맹점, 반례 및 예외 상황 집중 추적',
-    instruction: '본문에서 은연중에 전제하고 있는 명시되지 않은 숨은 가정, 적용 범위의 예외 조건 및 잠재적 반례를 중점 탐색해 주세요.'
+    title: 'Hidden Assumptions & Counterexamples',
+    badge: 'Axioms/Assumptions',
+    desc: 'Traces unstated implicit assumptions, boundary-condition blind spots, counterexamples, and edge-case exceptions',
+    instruction: 'Focus on identifying unstated implicit assumptions, boundary-condition exceptions in scope, and potential counterexamples.'
   },
   {
     id: 'logic',
-    title: '논리적 비약 & 단락 충돌',
-    badge: '논리 흐름',
-    desc: '단락 간 논리적 연결 고리, 전제와 결론 사이의 유도 비약, 텍스트 상호 충돌 조항 검사',
-    instruction: '단락 간의 논리적 연결성, 전제에서 결론으로 넘어가는 과정의 비약 및 텍스트 상의 주장 충돌을 집중적으로 검사해 주세요.'
+    title: 'Logical Leaps & Paragraph Conflicts',
+    badge: 'Logical Flow',
+    desc: 'Checks logical connections between paragraphs, inferential leaps from premises to conclusions, and conflicting statements',
+    instruction: 'Focus on logical connectivity between paragraphs, inferential leaps from premises to conclusions, and conflicting claims in the text.'
   }
 ];
 
@@ -163,14 +163,14 @@ export default function TheoryWorkspace({
     if (!pendingSuggestion) return;
     setMarkdown(pendingSuggestion.proposedText);
     setPendingSuggestion(null);
-    setStatus('✓ AI 수정 제안을 수락하여 본문에 반영했습니다.');
+    setStatus('✓ Accepted AI revision and applied it to the document.');
     onSuggestionSettled?.('accepted');
   };
 
   const handleRejectSuggestion = () => {
     if (!pendingSuggestion) return;
     setPendingSuggestion(null);
-    setStatus('✕ 남은 수정 제안을 거절하고 현재 본문을 유지했습니다.');
+    setStatus('✕ Rejected remaining revisions and kept the current text.');
     onSuggestionSettled?.('rejected');
   };
 
@@ -183,7 +183,7 @@ export default function TheoryWorkspace({
     const nextDiff = computeLineDiff(nextOriginal, nextProposed);
     if (nextDiff.stats.added === 0 && nextDiff.stats.removed === 0) {
       setPendingSuggestion(null);
-      setStatus('✓ 모든 수정 제안을 검토해 본문에 반영했습니다.');
+      setStatus('✓ Reviewed and applied all revision suggestions to the document.');
       onSuggestionSettled?.('accepted');
       return;
     }
@@ -219,7 +219,7 @@ export default function TheoryWorkspace({
       setMarkdown(proposed);
       setPendingSuggestion(null);
       setDiffViewMode('preview');
-      setStatus('✓ AI 수정 제안을 수락하여 본문에 반영했습니다.');
+      setStatus('✓ Accepted AI revision and applied it to the document.');
       onSuggestionSettled?.('accepted');
       return;
     }
@@ -227,14 +227,14 @@ export default function TheoryWorkspace({
     if (!markdown.trim() || incomingDraft.mode === 'replace') {
       if (!markdown.trim()) {
         setMarkdown(proposed);
-        setStatus('대화 답변으로 연구노트 본문을 작성했습니다.');
+        setStatus('Drafted research note body from chat response.');
         return;
       }
     }
     if (incomingDraft.mode === 'append') {
       setMarkdown(prev => prev.trimEnd() ? `${prev.trimEnd()}\n\n${proposed}` : proposed);
       setPendingSuggestion(null);
-      setStatus('✓ 선택한 내용을 연구노트 끝에 추가했습니다.');
+      setStatus('✓ Appended selected content to the end of the research note.');
       return;
     }
 
@@ -249,7 +249,7 @@ export default function TheoryWorkspace({
     });
     setDiffViewMode('diff');
     setEditorTab('write');
-    setStatus('✦ AI 수정 제안이 도착했습니다. 상단 바에서 수락 또는 거절을 선택하세요.');
+    setStatus('✦ AI revision suggestions arrived. Accept or reject in the top bar.');
   }, [incomingDraft]);
 
   const [isWikiPublished, setIsWikiPublished] = useState(false);
@@ -277,9 +277,9 @@ export default function TheoryWorkspace({
     try {
       await publishTheoryToWiki(snapshot.document, snapshot.version);
       setIsWikiPublished(true);
-      setStatus('현재 버전이 Wiki 서고에 등록되었습니다.');
+      setStatus('Current version published to Wiki archive.');
     } catch {
-      setStatus('Wiki 등록에 실패했습니다.');
+      setStatus('Failed to publish to Wiki.');
     } finally {
       setPublishBusy(false);
     }
@@ -387,7 +387,7 @@ export default function TheoryWorkspace({
     return () => window.removeEventListener('beforeunload', warn);
   }, [dirty]);
 
-  const confirmDiscard = () => !dirty || window.confirm('저장하지 않은 문서 변경을 버릴까요?');
+  const confirmDiscard = () => !dirty || window.confirm('Discard unsaved document changes?');
   const close = () => { if (!busy && confirmDiscard()) onClose(); };
   const adopt = (value: TheorySnapshot) => {
     setSnapshot(value);
@@ -404,7 +404,7 @@ export default function TheoryWorkspace({
     if (!initialDocumentId) return;
     let active = true;
     void loadTheory(initialDocumentId).then(value => { if (active) adopt(value); })
-      .catch(cause => { if (active) setError(cause instanceof Error ? cause.message : '문서를 열지 못했습니다.'); })
+      .catch(cause => { if (active) setError(cause instanceof Error ? cause.message : 'Failed to open document.'); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [initialDocumentId]);
@@ -417,13 +417,13 @@ export default function TheoryWorkspace({
         if (!active || analysisAbort.current) return;
         const restored = await Promise.all(runs.map(async item => {
           if (item.status !== 'running') return item;
-          const stopped: AnalysisRun = { ...item, status: 'stopped', error: '이전 분석 실행이 종료되었습니다. 자동으로 다시 전송하지 않습니다.' };
+          const stopped: AnalysisRun = { ...item, status: 'stopped', error: 'Previous analysis run ended. It will not be automatically re-sent.' };
           await qaxiomDatabase.analysis_runs.put(stopped);
           return stopped;
         }));
         if (active && !analysisAbort.current) { setAnalysisHistory(restored); setAnalysisRun(restored[0] ?? null); }
       })
-      .catch(() => { if (active) setError('분석 기록을 읽지 못했습니다.'); });
+      .catch(() => { if (active) setError('Failed to load analysis history.'); });
     return () => { active = false; };
   }, [analysisDocumentId]);
   useEffect(() => {
@@ -433,13 +433,13 @@ export default function TheoryWorkspace({
     qaxiomDatabase.document_blocks.where('versionId').equals(analysisRun.versionId).sortBy('position')])
       .then(([version, blocks]) => {
         if (active && version?.documentId === snapshot.document.id) setHistoricalAnalysisSnapshot({ ...snapshot, version, blocks });
-      }).catch(() => { if (active) setError('이전 분석의 문서 버전을 읽지 못했습니다.'); });
+      }).catch(() => { if (active) setError('Failed to load document version for previous analysis.'); });
     return () => { active = false; };
   }, [analysisRun, snapshot]);
   useEffect(() => () => { analysisAbort.current?.abort(); }, []);
   const run = async (operation: () => Promise<void>) => {
     setBusy(true); setError(''); setStatus('');
-    try { await operation(); } catch (cause) { setError(cause instanceof Error ? cause.message : '문서 작업에 실패했습니다.'); }
+    try { await operation(); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Document operation failed.'); }
     finally { setBusy(false); }
   };
   const persistDraft = async () => {
@@ -453,7 +453,7 @@ export default function TheoryWorkspace({
       : await createTheory(input);
     adopt(saved);
     onSaved?.({ id: saved.document.id, title: saved.version.title, version: saved.version.number });
-    setStatus(`v${saved.version.number} 저장 완료. 이전 버전은 보존됩니다.`);
+    setStatus(`Saved v${saved.version.number}. Previous versions are preserved.`);
     return saved;
   };
   const save = () => run(async () => { await persistDraft(); });
@@ -468,7 +468,7 @@ export default function TheoryWorkspace({
   };
 
   const handleInsertQuote = (quoteText: string, sourceName: string, locationStr: string) => {
-    const quoteMarkdown = `\n\n> "${quoteText}"\n> — *출처: ${sourceName}${locationStr ? ` (${locationStr})` : ''}*\n\n`;
+    const quoteMarkdown = `\n\n> "${quoteText}"\n> — *Source: ${sourceName}${locationStr ? ` (${locationStr})` : ''}*\n\n`;
     const textarea = textareaRef.current;
     if (!textarea) {
       setMarkdown(prev => prev + quoteMarkdown);
@@ -494,9 +494,9 @@ export default function TheoryWorkspace({
     analysisAbort.current = abort;
     setAnalysisProgress(null);
     try {
-      if (!title.trim() || !markdown.trim()) throw new Error('문서 제목과 본문을 입력해 주세요.');
+      if (!title.trim() || !markdown.trim()) throw new Error('Please enter a document title and body.');
       const target = dirty || !snapshot ? await persistDraft() : snapshot;
-      if (dirty || !snapshot) setStatus(`v${target.version.number} 자동 저장 후 전체 문서를 분석합니다.`);
+      if (dirty || !snapshot) setStatus(`Auto-saved v${target.version.number}; analyzing full document.`);
 
       activeRun = {
         id: crypto.randomUUID(), documentId: target.document.id, versionId: target.version.id,
@@ -505,7 +505,7 @@ export default function TheoryWorkspace({
       };
       await qaxiomDatabase.analysis_runs.add(activeRun);
       setAnalysisRun(activeRun); setEditorTab('analysis');
-      setAnalysisProgress({ runId: activeRun.id, stage: '분석 요청 준비 중', startedAt: Date.now(), receivedChars: 0, reasoningSummary: '' });
+      setAnalysisProgress({ runId: activeRun.id, stage: 'Preparing analysis request', startedAt: Date.now(), receivedChars: 0, reasoningSummary: '' });
       setAnalysisHistory(previous => [activeRun!, ...previous]);
 
       const updateProgress = (changes: Partial<AnalysisProgress>) => {
@@ -522,15 +522,15 @@ export default function TheoryWorkspace({
       };
 
       if (useChunking) {
-        // 분할 분석 (Chunking Mode)
+        // Chunked Analysis (Chunking Mode)
         const chunks = await prepareChunkedDocumentAnalysis(target, { focusInstruction: overrideInstruction });
         const subRuns: AnalysisRun[] = [];
         let receivedTotal = 0;
 
         for (let i = 0; i < chunks.length; i++) {
-          if (abort.signal.aborted) throw new Error('분석을 취소했습니다.');
+          if (abort.signal.aborted) throw new Error('Analysis was canceled.');
           const chunk = chunks[i];
-          updateProgress({ stage: `모델 응답 대기 중 · 섹션 ${i + 1}/${chunks.length}` });
+          updateProgress({ stage: `Waiting for model response · Section ${i + 1}/${chunks.length}` });
 
           let response = ''; let failure: Error | null = null; let reportedChars = 0;
           await sendChatMessage([{ id: crypto.randomUUID(), role: 'user', content: chunk.requestPrompt, timestamp: Date.now() }], targetModelId,
@@ -539,18 +539,18 @@ export default function TheoryWorkspace({
                 response += c;
                 if (reportedChars === 0 || response.length - reportedChars >= 2048) {
                   reportedChars = response.length;
-                  updateProgress({ stage: `결과 수신 중 · 섹션 ${i + 1}/${chunks.length}`, receivedChars: receivedTotal + response.length });
+                  updateProgress({ stage: `Receiving results · Section ${i + 1}/${chunks.length}`, receivedChars: receivedTotal + response.length });
                 }
-                if (response.length > 2_000_000) { failure = new Error('분석 응답이 너무 깁니다.'); abort.abort(); }
+                if (response.length > 2_000_000) { failure = new Error('Analysis response is too long.'); abort.abort(); }
               },
               onReasoningSummary: appendReasoningSummary,
               onError: cause => { failure = cause; }, onFinish: () => { }
           }, abort.signal);
 
           if (failure) throw failure;
-          if (abort.signal.aborted) throw new Error('분석을 취소했습니다.');
+          if (abort.signal.aborted) throw new Error('Analysis was canceled.');
 
-          updateProgress({ stage: `응답 검증 중 · 섹션 ${i + 1}/${chunks.length}` });
+          updateProgress({ stage: `Validating response · Section ${i + 1}/${chunks.length}` });
           const chunkSnapshot: TheorySnapshot = { ...target, blocks: chunk.blocks };
           const subRun = parseDocumentAnalysis(response, chunkSnapshot, targetModelId);
           subRuns.push(subRun);
@@ -562,13 +562,13 @@ export default function TheoryWorkspace({
         completed.id = activeRun.id; completed.createdAt = activeRun.createdAt;
         await qaxiomDatabase.analysis_runs.put(completed);
         setAnalysisRun(completed);
-        updateProgress({ stage: '분석 완료' });
+        updateProgress({ stage: 'Analysis complete' });
         setAnalysisHistory(previous => previous.map(item => item.id === completed.id ? completed : item));
-        setStatus('섹션별 분할 정합성 분석이 성공적으로 완료되었습니다.');
+        setStatus('Sectioned consistency analysis completed successfully.');
       } else {
-        // 일반 통합 분석 (Single Context Mode)
+        // Unified Single-Context Analysis (Single Context Mode)
         const request = await prepareDocumentAnalysis(target, { focusInstruction: overrideInstruction });
-        updateProgress({ stage: '모델 응답 대기 중' });
+        updateProgress({ stage: 'Waiting for model response' });
         let response = ''; let failure: Error | null = null; let reportedChars = 0;
         await sendChatMessage([{ id: crypto.randomUUID(), role: 'user', content: request, timestamp: Date.now() }], targetModelId,
           'document_analysis', settings, {
@@ -576,30 +576,30 @@ export default function TheoryWorkspace({
               response += chunk;
               if (reportedChars === 0 || response.length - reportedChars >= 2048) {
                 reportedChars = response.length;
-                updateProgress({ stage: '결과 수신 중', receivedChars: response.length });
+                updateProgress({ stage: 'Receiving results', receivedChars: response.length });
               }
-              if (response.length > 2_000_000) { failure = new Error('분석 응답이 너무 깁니다.'); abort.abort(); }
+              if (response.length > 2_000_000) { failure = new Error('Analysis response is too long.'); abort.abort(); }
             },
             onReasoningSummary: appendReasoningSummary,
             onError: cause => { failure = cause; }, onFinish: () => { }
         }, abort.signal);
         if (failure) throw failure;
-        if (abort.signal.aborted) throw new Error('분석을 취소했습니다.');
-        updateProgress({ stage: '응답 검증 중', receivedChars: response.length });
+        if (abort.signal.aborted) throw new Error('Analysis was canceled.');
+        updateProgress({ stage: 'Validating response', receivedChars: response.length });
         const completed = parseDocumentAnalysis(response, target, targetModelId);
         completed.id = activeRun.id; completed.createdAt = activeRun.createdAt;
         await qaxiomDatabase.analysis_runs.put(completed);
         setAnalysisRun(completed);
-        updateProgress({ stage: '분석 완료' });
+        updateProgress({ stage: 'Analysis complete' });
         setAnalysisHistory(previous => previous.map(item => item.id === completed.id ? completed : item));
-        setStatus('전체 문서 정합성 분석이 성공적으로 완료되었습니다.');
+        setStatus('Full-document consistency analysis completed successfully.');
       }
     } catch (cause) {
-      const message = cause instanceof Error ? cause.message : 'AI 분석에 실패했습니다.';
+      const message = cause instanceof Error ? cause.message : 'AI analysis failed.';
       setError(message);
       if (activeRun) {
         const failed: AnalysisRun = { ...activeRun, status: abort.signal.aborted ? 'stopped' : 'failed', error: message };
-        setAnalysisProgress(previous => previous?.runId === failed.id ? { ...previous, stage: failed.status === 'stopped' ? '분석 취소됨' : '분석 실패' } : previous);
+        setAnalysisProgress(previous => previous?.runId === failed.id ? { ...previous, stage: failed.status === 'stopped' ? 'Analysis canceled' : 'Analysis failed' } : previous);
         await qaxiomDatabase.analysis_runs.put(failed);
         setAnalysisRun(failed);
         setAnalysisHistory(previous => previous.map(item => item.id === failed.id ? failed : item));
@@ -613,15 +613,15 @@ export default function TheoryWorkspace({
       setAnalysisRun({ ...analysisRun, findings: analysisRun.findings.map(item => item.id === finding.id ? { ...item, decision } : item) });
       setAnalysisHistory(previous => previous.map(item => item.id === analysisRun.id
         ? { ...item, findings: item.findings.map(value => value.id === finding.id ? { ...value, decision } : value) } : item));
-    } catch (cause) { setError(cause instanceof Error ? cause.message : '분석 의견 상태를 저장하지 못했습니다.'); }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Failed to save finding decision.'); }
   };
   const applyFinding = (finding: AnalysisFinding) => {
     if (!analysisRun || !snapshot) return;
     try {
       setMarkdown(applyAnalysisSuggestion(markdown, snapshot, analysisRun, finding));
       setEditorTab('write');
-      setStatus('수정안을 편집 내용에 반영했습니다. 확인 후 문서를 저장하세요.');
-    } catch (cause) { setError(cause instanceof Error ? cause.message : '수정안을 적용하지 못했습니다.'); }
+      setStatus('Applied suggestion to draft. Review and save the document.');
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Failed to apply suggestion.'); }
   };
   const handleDeleteAnalysis = async (targetRun: AnalysisRun) => {
     try {
@@ -631,8 +631,8 @@ export default function TheoryWorkspace({
       if (analysisRun?.id === targetRun.id) {
         setAnalysisRun(nextHistory[0] ?? null);
       }
-      setStatus('분석 결과를 삭제했습니다.');
-    } catch (cause) { setError(cause instanceof Error ? cause.message : '분석 결과를 삭제하지 못했습니다.'); }
+      setStatus('Deleted analysis result.');
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Failed to delete analysis result.'); }
   };
   const comparison = snapshot?.history.find(version => version.id === comparisonId);
   const changes = snapshot && comparison ? compareBlocks(comparisonBlocks, snapshot.blocks).filter(change => change.change !== 'unchanged') : [];
@@ -642,7 +642,7 @@ export default function TheoryWorkspace({
   return (
     <dialog ref={dialog} className={`theory-workspace ${embedded ? 'embedded' : ''}`} aria-labelledby="theory-heading"
       onCancel={event => { event.preventDefault(); close(); }}>
-      {/* 1. 상단바: 단일 통합 상단바 (프로젝트 칩 + 인라인 타이틀 편집 + 작업 버튼) */}
+      {/* 1. Top bar: unified header bar (project chip + inline title editor + action buttons) */}
       <header className="theory-header">
         <div className="theory-header-meta">
           {onOpenMobileMenu && (
@@ -651,35 +651,35 @@ export default function TheoryWorkspace({
               id="mobile-menu-btn"
               className="mobile-menu-btn topbar-tooltip"
               onClick={onOpenMobileMenu}
-              data-tooltip="대화 메뉴 열기"
-              aria-label="대화 메뉴 열기"
+              data-tooltip="Open chat menu"
+              aria-label="Open chat menu"
             >
               <Menu size={18} />
             </button>
           )}
 
-          {/* 프로젝트명 칩 (📁 Qaether Theory) */}
+          {/* Project name chip */}
           {projectName && (
-            <div className="header-project-chip header-project-label" aria-label={`현재 프로젝트: ${projectName}`}>
+            <div className="header-project-chip header-project-label" aria-label={`Current project: ${projectName}`}>
               <Folder size={13} className="header-project-icon" />
               <span className="header-project-name">{projectName}</span>
             </div>
           )}
 
-          {/* 프로젝트명 바로 오른쪽에 위치한 문서 제목 표시/편집 영역 */}
+          {/* Document title display/edit area */}
           {(!snapshot || isEditingTitle) ? (
             <form onSubmit={handleTitleSubmit} className="title-edit-form theory-title-edit-form">
-              <label htmlFor="theory-title" className="sr-only">문서 제목</label>
+              <label htmlFor="theory-title" className="sr-only">Document title</label>
               <input
                 id="theory-title"
                 className="title-edit-input theory-title-edit-input"
-                aria-label="문서 제목"
+                aria-label="Document title"
                 value={isEditingTitle ? titleDraft : title}
                 onChange={e => {
                   setTitleDraft(e.target.value);
                   setTitle(e.target.value);
                 }}
-                placeholder="문서 제목을 입력하세요"
+                placeholder="Enter document title"
                 autoFocus={!initialDocumentId || isEditingTitle}
                 maxLength={100}
                 disabled={busy || loading}
@@ -692,16 +692,16 @@ export default function TheoryWorkspace({
                   if (event.key === 'Escape' && snapshot) finishTitleEditing();
                 }}
               />
-              <button type="submit" className="title-save-btn topbar-tooltip" aria-label="문서 제목 저장" data-tooltip="문서 제목 저장">
+              <button type="submit" className="title-save-btn topbar-tooltip" aria-label="Save document title" data-tooltip="Save document title">
                 <Check size={14} />
               </button>
               <h2 id="theory-heading" className="sr-only">
-                {title.trim() || (snapshot ? snapshot.version.title : '새 연구노트')}
+                {title.trim() || (snapshot ? snapshot.version.title : 'New Research Note')}
               </h2>
             </form>
           ) : (
             <div className="title-display theory-title-display">
-              <h2 id="theory-heading" aria-label={title || '연구노트'}>
+              <h2 id="theory-heading" aria-label={title || 'Research Note'}>
                 <button
                   ref={titleButtonRef}
                   type="button"
@@ -710,10 +710,10 @@ export default function TheoryWorkspace({
                     setTitleDraft(title);
                     setIsEditingTitle(true);
                   }}
-                  aria-label={`${title || '연구노트'} 제목 수정`}
-                  data-tooltip="문서 제목 수정"
+                  aria-label={`Edit title for ${title || 'Research Note'}`}
+                  data-tooltip="Edit document title"
                 >
-                  <span>{title || '연구노트'}</span>
+                  <span>{title || 'Research Note'}</span>
                   <span className="theory-title-edit-affordance" aria-hidden="true">
                     <Edit3 size={14} strokeWidth={2.4} />
                   </span>
@@ -727,26 +727,26 @@ export default function TheoryWorkspace({
               type="button"
               className="theory-version-chip topbar-tooltip"
               onClick={() => setActiveModal(activeModal === 'history' ? null : 'history')}
-              data-tooltip="버전 비교"
-              aria-label={`v${snapshot.version.number} 버전 비교`}
+              data-tooltip="Compare versions"
+              aria-label={`Compare version v${snapshot.version.number}`}
               aria-expanded={activeModal === 'history'}
             >
               v{snapshot.version.number}
             </button>
           )}
-          {dirty && <span className="theory-dirty-indicator" title="저장되지 않은 변경사항이 있습니다">● 미저장</span>}
+          {dirty && <span className="theory-dirty-indicator" title="Unsaved changes">● Unsaved</span>}
         </div>
 
         <div className="theory-header-actions">
           {(snapshot || markdown.trim()) && (
-            <aside className="theory-top-ai-aside" aria-label="AI 분석과 검토 결과">
+            <aside className="theory-top-ai-aside" aria-label="AI analysis and review results">
               <button
                 type="button"
                 className={`theory-topbar-btn theory-btn-ai topbar-tooltip ${editorTab === 'analysis' ? 'active' : ''}`}
                 onClick={() => setActiveModal('analysis')}
                 disabled={analysisBusy || busy || loading}
-                data-tooltip="AI 분석"
-                aria-label="AI로 문서 분석"
+                data-tooltip="AI Analysis"
+                aria-label="Analyze document with AI"
               >
                 <Sparkles size={16} />
               </button>
@@ -759,8 +759,8 @@ export default function TheoryWorkspace({
               className="theory-topbar-btn topbar-tooltip"
               onClick={() => setIsReferenceModalOpen(true)}
               disabled={busy || loading}
-              data-tooltip="레퍼런스 추가"
-              aria-label="레퍼런스 추가"
+              data-tooltip="Add reference"
+              aria-label="Add reference"
               style={{ color: '#fbbf24' }}
             >
               <Paperclip size={16} />
@@ -772,8 +772,8 @@ export default function TheoryWorkspace({
             className={`theory-topbar-btn topbar-tooltip ${isSearchDrawerOpen ? 'active' : ''}`}
             onClick={() => setIsSearchDrawerOpen(prev => !prev)}
             disabled={busy || loading}
-            data-tooltip="통합 검색 (노트내 단어 / 레퍼런스 RAG)"
-            aria-label="통합 검색"
+            data-tooltip="Search (in-note terms / reference RAG)"
+            aria-label="Search"
             style={{ color: '#38bdf8' }}
           >
             <Search size={16} />
@@ -785,8 +785,8 @@ export default function TheoryWorkspace({
               className={`theory-topbar-btn topbar-tooltip ${isWikiPublished ? 'published' : ''}`}
               onClick={handlePublishToWiki}
               disabled={publishBusy || isWikiPublished || busy || loading}
-              data-tooltip={isWikiPublished ? `Wiki 등재됨 (v${snapshot.version.number})` : '이 버전을 Wiki에 등록'}
-              aria-label="이 버전을 Wiki에 등록"
+              data-tooltip={isWikiPublished ? `Published to Wiki (v${snapshot.version.number})` : 'Publish this version to Wiki'}
+              aria-label="Publish this version to Wiki"
               style={isWikiPublished ? { color: '#4ade80' } : { color: '#c084fc' }}
             >
               {isWikiPublished ? <Check size={16} /> : <BookPlus size={16} />}
@@ -799,8 +799,8 @@ export default function TheoryWorkspace({
               className="theory-topbar-btn theory-btn-criteria topbar-tooltip"
               onClick={() => setActiveModal('contract')}
               disabled={busy || loading}
-              data-tooltip="연구 기준"
-              aria-label="연구 기준"
+              data-tooltip="Research Criteria"
+              aria-label="Research Criteria"
             >
               <BookOpen size={16} />
             </button>
@@ -811,8 +811,8 @@ export default function TheoryWorkspace({
             className="theory-topbar-btn theory-btn-save topbar-tooltip"
             disabled={!title.trim() || !markdown.trim() || !dirty || busy}
             onClick={() => void save()}
-            data-tooltip={snapshot ? '새 버전 저장' : '문서 저장'}
-            aria-label={snapshot ? '새 버전 저장' : '문서 저장'}
+            data-tooltip={snapshot ? 'Save new version' : 'Save document'}
+            aria-label={snapshot ? 'Save new version' : 'Save document'}
           >
             <Save size={16} />
           </button>
@@ -833,25 +833,25 @@ export default function TheoryWorkspace({
         />
       )}
 
-      {/* 2. 에디터 본체: VCS 스타일의 풀스크린 마크다운 편집기 */}
+      {/* 2. Editor Body: VCS-style Fullscreen Markdown Editor */}
       <div className="theory-editor-container vcs-mode" aria-busy={busy || loading}>
         <div className="theory-editor-toolbar-bar">
           <div className="theory-editor-toolbar-left">
             {!snapshot && (
               <div className="theory-editor-step-label">
-                <h3>1. 문서 작성</h3>
+                <h3>1. Write Document</h3>
               </div>
             )}
 
             {editorTab === 'write' && (
               <div className="theory-md-toolbar-actions">
-                <button type="button" className="theory-md-btn" onClick={() => insertMarkdown('### ', '', '제목')} title="제목 3 (###)" aria-label="제목"><Heading size={13} /></button>
-                <button type="button" className="theory-md-btn" onClick={() => insertMarkdown('**', '**', '굵게')} title="굵게 (**텍스트**)" aria-label="굵게"><Bold size={13} /></button>
-                <button type="button" className="theory-md-btn" onClick={() => insertMarkdown('*', '*', '기울임')} title="기울임 (*텍스트*)" aria-label="기울임"><Italic size={13} /></button>
-                <button type="button" className="theory-md-btn" onClick={() => insertMarkdown('$', '$', 'x')} title="인라인 수식 ($x$)" aria-label="인라인 수식"><Sigma size={13} /></button>
-                <button type="button" className="theory-md-btn" onClick={() => insertMarkdown('```\n', '\n```', 'code')} title="코드 블록" aria-label="코드 블록"><Code size={13} /></button>
-                <button type="button" className="theory-md-btn" onClick={() => insertMarkdown('> ', '', '인용')} title="인용문 (>)" aria-label="인용"><Quote size={13} /></button>
-                <button type="button" className="theory-md-btn" onClick={() => insertMarkdown('- ', '', '목록')} title="글머리 기호 (-)" aria-label="글머리 기호"><List size={13} /></button>
+                <button type="button" className="theory-md-btn" onClick={() => insertMarkdown('### ', '', 'Heading')} title="Heading 3 (###)" aria-label="Heading"><Heading size={13} /></button>
+                <button type="button" className="theory-md-btn" onClick={() => insertMarkdown('**', '**', 'bold')} title="Bold (**text**)" aria-label="Bold"><Bold size={13} /></button>
+                <button type="button" className="theory-md-btn" onClick={() => insertMarkdown('*', '*', 'italic')} title="Italic (*text*)" aria-label="Italic"><Italic size={13} /></button>
+                <button type="button" className="theory-md-btn" onClick={() => insertMarkdown('$', '$', 'x')} title="Inline math ($x$)" aria-label="Inline math"><Sigma size={13} /></button>
+                <button type="button" className="theory-md-btn" onClick={() => insertMarkdown('```\n', '\n```', 'code')} title="Code block" aria-label="Code block"><Code size={13} /></button>
+                <button type="button" className="theory-md-btn" onClick={() => insertMarkdown('> ', '', 'quote')} title="Blockquote (>)" aria-label="Blockquote"><Quote size={13} /></button>
+                <button type="button" className="theory-md-btn" onClick={() => insertMarkdown('- ', '', 'item')} title="Bullet list (-)" aria-label="Bullet list"><List size={13} /></button>
               </div>
             )}
           </div>
@@ -860,8 +860,8 @@ export default function TheoryWorkspace({
             {editorTab === 'preview' && (
               <select
                 className="theory-math-renderer-select"
-                aria-label="미리보기 수식 렌더러"
-                title="미리보기 수식 렌더러"
+                aria-label="Preview math renderer"
+                title="Preview math renderer"
                 value={previewMathRenderer}
                 onChange={event => setPreviewMathRenderer(event.target.value as 'mathjax' | 'katex')}
               >
@@ -874,47 +874,47 @@ export default function TheoryWorkspace({
                 type="button"
                 className={`theory-md-tab ${editorTab === 'write' ? 'active' : ''}`}
                 onClick={() => setEditorTab('write')}
-                title="마크다운 편집 모드"
+                title="Markdown edit mode"
               >
                 <Edit3 size={13} />
-                <span>편집</span>
+                <span>Edit</span>
               </button>
               <button
                 type="button"
                 className={`theory-md-tab ${editorTab === 'preview' ? 'active' : ''}`}
                 onClick={() => setEditorTab('preview')}
-                title="마크다운 렌더링 미리보기 모드"
+                title="Markdown rendered preview mode"
               >
                 <Eye size={13} />
-                <span>미리보기</span>
+                <span>Preview</span>
               </button>
               {snapshot && (analysisRun || editorTab === 'analysis') && <button
                 type="button"
                 className={`theory-md-tab ${editorTab === 'analysis' ? 'active' : ''}`}
                 onClick={() => setEditorTab('analysis')}
-                title="AI 분석 결과"
+                title="AI analysis results"
               >
                 <Sparkles size={13} />
-                <span>분석</span>
+                <span>Analysis</span>
               </button>}
             </div>
           </div>
         </div>
 
-        {/* 순수 편집기 본문: 화면 전체를 채움 */}
-        <label htmlFor="theory-markdown" className="sr-only">문서 본문 (Markdown)</label>
+        {/* Editor body: fills the viewport */}
+        <label htmlFor="theory-markdown" className="sr-only">Document body (Markdown)</label>
         <div className="theory-editor-body vcs-editor-body">
           {pendingSuggestion && editorTab === 'write' ? (
             <div className="theory-inline-diff-container">
               {/* Floating Review Action Bar */}
-              <div className="theory-review-floating-bar" role="region" aria-label="AI 수정 제안 검토">
+              <div className="theory-review-floating-bar" role="region" aria-label="Review AI revision suggestions">
                 <div className="theory-review-bar-info">
                   <span className="theory-review-sparkle">✦</span>
-                  <span className="theory-review-title">AI 수정 제안 검토</span>
-                  <span className="theory-diff-stat-badge added">+{pendingSuggestion.stats.added}줄</span>
-                  <span className="theory-diff-stat-badge removed">-{pendingSuggestion.stats.removed}줄</span>
+                  <span className="theory-review-title">Review AI Revision Suggestions</span>
+                  <span className="theory-diff-stat-badge added">+{pendingSuggestion.stats.added} lines</span>
+                  <span className="theory-diff-stat-badge removed">-{pendingSuggestion.stats.removed} lines</span>
                   <span className="theory-diff-stat-badge hunks">
-                    남은 변경 {groupDiffIntoSegments(pendingSuggestion.diffLines).filter(s => s.kind === 'hunk').length}건
+                    {groupDiffIntoSegments(pendingSuggestion.diffLines).filter(s => s.kind === 'hunk').length} remaining change(s)
                   </span>
                 </div>
                 <div className="theory-review-bar-actions">
@@ -922,29 +922,29 @@ export default function TheoryWorkspace({
                     type="button"
                     className="theory-review-btn-toggle"
                     onClick={() => setDiffViewMode(m => m === 'diff' ? 'preview' : 'diff')}
-                    title="Diff 보기와 제안 결과 미리보기 전환"
+                    title="Toggle between Diff view and Result preview"
                   >
-                    {diffViewMode === 'diff' ? '결과 미리보기' : 'Diff 보기'}
+                    {diffViewMode === 'diff' ? 'Preview Result' : 'View Diff'}
                   </button>
                   <button
                     type="button"
                     className="theory-review-btn-reject"
                     onClick={handleRejectSuggestion}
-                    title="남은 수정 제안 모두 거절 (Esc)"
-                    aria-label="전체 거절 (Esc)"
+                    title="Reject all remaining suggestions (Esc)"
+                    aria-label="Reject All (Esc)"
                   >
                     <X size={14} />
-                    <span>전체 거절 (Esc)</span>
+                    <span>Reject All (Esc)</span>
                   </button>
                   <button
                     type="button"
                     className="theory-review-btn-accept"
                     onClick={handleAcceptSuggestion}
-                    title="남은 수정 제안 모두 수락 (⌘+Enter)"
-                    aria-label="전체 수락 (Cmd+Enter)"
+                    title="Accept all remaining suggestions (⌘+Enter)"
+                    aria-label="Accept All (Cmd+Enter)"
                   >
                     <Check size={14} />
-                    <span>전체 수락 (⌘↵)</span>
+                    <span>Accept All (⌘↵)</span>
                   </button>
                 </div>
               </div>
@@ -969,7 +969,7 @@ export default function TheoryWorkspace({
                         <div key={hunk.id} className="theory-diff-hunk-group" data-hunk-id={hunk.id}>
                           <div className="theory-diff-hunk-bar">
                             <span className="theory-diff-hunk-label">
-                              변경 #{hunk.index + 1}
+                              Change #{hunk.index + 1}
                               {hunk.addedCount > 0 && <span className="theory-diff-hunk-count added"> +{hunk.addedCount}</span>}
                               {hunk.removedCount > 0 && <span className="theory-diff-hunk-count removed"> -{hunk.removedCount}</span>}
                             </span>
@@ -977,20 +977,20 @@ export default function TheoryWorkspace({
                               <button
                                 type="button"
                                 className="theory-diff-hunk-btn reject"
-                                aria-label={`변경 ${hunk.index + 1} 거절`}
+                                aria-label={`Reject change ${hunk.index + 1}`}
                                 onClick={() => handleResolveHunk(hunk.id, 'reject')}
                               >
                                 <X size={12} />
-                                <span>거절</span>
+                                <span>Reject</span>
                               </button>
                               <button
                                 type="button"
                                 className="theory-diff-hunk-btn accept"
-                                aria-label={`변경 ${hunk.index + 1} 수락`}
+                                aria-label={`Accept change ${hunk.index + 1}`}
                                 onClick={() => handleResolveHunk(hunk.id, 'accept')}
                               >
                                 <Check size={12} />
-                                <span>수락</span>
+                                <span>Accept</span>
                               </button>
                             </div>
                           </div>
@@ -1034,8 +1034,8 @@ export default function TheoryWorkspace({
               value={markdown}
               onChange={event => setMarkdown(event.target.value)}
               onKeyDown={handleEditorKeyDown}
-              placeholder="아이디어, 연구 가설, 수식($...$, $$...$$), 설명을 자유롭게 적으세요. Markdown 문법이 지원됩니다."
-              aria-label="문서 본문 (Markdown)"
+              placeholder="Write ideas, research hypotheses, equations ($...$, $$...$$), and explanations freely. Markdown is supported."
+              aria-label="Document body (Markdown)"
             />
           )}
           {editorTab === 'preview' && (
@@ -1043,7 +1043,7 @@ export default function TheoryWorkspace({
               <div className="theory-preview-content">
                 {markdown.trim() ? (
                   previewMathRenderer === 'mathjax' ? (
-                    <Suspense fallback={<p role="status">MathJax 미리보기 준비 중…</p>}>
+                    <Suspense fallback={<p role="status">Preparing MathJax preview…</p>}>
                       <MathJaxMarkdown content={preprocessLatex(markdown)} />
                     </Suspense>
                   ) : (
@@ -1055,14 +1055,14 @@ export default function TheoryWorkspace({
                     </ReactMarkdown>
                   )
                 ) : (
-                  <p className="theory-preview-empty">작성된 마크다운 내용이 없습니다. '편집' 탭에서 본문을 작성하세요.</p>
+                  <p className="theory-preview-empty">No Markdown content yet. Write your document in the &ldquo;Edit&rdquo; tab.</p>
                 )}
               </div>
             </div>
           )}
           {editorTab === 'analysis' && snapshot && <div className="theory-markdown-preview-pane vcs-preview-pane">
-            {dirty && <p className="document-analysis-warning">현재 편집 내용은 분석 대상 버전과 다릅니다. 저장 후 AI 분석을 다시 실행하세요.</p>}
-            {analysisRun && analysisRun.versionId !== snapshot.version.id && <p className="document-analysis-warning">이전 버전의 분석 결과가 있습니다. 현재 v{snapshot.version.number} 문서를 다시 분석하세요.</p>}
+            {dirty && <p className="document-analysis-warning">Current edits differ from the analyzed version. Save and re-run AI analysis.</p>}
+            {analysisRun && analysisRun.versionId !== snapshot.version.id && <p className="document-analysis-warning">Analysis results are from a previous version. Re-analyze the current v{snapshot.version.number} document.</p>}
             <DocumentAnalysisView
               snapshot={analysisViewSnapshot ?? snapshot}
               run={analysisRun?.versionId === (analysisViewSnapshot ?? snapshot).version.id ? analysisRun : null}
@@ -1088,13 +1088,13 @@ export default function TheoryWorkspace({
           />
         </div>
 
-        {/* 에디터 하단 미니멀 정보 바 */}
+        {/* Minimal editor footer bar */}
         <div className="theory-editor-footer-bar">
           <div className="theory-footer-stats">
-            <span>{markdown.length}자</span>
+            <span>{markdown.length} chars</span>
             <span>·</span>
-            <span>{markdown ? markdown.split('\n').length : 0}줄</span>
-            {dirty && <span className="theory-footer-dirty">● 미저장 변경 있음</span>}
+            <span>{markdown ? markdown.split('\n').length : 0} lines</span>
+            {dirty && <span className="theory-footer-dirty">● Unsaved changes</span>}
           </div>
 
           {assistantDraft && !pendingSuggestion && (
@@ -1104,7 +1104,7 @@ export default function TheoryWorkspace({
               onClick={() => {
                 if (!markdown.trim()) {
                   setMarkdown(assistantDraft);
-                  setStatus('최근 대화 답변을 본문으로 가져왔습니다.');
+                  setStatus('Imported latest chat response into the document.');
                   return;
                 }
                 const diffResult = computeLineDiff(markdown, assistantDraft);
@@ -1117,16 +1117,16 @@ export default function TheoryWorkspace({
                 });
                 setDiffViewMode('diff');
                 setEditorTab('write');
-                setStatus('✦ 최근 대화 답변의 변경 사항을 검토 중입니다.');
+                setStatus('✦ Reviewing changes from latest chat response.');
               }}
             >
-              최근 대화 답변 변경 검토
+              Review changes from latest chat response
             </button>
           )}
         </div>
       </div>
 
-      {/* 3. 분석/도구 절차 팝업 모달 다이얼로그 */}
+      {/* 3. Analysis / Tool Modal Dialog */}
       {activeModal && (
         <div className="theory-modal-backdrop" onClick={() => setActiveModal(null)}>
           <div className="theory-modal-container" onClick={e => e.stopPropagation()}>
@@ -1136,16 +1136,16 @@ export default function TheoryWorkspace({
                 {activeModal === 'history' && <Folder size={18} className="theory-modal-title-icon" />}
                 {activeModal === 'analysis' && <Sparkles size={18} className="theory-modal-title-icon" />}
                 <h3>
-                  {activeModal === 'contract' && '연구 기준 (ResearchContract) 설정 및 AI 후보 제안'}
-                  {activeModal === 'history' && '문서 버전 비교 및 과거 버전 복원'}
-                  {activeModal === 'analysis' && 'AI 문서 정합성 분석 및 검토 설정'}
+                  {activeModal === 'contract' && 'Research Criteria (ResearchContract) & AI Suggestions'}
+                  {activeModal === 'history' && 'Compare Versions & Restore Past Version'}
+                  {activeModal === 'analysis' && 'AI Consistency Analysis & Review Settings'}
                 </h3>
               </div>
               <button
                 type="button"
                 className="theory-modal-close-btn"
                 onClick={() => setActiveModal(null)}
-                title="창 닫기"
+                title="Close"
               >
                 <X size={16} />
               </button>
@@ -1176,7 +1176,7 @@ export default function TheoryWorkspace({
                         for (const key of keys) delete next[key];
                         return next;
                       });
-                      setStatus(`${keys.length}개 연구 기준 후보를 입력했습니다. 확인 후 문서를 저장하세요.`);
+                      setStatus(`Populated ${keys.length} research criteria candidate(s). Review and save the document.`);
                     }}
                   />
 
@@ -1184,13 +1184,13 @@ export default function TheoryWorkspace({
                     <summary className="theory-contract-summary">
                       <div className="theory-summary-left">
                         <BookOpen size={16} />
-                        <span>수동 연구 기준 입력 (목적 · 가정 · 정의 · 기호 · 범위)</span>
+                        <span>Manual Research Criteria (Purpose · Assumptions · Definitions · Symbols · Scope)</span>
                       </div>
-                      <span className="theory-contract-count-badge">6개 항목</span>
+                      <span className="theory-contract-count-badge">6 items</span>
                     </summary>
                     <fieldset disabled={busy || loading} className="theory-contract-fieldset">
                       <p className="theory-modal-hint">
-                        직접 명시한 연구 기준은 문서 버전과 함께 보존됩니다. 본문의 근거 문단(블록)과 연결하여 논리적 정합성을 더 높일 수 있습니다.
+                        Explicitly defined research criteria are preserved with the document version. Link them to source paragraphs (blocks) to strengthen logical traceability.
                       </p>
                       <div className="theory-contract-grid">
                         {(Object.keys(contractLabels) as (keyof ResearchContract)[]).map(key => (
@@ -1198,15 +1198,15 @@ export default function TheoryWorkspace({
                             <div className="theory-contract-item-header">
                               <label htmlFor={`contract-${key}`}>{contractLabels[key]}</label>
                               {contract[key].trim() ? (
-                                <span className="theory-field-status filled">작성됨</span>
+                                <span className="theory-field-status filled">Filled</span>
                               ) : (
-                                <span className="theory-field-status empty">비어있음</span>
+                                <span className="theory-field-status empty">Empty</span>
                               )}
                             </div>
                             <textarea
                               id={`contract-${key}`}
                               rows={2}
-                              placeholder={`${contractLabels[key]} 내용을 입력하세요...`}
+                              placeholder={`Enter ${contractLabels[key]}...`}
                               value={contract[key]}
                               onChange={event => {
                                 setContract(previous => ({ ...previous, [key]: event.target.value }));
@@ -1219,7 +1219,7 @@ export default function TheoryWorkspace({
                             />
                             {snapshot && (
                               <label className="theory-anchor-selector">
-                                <span>근거 블록 연결:</span>
+                                <span>Link evidence block:</span>
                                 <select
                                   value={contractAnchors[key]?.blockId ?? ''}
                                   disabled={!contract[key].trim()}
@@ -1231,9 +1231,9 @@ export default function TheoryWorkspace({
                                     return next;
                                   })}
                                 >
-                                  <option value="">연결 없음</option>
+                                  <option value="">No link</option>
                                   {snapshot.blocks.map(block => (
-                                    <option key={block.id} value={block.id}>블록 {block.position + 1} · {block.text.slice(0, 50)}...</option>
+                                    <option key={block.id} value={block.id}>Block {block.position + 1} · {block.text.slice(0, 50)}...</option>
                                   ))}
                                 </select>
                               </label>
@@ -1247,10 +1247,10 @@ export default function TheoryWorkspace({
               )}
 
               {activeModal === 'history' && snapshot && (
-                <section className="theory-history" aria-label="버전 비교">
-                  <p className="theory-modal-hint">과거 버전을 선택하여 현재 저장된 v{snapshot.version.number}과의 변경점을 확인합니다.</p>
+                <section className="theory-history" aria-label="Compare versions">
+                  <p className="theory-modal-hint">Select a past version to view changes compared to the currently saved v{snapshot.version.number}.</p>
                   <select
-                    aria-label="비교할 버전"
+                    aria-label="Version to compare"
                     value={comparisonId}
                     disabled={busy}
                     className="theory-version-select"
@@ -1263,7 +1263,7 @@ export default function TheoryWorkspace({
                       });
                     }}
                   >
-                    <option value="">비교할 버전 선택</option>
+                    <option value="">Select version to compare</option>
                     {snapshot.history.filter(version => version.id !== snapshot.version.id).map(version => (
                       <option key={version.id} value={version.id}>v{version.number} — {version.title}</option>
                     ))}
@@ -1276,31 +1276,31 @@ export default function TheoryWorkspace({
                         className="theory-restore-btn"
                         disabled={busy}
                         onClick={() => {
-                          if (!confirmDiscard() || !window.confirm(`v${comparison.number}의 내용을 새 버전으로 복원할까요? 모든 과거 버전은 유지됩니다.`)) return;
+                          if (!confirmDiscard() || !window.confirm(`Restore v${comparison.number} as a new version? All past versions will be preserved.`)) return;
                           void run(async () => {
                             const saved = await restoreTheoryVersion(snapshot.document.id, snapshot.version.id, comparison.id);
                             adopt(saved);
-                            setStatus(`v${saved.version.number}으로 복원 완료.`);
+                            setStatus(`Restored to v${saved.version.number}.`);
                             setActiveModal(null);
                           });
                         }}
                       >
-                        이 버전으로 복원
+                        Restore this version
                       </button>
                       {comparison.title !== snapshot.version.title && (
-                        <p className="theory-diff-title-change">제목 변경: {comparison.title} → {snapshot.version.title}</p>
+                        <p className="theory-diff-title-change">Title changed: {comparison.title} → {snapshot.version.title}</p>
                       )}
                       {(Object.keys(contractLabels) as (keyof ResearchContract)[]).filter(key => comparison.contract[key] !== snapshot.version.contract[key]).map(key => (
                         <div className="theory-change" key={key}>
-                          <strong>{contractLabels[key]} 변경</strong>
-                          <div className="theory-diff"><pre>{comparison.contract[key] || '(없음)'}</pre><pre>{snapshot.version.contract[key] || '(없음)'}</pre></div>
+                          <strong>{contractLabels[key]} changed</strong>
+                          <div className="theory-diff"><pre>{comparison.contract[key] || '(None)'}</pre><pre>{snapshot.version.contract[key] || '(None)'}</pre></div>
                         </div>
                       ))}
-                      <p className="theory-diff-count-label">본문 변경 {changes.length}개 · 왼쪽: 과거 / 오른쪽: 현재</p>
+                      <p className="theory-diff-count-label">{changes.length} body change(s) · Left: Past / Right: Current</p>
                       {changes.map(change => (
                         <div key={change.id} className="theory-change">
                           <strong>{changeLabels[change.change]}</strong>
-                          <div className="theory-diff"><pre>{change.before || '(없음)'}</pre><pre>{change.after || '(없음)'}</pre></div>
+                          <div className="theory-diff"><pre>{change.before || '(None)'}</pre><pre>{change.after || '(None)'}</pre></div>
                         </div>
                       ))}
                     </div>
@@ -1322,24 +1322,24 @@ export default function TheoryWorkspace({
                 const isOverSafeLimit = totalEstimatedTokens > safePromptLimit;
                 const isOverLimit = totalEstimatedTokens > modelContextLimit;
 
-                // 1-Click 추천 모델 찾기 (현재 토큰을 안정적으로 수용 가능한 1M/2M 대용량 모델)
+                // 1-Click recommended model (1M/2M large-context model that safely fits current tokens)
                 const recommendedLargeModel = AVAILABLE_MODELS.find(m => (m.contextWindowTokens || 0) >= 1_000_000 && m.id !== analysisModelId);
 
                 return (
                   <div className="theory-analysis-modal-view">
                     <p className="theory-modal-hint">
-                      문서 전체의 내부 정합성, 수식 유도, 공리/가정 누락 및 반례 후보를 심층 검토합니다.
+                      Performs a deep review of internal consistency, equation derivations, missing axioms/assumptions, and counterexample candidates across the entire document.
                     </p>
 
                     <div className="theory-analysis-config-section">
                       <div className="theory-analysis-label-row">
                         <label className="theory-analysis-config-label">
                           <Cpu size={15} />
-                          <span>분석 모델 및 용량 제한</span>
+                          <span>Analysis Model &amp; Context Limit</span>
                         </label>
                         {isOverSafeLimit && (
                           <span className={`theory-token-status-badge ${isOverLimit ? 'critical' : 'warning'}`}>
-                            {isOverLimit ? '⚠️ 용량 초과' : '⚡ 권장 한도 경고'}
+                            {isOverLimit ? '⚠️ Over Limit' : '⚡ Recommended Limit Warning'}
                           </span>
                         )}
                       </div>
@@ -1350,42 +1350,42 @@ export default function TheoryWorkspace({
                       >
                         {AVAILABLE_MODELS.map(model => (
                           <option key={model.id} value={model.id}>
-                            {model.name} ({model.provider.toUpperCase()}) — 최대 {formatTokenLimit(model.contextWindowTokens || 128000)}
+                            {model.name} ({model.provider.toUpperCase()}) — Max {formatTokenLimit(model.contextWindowTokens || 128000)}
                           </option>
                         ))}
                       </select>
                       <div className="theory-analysis-token-summary">
-                        <span>모델 총 컨텍스트: <strong>{formatTokenLimit(modelContextLimit)}</strong> (권장 안전 입력: <strong>{formatTokenLimit(safePromptLimit)}</strong>)</span>
+                        <span>Total Model Context: <strong>{formatTokenLimit(modelContextLimit)}</strong> (Recommended Safe Input: <strong>{formatTokenLimit(safePromptLimit)}</strong>)</span>
                       </div>
                     </div>
 
-                    {/* 실시간 토큰 점유율 및 대상 문서 정보 (분석 모델 선택 바로 아래 위치) */}
+                    {/* Real-time token usage and target document info */}
                     <div className="theory-analysis-context-info">
                       <div className="theory-analysis-info-row">
-                        <span>분석 대상 문서:</span>
-                        <strong>{title || '(제목 없음)'} {snapshot ? `(v${snapshot.version.number})` : '(초안)'}</strong>
+                        <span>Target Document:</span>
+                        <strong>{title || '(Untitled)'} {snapshot ? `(v${snapshot.version.number})` : '(Draft)'}</strong>
                       </div>
                       <div className="theory-analysis-info-row">
-                        <span>분석 범위:</span>
-                        <span>전체 {snapshot?.blocks.length ?? 0}개 블록 / 연구 기준 {Object.values(contract).filter(v => v.trim()).length}/6개 포함</span>
+                        <span>Analysis Scope:</span>
+                        <span>All {snapshot?.blocks.length ?? 0} block(s) / {Object.values(contract).filter(v => v.trim()).length}/6 criteria included</span>
                       </div>
 
-                      {/* 토큰 세부 구성 Breakdown */}
+                      {/* Token Breakdown */}
                       <div className="theory-token-breakdown-chips">
-                        <span className="theory-token-chip">본문 ~{estimatedDocTokens.toLocaleString()} 토큰</span>
+                        <span className="theory-token-chip">Body ~{estimatedDocTokens.toLocaleString()} tokens</span>
                         {estimatedContractTokens > 0 && (
-                          <span className="theory-token-chip">연구기준 ~{estimatedContractTokens.toLocaleString()} 토큰</span>
+                          <span className="theory-token-chip">Criteria ~{estimatedContractTokens.toLocaleString()} tokens</span>
                         )}
                         {estimatedInstructionTokens > 0 && (
-                          <span className="theory-token-chip">추가지시 ~{estimatedInstructionTokens.toLocaleString()} 토큰</span>
+                          <span className="theory-token-chip">Instructions ~{estimatedInstructionTokens.toLocaleString()} tokens</span>
                         )}
                       </div>
 
                       <div className="theory-analysis-token-meter-box">
                         <div className="theory-token-meter-header">
-                          <span>실시간 예상 컨텍스트 점유율:</span>
+                          <span>Estimated Context Usage:</span>
                           <strong className={isOverLimit ? 'over-limit' : isOverSafeLimit ? 'warning-limit' : ''}>
-                            ~{totalEstimatedTokens.toLocaleString()} / {modelContextLimit.toLocaleString()} 토큰 ({tokenUsageRatio < 0.1 && totalEstimatedTokens > 0 ? '<0.1' : tokenUsageRatio.toFixed(1)}%)
+                            ~{totalEstimatedTokens.toLocaleString()} / {modelContextLimit.toLocaleString()} tokens ({tokenUsageRatio < 0.1 && totalEstimatedTokens > 0 ? '<0.1' : tokenUsageRatio.toFixed(1)}%)
                           </strong>
                         </div>
                         <div className="theory-token-meter-bar">
@@ -1399,8 +1399,8 @@ export default function TheoryWorkspace({
                           <div className="theory-token-recommendation-box">
                             <p className="theory-token-warning-text">
                               {isOverLimit
-                                ? '⚠️ 문서 및 지시사항의 총 토큰 수가 선택된 모델의 전체 용량을 초과했습니다.'
-                                : '💡 AI의 안정적인 정합성 검토 결과 생성을 위해 더 여유로운 대용량 컨텍스트 모델 사용을 권장합니다.'}
+                                ? '⚠️ Total tokens for the document and instructions exceed the selected model\'s capacity.'
+                                : '💡 A larger-context model is recommended for reliable AI consistency review.'}
                             </p>
                             {recommendedLargeModel && (
                               <button
@@ -1408,13 +1408,13 @@ export default function TheoryWorkspace({
                                 className="theory-token-switch-btn"
                                 onClick={() => setAnalysisModelId(recommendedLargeModel.id)}
                               >
-                                ⚡ {recommendedLargeModel.name} ({formatTokenLimit(recommendedLargeModel.contextWindowTokens || 1000000)}) 모델로 1-Click 전환
+                                ⚡ 1-Click switch to {recommendedLargeModel.name} ({formatTokenLimit(recommendedLargeModel.contextWindowTokens || 1000000)})
                               </button>
                             )}
                           </div>
                         )}
 
-                        {/* 분할 분석 (Chunking Mode) 선택 옵션 */}
+                        {/* Chunking Mode Option */}
                         <div className="theory-chunking-option-box">
                           <label className="theory-chunking-toggle-label">
                             <input
@@ -1422,10 +1422,10 @@ export default function TheoryWorkspace({
                               checked={isChunkingEnabled}
                               onChange={e => setIsChunkingEnabled(e.target.checked)}
                             />
-                            <span>🧩 섹션별 분할 분석 (Chunking Mode) 사용</span>
+                            <span>🧩 Use Section-by-Section Analysis (Chunking Mode)</span>
                           </label>
                           <p className="theory-chunking-hint">
-                            문서가 모델의 컨텍스트 용량을 초과하더라도 장/단락 단위로 쪼개어 안전하게 순차 검토합니다. (블록 ID 매핑 및 1-클릭 Diff 100% 보존)
+                            Even if the document exceeds the model&apos;s context limit, it is safely reviewed sequentially by chapter/section. (Preserves 100% block ID mapping and 1-click Diffs.)
                           </p>
                         </div>
                       </div>
@@ -1434,7 +1434,7 @@ export default function TheoryWorkspace({
                     <div className="theory-analysis-config-section">
                       <label className="theory-analysis-config-label">
                         <Sliders size={15} />
-                        <span>검토 포커스 선택</span>
+                        <span>Select Review Focus</span>
                       </label>
                       <div className="theory-analysis-preset-grid">
                         {ANALYSIS_PRESETS.map(preset => {
@@ -1459,12 +1459,12 @@ export default function TheoryWorkspace({
                     <div className="theory-analysis-config-section">
                       <label className="theory-analysis-config-label">
                         <Edit3 size={15} />
-                        <span>연구자 추가 지시사항 (선택)</span>
+                        <span>Additional Researcher Instructions (Optional)</span>
                       </label>
                       <textarea
                         className="theory-analysis-custom-textarea"
                         rows={3}
-                        placeholder="예: 3장의 게이지 대칭성 유도 과정과 공리 2의 타당성을 중점적으로 검토해줘"
+                        placeholder="e.g., Focus on the gauge symmetry derivation in Section 3 and the validity of Axiom 2"
                         value={analysisCustomInstruction}
                         onChange={e => setAnalysisCustomInstruction(e.target.value)}
                       />
@@ -1481,7 +1481,7 @@ export default function TheoryWorkspace({
                 className="theory-modal-footer-close-btn"
                 onClick={() => setActiveModal(null)}
               >
-                닫기
+                Close
               </button>
               {activeModal === 'contract' && (
                 <button
@@ -1494,7 +1494,7 @@ export default function TheoryWorkspace({
                   }}
                 >
                   <Save size={14} />
-                  <span>연구 기준 저장</span>
+                  <span>Save Research Criteria</span>
                 </button>
               )}
               {activeModal === 'analysis' && (() => {
@@ -1512,7 +1512,7 @@ export default function TheoryWorkspace({
                     type="button"
                     className={`theory-modal-footer-save-btn theory-start-analysis-modal-btn ${!canStart ? 'over-limit-btn' : ''}`}
                     disabled={analysisBusy || busy || !title.trim() || !markdown.trim() || !canStart}
-                    title={!canStart ? '선택한 모델의 토큰 용량을 초과했습니다. Gemini 모델을 선택하거나 분할 분석 옵션을 켜주세요.' : '정합성 분석 시작'}
+                    title={!canStart ? 'Exceeds the selected model\'s token capacity. Choose a Gemini model or enable Chunking Mode.' : 'Start Consistency Analysis'}
                     onClick={() => {
                       if (!canStart) return;
                       const presetObj = ANALYSIS_PRESETS.find(p => p.id === analysisPreset);
@@ -1528,10 +1528,10 @@ export default function TheoryWorkspace({
                     <Sparkles size={14} />
                     <span>
                       {isOverLimit && isChunkingEnabled
-                        ? '분할 정합성 분석 시작'
+                        ? 'Start Chunked Consistency Analysis'
                         : isOverLimit
-                          ? '용량 초과 (분할 또는 모델 변경 필요)'
-                          : '정합성 분석 시작'}
+                          ? 'Over Limit (Enable Chunking or Switch Model)'
+                          : 'Start Consistency Analysis'}
                     </span>
                   </button>
                 );

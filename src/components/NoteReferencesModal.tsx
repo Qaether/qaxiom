@@ -55,7 +55,7 @@ export const NoteReferencesModal: React.FC<NoteReferencesModalProps> = ({
       const allTheories = await listTheories();
       setOtherTheories(allTheories.filter(t => t.document.id !== documentId));
     } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : 'Wiki 자료를 불러오지 못했습니다.');
+      setErrorMessage(err instanceof Error ? err.message : 'Failed to load Wiki resources.');
     } finally {
       setBusy(false);
     }
@@ -83,7 +83,7 @@ export const NoteReferencesModal: React.FC<NoteReferencesModalProps> = ({
       await onSaveBindings(selectedIds);
       onClose();
     } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : '저장에 실패했습니다.');
+      setErrorMessage(err instanceof Error ? err.message : 'Failed to save.');
     } finally {
       setBusy(false);
     }
@@ -97,7 +97,7 @@ export const NoteReferencesModal: React.FC<NoteReferencesModalProps> = ({
 
     setBusy(true);
     setErrorMessage('');
-    setStatusMessage('파일을 등록하고 Wiki에 색인하는 중…');
+    setStatusMessage('Registering file and indexing into Wiki…');
     try {
       if (file.name.toLowerCase().endsWith('.pdf')) {
         const result = await registerPdf(file.name, await file.arrayBuffer(), 'external');
@@ -109,9 +109,9 @@ export const NoteReferencesModal: React.FC<NoteReferencesModalProps> = ({
         setSelectedIds(prev => [...new Set([...prev, wikiId])]);
       }
       await loadData();
-      setStatusMessage(`“${file.name}” 파일이 Wiki에 등록되고 현재 노트에 연결되었습니다.`);
+      setStatusMessage(`"${file.name}" has been registered to Wiki and linked to the current note.`);
     } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : '파일 처리에 실패했습니다.');
+      setErrorMessage(err instanceof Error ? err.message : 'Failed to process file.');
     } finally {
       setBusy(false);
     }
@@ -121,7 +121,7 @@ export const NoteReferencesModal: React.FC<NoteReferencesModalProps> = ({
   const handleWebSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!webUrl.trim() || !webContent.trim()) {
-      setErrorMessage('URL과 웹 문서 본문 내용을 입력해 주세요.');
+      setErrorMessage('Please enter both the URL and web document content.');
       return;
     }
     setBusy(true);
@@ -134,9 +134,9 @@ export const NoteReferencesModal: React.FC<NoteReferencesModalProps> = ({
       setWebContent('');
       await loadData();
       setActiveTab('wiki');
-      setStatusMessage('웹 레퍼런스가 등록되어 현재 노트에 연결되었습니다.');
+      setStatusMessage('Web reference registered and linked to the current note.');
     } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : '웹 레퍼런스 등록에 실패했습니다.');
+      setErrorMessage(err instanceof Error ? err.message : 'Failed to register web reference.');
     } finally {
       setBusy(false);
     }
@@ -150,9 +150,9 @@ export const NoteReferencesModal: React.FC<NoteReferencesModalProps> = ({
       const page = await publishTheoryToWiki(doc, ver);
       setSelectedIds(prev => [...new Set([...prev, page.id])]);
       await loadData();
-      setStatusMessage(`내부 연구 스냅샷 “${ver.title} (v${ver.number})”이 연결되었습니다.`);
+      setStatusMessage(`Internal research snapshot "${ver.title} (v${ver.number})" linked.`);
     } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : '연구 스냅샷 연결에 실패했습니다.');
+      setErrorMessage(err instanceof Error ? err.message : 'Failed to link research snapshot.');
     } finally {
       setBusy(false);
     }
@@ -166,13 +166,13 @@ export const NoteReferencesModal: React.FC<NoteReferencesModalProps> = ({
   const getEntryBadge = (type?: WikiEntryType) => {
     switch (type) {
       case 'paper':
-        return <span className="entry-tag tag-paper"><FileText size={11} /> 논문/파일</span>;
+        return <span className="entry-tag tag-paper"><FileText size={11} /> Paper / File</span>;
       case 'web':
-        return <span className="entry-tag tag-web"><Globe size={11} /> 웹</span>;
+        return <span className="entry-tag tag-web"><Globe size={11} /> Web</span>;
       case 'theory_snapshot':
-        return <span className="entry-tag tag-theory"><BookOpen size={11} /> 내부 연구</span>;
+        return <span className="entry-tag tag-theory"><BookOpen size={11} /> Internal Research</span>;
       default:
-        return <span className="entry-tag tag-note"><FileText size={11} /> 노트</span>;
+        return <span className="entry-tag tag-note"><FileText size={11} /> Note</span>;
     }
   };
 
@@ -184,13 +184,13 @@ export const NoteReferencesModal: React.FC<NoteReferencesModalProps> = ({
           <div className="modal-header-left">
             <BookOpen className="header-icon" size={20} />
             <div>
-              <h3 id="note-references-title">레퍼런스 추가</h3>
+              <h3 id="note-references-title">Add References</h3>
               <p className="modal-subtitle">
-                현재 연구노트에 연결할 자료를 선택하세요. 선택된 자료만 이 노트의 RAG 검색 범위에 포함됩니다.
+                Select sources to link to this research note. Only selected sources are included in this note’s RAG search scope.
               </p>
             </div>
           </div>
-          <button type="button" className="close-btn" onClick={onClose} aria-label="닫기">
+          <button type="button" className="close-btn" onClick={onClose} aria-label="Close">
             <X size={18} />
           </button>
         </div>
@@ -202,28 +202,28 @@ export const NoteReferencesModal: React.FC<NoteReferencesModalProps> = ({
             className={`tab-btn ${activeTab === 'wiki' ? 'active' : ''}`}
             onClick={() => setActiveTab('wiki')}
           >
-            Wiki 서고에서 선택 ({selectedIds.length}개 선택됨)
+            Select from Wiki ({selectedIds.length} selected)
           </button>
           <button
             type="button"
             className={`tab-btn ${activeTab === 'file' ? 'active' : ''}`}
             onClick={() => setActiveTab('file')}
           >
-            새 파일 등록
+            Upload File
           </button>
           <button
             type="button"
             className={`tab-btn ${activeTab === 'web' ? 'active' : ''}`}
             onClick={() => setActiveTab('web')}
           >
-            웹 URL 추가
+            Add Web URL
           </button>
           <button
             type="button"
             className={`tab-btn ${activeTab === 'theories' ? 'active' : ''}`}
             onClick={() => setActiveTab('theories')}
           >
-            내 다른 연구노트 가져오기
+            Import Research Note
           </button>
         </div>
 
@@ -239,7 +239,7 @@ export const NoteReferencesModal: React.FC<NoteReferencesModalProps> = ({
                 <Search size={14} className="search-icon" />
                 <input
                   type="text"
-                  placeholder="Wiki 서고 자료 검색..."
+                  placeholder="Search Wiki library..."
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                 />
@@ -248,9 +248,9 @@ export const NoteReferencesModal: React.FC<NoteReferencesModalProps> = ({
               {filteredWikiPages.length === 0 ? (
                 <div className="empty-wiki-hint">
                   {wikiPages.length === 0 ? (
-                    <p>등록된 Wiki 자료가 없습니다. [새 파일 등록] 또는 [웹 URL 추가] 탭에서 자료를 추가해 보세요.</p>
+                    <p>No Wiki resources registered. Add one from the [Upload File] or [Add Web URL] tab.</p>
                   ) : (
-                    <p>검색 결과와 일치하는 Wiki 자료가 없습니다.</p>
+                    <p>No Wiki resources match your search.</p>
                   )}
                 </div>
               ) : (
@@ -284,13 +284,13 @@ export const NoteReferencesModal: React.FC<NoteReferencesModalProps> = ({
                                 rel="noreferrer"
                                 className="item-link"
                                 onClick={e => e.stopPropagation()}
-                                title="원본 링크 열기"
+                                title="Open original link"
                               >
                                 <ExternalLink size={12} />
                               </a>
                             )}
                           </div>
-                          <p className="item-summary">{page.summary || '내용 요약 없음'}</p>
+                          <p className="item-summary">{page.summary || 'No summary available'}</p>
                         </div>
                       </div>
                     );
@@ -304,10 +304,10 @@ export const NoteReferencesModal: React.FC<NoteReferencesModalProps> = ({
             <div className="tab-pane-file">
               <div className="file-drop-area">
                 <Upload size={32} className="upload-icon" />
-                <h4>파일을 선택하여 Wiki 서고에 등록</h4>
-                <p>Markdown(.md), 텍스트(.txt), PDF(.pdf) 파일을 로컬에서 안전하게 색인합니다.</p>
+                <h4>Select a File to Register in Wiki</h4>
+                <p>Markdown (.md), text (.txt), and PDF (.pdf) files are indexed safely on your local device.</p>
                 <label className="file-choose-label">
-                  파일 선택
+                  Choose File
                   <input
                     type="file"
                     accept=".md,.markdown,.txt,.pdf"
@@ -323,32 +323,32 @@ export const NoteReferencesModal: React.FC<NoteReferencesModalProps> = ({
           {activeTab === 'web' && (
             <form className="tab-pane-web" onSubmit={handleWebSubmit}>
               <div className="form-group">
-                <label htmlFor="web-url">참조 웹 URL *</label>
+                <label htmlFor="web-url">Reference Web URL *</label>
                 <input
                   id="web-url"
                   type="url"
-                  placeholder="https://arxiv.org/abs/... 또는 웹 문서 링크"
+                  placeholder="https://arxiv.org/abs/... or web document URL"
                   value={webUrl}
                   onChange={e => setWebUrl(e.target.value)}
                   required
                 />
               </div>
               <div className="form-group">
-                <label htmlFor="web-title">문서 제목 (선택)</label>
+                <label htmlFor="web-title">Document Title (Optional)</label>
                 <input
                   id="web-title"
                   type="text"
-                  placeholder="논문명 또는 기사 제목"
+                  placeholder="Paper or article title"
                   value={webTitle}
                   onChange={e => setWebTitle(e.target.value)}
                 />
               </div>
               <div className="form-group">
-                <label htmlFor="web-content">발췌 본문 텍스트 (Markdown/텍스트) *</label>
+                <label htmlFor="web-content">Excerpt Body Text (Markdown/Text) *</label>
                 <textarea
                   id="web-content"
                   rows={6}
-                  placeholder="웹 페이지에서 참고할 본문이나 초록을 복사해 붙여넣으세요..."
+                  placeholder="Paste the relevant excerpt or abstract from the web page..."
                   value={webContent}
                   onChange={e => setWebContent(e.target.value)}
                   required
@@ -356,7 +356,7 @@ export const NoteReferencesModal: React.FC<NoteReferencesModalProps> = ({
               </div>
               <button type="submit" className="submit-btn" disabled={busy}>
                 <Plus size={14} />
-                <span>Wiki에 등록 및 현재 노트에 연결</span>
+                <span>Register to Wiki & Link to Current Note</span>
               </button>
             </form>
           )}
@@ -364,10 +364,10 @@ export const NoteReferencesModal: React.FC<NoteReferencesModalProps> = ({
           {activeTab === 'theories' && (
             <div className="tab-pane-theories">
               <p className="theories-intro">
-                같은 프로젝트 내의 다른 연구노트 확정 버전을 이 노트의 전제/레퍼런스로 연결합니다.
+                Link a finalized version of another research note in the same project as a premise or reference for this note.
               </p>
               {otherTheories.length === 0 ? (
-                <p className="empty-hint">참조할 수 있는 다른 연구노트가 없습니다.</p>
+                <p className="empty-hint">No other research notes available to reference.</p>
               ) : (
                 <div className="theories-list">
                   {otherTheories.map(t => (
@@ -383,7 +383,7 @@ export const NoteReferencesModal: React.FC<NoteReferencesModalProps> = ({
                         disabled={busy}
                       >
                         <Plus size={13} />
-                        <span>이 버전 연결</span>
+                        <span>Link Version</span>
                       </button>
                     </div>
                   ))}
@@ -396,15 +396,15 @@ export const NoteReferencesModal: React.FC<NoteReferencesModalProps> = ({
         {/* Footer */}
         <div className="modal-footer">
           <div className="footer-status">
-            <span>선택된 레퍼런스: <strong>{selectedIds.length}</strong>개</span>
+            <span>Selected references: <strong>{selectedIds.length}</strong></span>
           </div>
           <div className="footer-actions">
             <button type="button" className="btn-cancel" onClick={onClose} disabled={busy}>
-              취소
+              Cancel
             </button>
             <button type="button" className="btn-save" onClick={handleSave} disabled={busy}>
               <Check size={14} />
-              <span>적용하기</span>
+              <span>Apply</span>
             </button>
           </div>
         </div>

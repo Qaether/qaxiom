@@ -67,7 +67,7 @@ export const NoteInlineSearchDrawer: React.FC<NoteInlineSearchDrawerProps> = ({
     });
 
     setNoteHits(results);
-    setStatus(results.length > 0 ? `노트 내 ${results.length}개 구절 발견` : '일치하는 단어가 없습니다.');
+    setStatus(results.length > 0 ? `Found ${results.length} matching lines in note` : 'No matching words found.');
   }, [query, markdown, mainTab]);
 
   const handleSearch = async () => {
@@ -76,7 +76,7 @@ export const NoteInlineSearchDrawer: React.FC<NoteInlineSearchDrawerProps> = ({
 
     setBusy(true);
     setError('');
-    setStatus('레퍼런스 RAG 검색 중…');
+    setStatus('Searching reference RAG…');
     setHits([]);
 
     try {
@@ -86,7 +86,7 @@ export const NoteInlineSearchDrawer: React.FC<NoteInlineSearchDrawerProps> = ({
         const boundIds = version?.referenceIds ?? [];
         if (boundIds.length === 0) {
           setBusy(false);
-          setStatus('이 노트에 연결된 레퍼런스가 없습니다. [+ 레퍼런스 추가]로 연결하거나 [전체 Wiki 서고] 선택 후 검색하세요.');
+          setStatus('No references are linked to this note. Link via [+ Add Reference] or switch to [All Wiki Library] to search.');
           return;
         }
         targetSourceIds = await resolveSourceIdsFromWikiIds(boundIds);
@@ -100,7 +100,7 @@ export const NoteInlineSearchDrawer: React.FC<NoteInlineSearchDrawerProps> = ({
 
       if (targetSourceIds.length === 0) {
         setBusy(false);
-        setStatus('프로젝트에 검색 가능한 레퍼런스 자료가 없습니다. [Project References]에서 자료를 추가하세요.');
+        setStatus('No searchable reference materials in this project. Add materials in [Project References].');
         return;
       }
 
@@ -108,7 +108,7 @@ export const NoteInlineSearchDrawer: React.FC<NoteInlineSearchDrawerProps> = ({
 
       if (!data.referenceSpans || data.referenceSpans.length === 0) {
         setBusy(false);
-        setStatus('선택한 레퍼런스에 인덱싱된 구절이 없습니다.');
+        setStatus('No indexed spans found in the selected references.');
         return;
       }
 
@@ -116,10 +116,10 @@ export const NoteInlineSearchDrawer: React.FC<NoteInlineSearchDrawerProps> = ({
       const results = searchBM25(data, query);
       setHits(results);
       setBusy(false);
-      setStatus(results.length > 0 ? `검색 결과 ${results.length}건 발견` : '일치하는 구절이 없습니다. 다른 키워드(용어, 수식, 개념)로 검색해 보세요.');
+      setStatus(results.length > 0 ? `Found ${results.length} results` : 'No matching passages found. Try different keywords (terms, formulas, concepts).');
     } catch (err) {
       setBusy(false);
-      setError(err instanceof Error ? err.message : '검색 실패');
+      setError(err instanceof Error ? err.message : 'Search failed');
     }
   };
 
@@ -154,14 +154,14 @@ export const NoteInlineSearchDrawer: React.FC<NoteInlineSearchDrawerProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="note-inline-search-drawer" aria-label="통합 에디터 검색">
+    <div className="note-inline-search-drawer" aria-label="Integrated Editor Search">
       {/* Drawer Header */}
       <div className="drawer-header">
         <div className="drawer-title">
           <Search size={16} />
-          <span>통합 검색</span>
+          <span>Integrated Search</span>
         </div>
-        <button type="button" className="drawer-close-btn" onClick={onClose} aria-label="닫기">
+        <button type="button" className="drawer-close-btn" onClick={onClose} aria-label="Close">
           <X size={16} />
         </button>
       </div>
@@ -177,7 +177,7 @@ export const NoteInlineSearchDrawer: React.FC<NoteInlineSearchDrawerProps> = ({
           }}
         >
           <FileText size={13} />
-          <span>노트 내 단어 찾기</span>
+          <span>Find in Note</span>
         </button>
         <button
           type="button"
@@ -188,7 +188,7 @@ export const NoteInlineSearchDrawer: React.FC<NoteInlineSearchDrawerProps> = ({
           }}
         >
           <Database size={13} />
-          <span>레퍼런스 RAG 검색</span>
+          <span>Reference RAG Search</span>
         </button>
       </div>
 
@@ -202,7 +202,7 @@ export const NoteInlineSearchDrawer: React.FC<NoteInlineSearchDrawerProps> = ({
               checked={scope === 'bound'}
               onChange={() => setScope('bound')}
             />
-            <span>이 노트 레퍼런스만 ({boundCount}개)</span>
+            <span>Note References Only ({boundCount})</span>
           </label>
           <label className={`scope-pill ${scope === 'all' ? 'active' : ''}`}>
             <input
@@ -211,7 +211,7 @@ export const NoteInlineSearchDrawer: React.FC<NoteInlineSearchDrawerProps> = ({
               checked={scope === 'all'}
               onChange={() => setScope('all')}
             />
-            <span>전체 Wiki 서고</span>
+            <span>All Wiki Library</span>
           </label>
         </div>
       )}
@@ -220,7 +220,7 @@ export const NoteInlineSearchDrawer: React.FC<NoteInlineSearchDrawerProps> = ({
       <div className="drawer-search-bar">
         <input
           type="text"
-          placeholder={mainTab === 'note_text' ? '노트 본문 단어/문장 검색…' : '레퍼런스 수식, 용어, 키워드 검색 (Enter)…'}
+          placeholder={mainTab === 'note_text' ? 'Search words or phrases in note…' : 'Search reference formulas, terms, keywords (Enter)…'}
           value={query}
           onChange={e => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -228,7 +228,7 @@ export const NoteInlineSearchDrawer: React.FC<NoteInlineSearchDrawerProps> = ({
         />
         {mainTab === 'rag_reference' && (
           <button type="button" className="search-exec-btn" onClick={handleSearch} disabled={busy || !query.trim()}>
-            {busy ? '검색 중…' : '검색'}
+            {busy ? 'Searching…' : 'Search'}
           </button>
         )}
       </div>
@@ -245,11 +245,11 @@ export const NoteInlineSearchDrawer: React.FC<NoteInlineSearchDrawerProps> = ({
               key={hit.id}
               className="search-hit-card note-hit-card clickable"
               onClick={() => onSelectNoteLine?.(hit.lineNumber)}
-              title="클릭 시 에디터의 해당 라인 위치로 즉시 이동"
+              title="Click to jump to this line in the editor"
             >
               <div className="hit-meta-row">
                 <span className="hit-location-tag">📍 Line {hit.lineNumber}</span>
-                <span className="hit-goto-hint">위치로 이동 ➔</span>
+                <span className="hit-goto-hint">Jump to line ➔</span>
               </div>
               <div className="hit-excerpt">
                 <pre>{hit.lineContent}</pre>
@@ -266,7 +266,7 @@ export const NoteInlineSearchDrawer: React.FC<NoteInlineSearchDrawerProps> = ({
                     {hit.source.name}
                   </span>
                   <span className="hit-location">{loc}</span>
-                  <span className="hit-score">점수 {hit.score.toFixed(2)}</span>
+                  <span className="hit-score">Score {hit.score.toFixed(2)}</span>
                 </div>
 
                 <div className="hit-excerpt">
@@ -278,20 +278,20 @@ export const NoteInlineSearchDrawer: React.FC<NoteInlineSearchDrawerProps> = ({
                     type="button"
                     className="hit-action-btn insert-btn"
                     onClick={() => handleInsert(hit)}
-                    title="현재 커서 위치에 마크다운 인용문 삽입"
+                    title="Insert Markdown quote at current cursor position"
                   >
                     {insertedId === hit.span.id ? <Check size={12} /> : <Quote size={12} />}
-                    <span>{insertedId === hit.span.id ? '본문 삽입됨!' : '본문에 인용 삽입'}</span>
+                    <span>{insertedId === hit.span.id ? 'Inserted!' : 'Insert Quote'}</span>
                   </button>
 
                   <button
                     type="button"
                     className="hit-action-btn copy-btn"
                     onClick={() => handleCopy(hit.span.text, hit.span.id)}
-                    title="발췌문 복사"
+                    title="Copy excerpt"
                   >
                     {copiedId === hit.span.id ? <Check size={12} /> : <Copy size={12} />}
-                    <span>{copiedId === hit.span.id ? '복사됨' : '복사'}</span>
+                    <span>{copiedId === hit.span.id ? 'Copied' : 'Copy'}</span>
                   </button>
 
                   {onSendToChat && (
@@ -299,10 +299,10 @@ export const NoteInlineSearchDrawer: React.FC<NoteInlineSearchDrawerProps> = ({
                       type="button"
                       className="hit-action-btn chat-btn"
                       onClick={() => onSendToChat(query, hit)}
-                      title="이 구절을 대화창으로 전달"
+                      title="Send this passage to chat"
                     >
                       <ArrowRight size={12} />
-                      <span>대화창 질문</span>
+                      <span>Ask in Chat</span>
                     </button>
                   )}
                 </div>

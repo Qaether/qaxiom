@@ -13,11 +13,11 @@ describe('ChatInput keyboard controls', () => {
     const onSendMessage = vi.fn();
     render(<ChatInput onSendMessage={onSendMessage} isStreaming={false} onStopStreaming={vi.fn()} currentMode="general" />);
 
-    const input = screen.getByRole('textbox', { name: '연구 질문 입력' });
-    await user.type(input, '첫 줄{Shift>}{Enter}{/Shift}둘째 줄');
-    expect((input as HTMLTextAreaElement).value).toBe('첫 줄\n둘째 줄');
+    const input = screen.getByRole('textbox', { name: 'Enter research question' });
+    await user.type(input, 'First line{Shift>}{Enter}{/Shift}Second line');
+    expect((input as HTMLTextAreaElement).value).toBe('First line\nSecond line');
     await user.keyboard('{Enter}');
-    expect(onSendMessage).toHaveBeenCalledWith('첫 줄\n둘째 줄');
+    expect(onSendMessage).toHaveBeenCalledWith('First line\nSecond line');
     expect((input as HTMLTextAreaElement).value).toBe('');
   });
 
@@ -27,8 +27,8 @@ describe('ChatInput keyboard controls', () => {
     const onSendMessage = vi.fn();
     render(<ChatInput onSendMessage={onSendMessage} isStreaming onStopStreaming={onStopStreaming} currentMode="general" />);
 
-    expect(screen.getByRole('textbox', { name: '연구 질문 입력' }).hasAttribute('disabled')).toBe(true);
-    const stop = screen.getByRole('button', { name: '생성 중단' });
+    expect(screen.getByRole('textbox', { name: 'Enter research question' }).hasAttribute('disabled')).toBe(true);
+    const stop = screen.getByRole('button', { name: 'Stop generation' });
     stop.focus();
     await user.keyboard('{Enter}');
     expect(onStopStreaming).toHaveBeenCalledOnce();

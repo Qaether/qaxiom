@@ -122,11 +122,11 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
                                 type="button"
                                 className="code-apply-btn"
                                 onClick={() => handleApply(codeString)}
-                                title="가운데 연구노트에 이 내용 적용"
-                                aria-label="노트에 적용"
+                                title="Apply this content to the center research note"
+                                aria-label="Apply to note"
                               >
                                 <FileDown size={12} />
-                                <span>노트에 적용</span>
+                                <span>Apply to note</span>
                               </button>
                             )}
                             <button
@@ -134,7 +134,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
                               onClick={() => navigator.clipboard.writeText(codeString)}
                             >
                               <Copy size={12} />
-                              <span>{isBibtex ? 'BibTeX 복사' : '코드 복사'}</span>
+                              <span>{isBibtex ? 'Copy BibTeX' : 'Copy code'}</span>
                             </button>
                           </div>
                         </div>
@@ -178,32 +178,32 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
             />
           )}
 
-          {!isUser && message.contextBundle && citations && <section className="message-citations" aria-label="답변 근거">
-            {message.contextBundle.retriever === 'graph-canonical-v1' && <p>정본 단독 문맥 · 레퍼런스 원문 0개. 자체 문서는 독립 외부 근거가 아니며 답변은 정합성 증명이 아닙니다.</p>}
-            {message.contextBundle.hybrid && <p>검색: BM25 + 벡터 RRF · 세대 {message.contextBundle.hybrid.spaceId} · {message.contextBundle.hybrid.model}/{message.contextBundle.hybrid.dimensions}차원 · 의미 색인 {message.contextBundle.hybrid.coveredSpanIds.length}구간/미색인 {message.contextBundle.hybrid.missingSpanIds.length}구간 · 제공사 revision 미확인</p>}
-            {message.contextBundle.hybrid?.manifestHash && <p>검색 당시 완성 manifest {message.contextBundle.hybrid.manifestHash} · 전환 번호 {message.contextBundle.hybrid.activationRevision} · 정합성 판정 아님</p>}
-            <p>인용 ID와 전송 원문의 연결만 확인합니다. 의미적 지지·정합성은 미검증입니다.</p>
-            {message.contextBundle.graph && <details><summary>답변의 정본 그래프 · 목표 {message.contextBundle.graph.context.targetBlockIds.length} / 추가 전제 {message.contextBundle.graph.context.premiseBlockIds.length}</summary>
-              <p>전송 당시 버전·승인 관계 기록이며 검사 완료나 독립 외부 증거가 아닙니다.</p>
+          {!isUser && message.contextBundle && citations && <section className="message-citations" aria-label="Response sources">
+            {message.contextBundle.retriever === 'graph-canonical-v1' && <p>Canonical-only context · 0 reference sources. Internal notes are not independent external evidence, and responses do not prove consistency.</p>}
+            {message.contextBundle.hybrid && <p>Retrieval: BM25 + vector RRF · Space {message.contextBundle.hybrid.spaceId} · {message.contextBundle.hybrid.model}/{message.contextBundle.hybrid.dimensions}d · Indexed {message.contextBundle.hybrid.coveredSpanIds.length} spans / Unindexed {message.contextBundle.hybrid.missingSpanIds.length} spans · Provider revision unverified</p>}
+            {message.contextBundle.hybrid?.manifestHash && <p>Retrieval manifest {message.contextBundle.hybrid.manifestHash} · Activation revision {message.contextBundle.hybrid.activationRevision} · Not a consistency verdict</p>}
+            <p>Verifies only the link between citation IDs and sent source text. Semantic support and consistency are unverified.</p>
+            {message.contextBundle.graph && <details><summary>Canonical graph for response · {message.contextBundle.graph.context.targetBlockIds.length} targets / {message.contextBundle.graph.context.premiseBlockIds.length} additional premises</summary>
+              <p>Snapshot of version and approval links at send time; not a verification result or independent external evidence.</p>
               <pre>{JSON.stringify(message.contextBundle.graph.context, null, 2)}</pre>
-              {message.contextBundle.graph.blocks.map((block, index) => <div key={block.id}><p>[[G{index + 1}]] 블록 {block.id} · {block.contentHash}</p><pre>{block.text}</pre></div>)}
+              {message.contextBundle.graph.blocks.map((block, index) => <div key={block.id}><p>[[G{index + 1}]] Block {block.id} · {block.contentHash}</p><pre>{block.text}</pre></div>)}
             </details>}
             {message.contextBundle.assembly && <details>
-              <summary>연구 기준과 문맥 범위</summary>
-              {message.contextBundle.projectScope && <><p>전송 당시 프로젝트 자료 정책 · 고정 기록이며 현재 정책이나 접근 제어의 증명이 아닙니다.</p><pre>{JSON.stringify(message.contextBundle.projectScope, null, 2)}</pre></>}
-              <p>부모 문맥 {message.contextBundle.assembly.parentSpanIds.length}개 · 예산상 미전송 {message.contextBundle.assembly.omittedSpanIds.length}개</p>
+              <summary>Research contract and context scope</summary>
+              {message.contextBundle.projectScope && <><p>Project material policy at send time · Fixed snapshot, not a guarantee of current policy or access control.</p><pre>{JSON.stringify(message.contextBundle.projectScope, null, 2)}</pre></>}
+              <p>{message.contextBundle.assembly.parentSpanIds.length} parent context spans · {message.contextBundle.assembly.omittedSpanIds.length} omitted due to budget</p>
               {!!message.contextBundle.assembly.omissions.length && <ul>{message.contextBundle.assembly.omissions.map(item =>
-                <li key={item.spanId}>{item.name} · {spanLocation(item)} · 미전송</li>)}</ul>}
+                <li key={item.spanId}>{item.name} · {spanLocation(item)} · Not sent</li>)}</ul>}
               {message.contextBundle.assembly.research ? <>
-                <p>{message.contextBundle.assembly.research.title} · v{message.contextBundle.assembly.research.number} · 비어 있는 기준: {message.contextBundle.assembly.research.emptyFields.join(', ') || '없음'}</p>
+                <p>{message.contextBundle.assembly.research.title} · v{message.contextBundle.assembly.research.number} · Empty fields: {message.contextBundle.assembly.research.emptyFields.join(', ') || 'None'}</p>
                 <pre>{JSON.stringify(message.contextBundle.assembly.research.contract, null, 2)}</pre>
-                {message.contextBundle.assembly.research.contractAnchors && <p>전송 당시 정본 원문 연결: {JSON.stringify(message.contextBundle.assembly.research.contractAnchors)}. 블록 본문 전송이나 근거의 참을 의미하지 않습니다.</p>}
-              </> : <p>연구 기준 미첨부 — 전제의 완전성 미확인</p>}
+                {message.contextBundle.assembly.research.contractAnchors && <p>Canonical source links at send time: {JSON.stringify(message.contextBundle.assembly.research.contractAnchors)}. Does not imply block text transmission or truth of evidence.</p>}
+              </> : <p>Research contract not attached — premise completeness unverified</p>}
             </details>}
-            {message.status === 'complete' && !citations.valid.length && <p role="alert">답변에 유효한 원문 인용이 없습니다.</p>}
-            {!!citations.invalid.length && <p role="alert">전송 근거에 없는 인용: {citations.invalid.join(', ')}</p>}
+            {message.status === 'complete' && !citations.valid.length && <p role="alert">No valid source citations in response.</p>}
+            {!!citations.invalid.length && <p role="alert">Citations not in sent sources: {citations.invalid.join(', ')}</p>}
             {message.contextBundle.evidence.map(item => <button type="button" key={item.citationId} onClick={() => onOpenSource?.(item)}>
-              [[{item.citationId}]] {item.name} · {spanLocation(item.span)} · {citations.valid.includes(item.citationId) ? '답변에서 인용' : '전송 근거'} · 원문 보기
+              [[{item.citationId}]] {item.name} · {spanLocation(item.span)} · {citations.valid.includes(item.citationId) ? 'Cited in response' : 'Sent source'} · View source
             </button>)}
           </section>}
 
@@ -214,7 +214,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
               {onRetry && (
                 <button type="button" className="retry-btn" onClick={onRetry}>
                   <RotateCcw size={13} />
-                  다시 시도
+                  Retry
                 </button>
               )}
             </div>
@@ -227,7 +227,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
               {onRetry && (
                 <button type="button" className="retry-btn" onClick={onRetry}>
                   <RotateCcw size={13} />
-                  다시 시도
+                  Retry
                 </button>
               )}
             </div>
@@ -240,11 +240,11 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
                 id={`apply-btn-${message.id}`}
                 className={`apply-doc-btn ${applied ? 'applied' : ''}`}
                 onClick={() => handleApply(message.content)}
-                title={applied ? '노트에 반영됨' : '가운데 연구노트에 이 답변 적용'}
-                aria-label={applied ? '노트에 반영됨' : '연구노트에 적용'}
+                title={applied ? 'Applied to note' : 'Apply this response to the center research note'}
+                aria-label={applied ? 'Applied to note' : 'Apply to research note'}
               >
                 {applied ? <Check size={14} className="copied-icon" /> : <FileDown size={14} />}
-                <span>{applied ? '반영됨' : '노트에 적용'}</span>
+                <span>{applied ? 'Applied' : 'Apply to note'}</span>
               </button>
             )}
             <button
@@ -252,8 +252,8 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
               id={`copy-btn-${message.id}`}
               className="copy-btn"
               onClick={handleCopy}
-              title={copied ? '복사됨' : '답변 복사'}
-              aria-label={copied ? '복사됨' : '답변 복사'}
+              title={copied ? 'Copied' : 'Copy response'}
+              aria-label={copied ? 'Copied' : 'Copy response'}
             >
               {copied ? <Check size={14} className="copied-icon" /> : <Copy size={14} />}
             </button>

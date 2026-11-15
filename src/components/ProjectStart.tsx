@@ -37,9 +37,9 @@ export default function ProjectStart({ onOpen, onReconnect, onSelectProject, onR
     try {
       const selected = await chooseWorkspaceDirectory();
       setDirectory(selected);
-      setFolderName((selected as WorkspaceDirectoryHandle & { name?: string }).name || '선택한 폴더');
+      setFolderName((selected as WorkspaceDirectoryHandle & { name?: string }).name || 'Selected folder');
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '폴더를 열지 못했습니다.');
+      setError(cause instanceof Error ? cause.message : 'Failed to open folder.');
     } finally {
       setBusy(false);
     }
@@ -48,7 +48,7 @@ export default function ProjectStart({ onOpen, onReconnect, onSelectProject, onR
   const run = async (task: () => Promise<void>) => {
     setBusy(true); setError('');
     try { await task(); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : '프로젝트를 열지 못했습니다.'); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : 'Failed to open project.'); }
     finally { setBusy(false); }
   };
 
@@ -59,8 +59,8 @@ export default function ProjectStart({ onOpen, onReconnect, onSelectProject, onR
         <button
           type="button"
           className="signin-btn"
-          onClick={() => alert('클라우드 서비스 및 계정 동기화 로그인은 준비 중입니다.')}
-          title="클라우드 로그인 (준비 중)"
+          onClick={() => alert('Cloud sync and account sign-in are coming soon.')}
+          title="Cloud sign-in (coming soon)"
           aria-label="Sign In"
         >
           <Cloud size={14} />
@@ -68,7 +68,7 @@ export default function ProjectStart({ onOpen, onReconnect, onSelectProject, onR
         </button>
       </div>
       <h1 id="project-start-heading">Projects</h1>
-      <p className="project-start-desc">작업할 연구 프로젝트를 선택하거나 새로운 로컬 프로젝트를 생성하세요.</p>
+      <p className="project-start-desc">Select a research project to work on or create a new local project.</p>
       {projectList.length > 0 && <section className="project-start-section" aria-label="Projects">
         <h2>Projects</h2>
         <div className="projects-list">
@@ -82,7 +82,7 @@ export default function ProjectStart({ onOpen, onReconnect, onSelectProject, onR
                     <div className="project-rename-row">
                       <input
                         type="text"
-                        aria-label={`${proj.name} 새 프로젝트 이름`}
+                        aria-label={`New project name for ${proj.name}`}
                         value={draftName}
                         maxLength={200}
                         disabled={busy}
@@ -111,8 +111,8 @@ export default function ProjectStart({ onOpen, onReconnect, onSelectProject, onR
                   )}
                   <span className="project-list-folder">
                     {isConfirmingDelete
-                      ? '목록에서 제거할까요? (로컬 폴더 파일은 삭제되지 않습니다)'
-                      : `선택한 폴더: ${proj.folderName}`}
+                      ? 'Remove from list? (Local folder files will not be deleted)'
+                      : `Selected folder: ${proj.folderName}`}
                   </span>
                 </div>
                 <div className="project-list-actions">
@@ -129,7 +129,7 @@ export default function ProjectStart({ onOpen, onReconnect, onSelectProject, onR
                           setDraftName('');
                         })}
                       >
-                        저장
+                        Save
                       </button>
                       <button
                         type="button"
@@ -137,7 +137,7 @@ export default function ProjectStart({ onOpen, onReconnect, onSelectProject, onR
                         disabled={busy}
                         onClick={() => { setEditingName(null); setDraftName(''); }}
                       >
-                        취소
+                        Cancel
                       </button>
                     </>
                   ) : isConfirmingDelete ? (
@@ -152,7 +152,7 @@ export default function ProjectStart({ onOpen, onReconnect, onSelectProject, onR
                           setConfirmDeleteName(null);
                         })}
                       >
-                        삭제 확인
+                        Confirm delete
                       </button>
                       <button
                         type="button"
@@ -160,7 +160,7 @@ export default function ProjectStart({ onOpen, onReconnect, onSelectProject, onR
                         disabled={busy}
                         onClick={() => setConfirmDeleteName(null)}
                       >
-                        취소
+                        Cancel
                       </button>
                     </>
                   ) : (
@@ -170,8 +170,8 @@ export default function ProjectStart({ onOpen, onReconnect, onSelectProject, onR
                           type="button"
                           className="project-icon-btn"
                           disabled={busy}
-                          aria-label={`${proj.name} 이름 변경`}
-                          title="이름 변경"
+                          aria-label={`Rename ${proj.name}`}
+                          title="Rename"
                           onClick={() => {
                             setError('');
                             setConfirmDeleteName(null);
@@ -187,8 +187,8 @@ export default function ProjectStart({ onOpen, onReconnect, onSelectProject, onR
                           type="button"
                           className="project-icon-btn project-icon-danger"
                           disabled={busy}
-                          aria-label={`${proj.name} 삭제`}
-                          title="목록에서 삭제"
+                          aria-label={`Delete ${proj.name}`}
+                          title="Remove from list"
                           onClick={() => {
                             setError('');
                             setEditingName(null);
@@ -204,7 +204,7 @@ export default function ProjectStart({ onOpen, onReconnect, onSelectProject, onR
                         disabled={busy}
                         onClick={() => void run(() => onSelectProject ? onSelectProject(proj) : onReconnect())}
                       >
-                        열기
+                        Open
                       </button>
                     </>
                   )}
@@ -214,19 +214,19 @@ export default function ProjectStart({ onOpen, onReconnect, onSelectProject, onR
           })}
         </div>
       </section>}
-      <section className="project-start-section" aria-label="새 프로젝트 설정">
-        <h2>새 프로젝트</h2>
-        <label htmlFor="project-name">프로젝트 이름</label>
-        <input id="project-name" value={name} maxLength={200} onChange={event => setName(event.target.value)} placeholder="예: 양자 스핀 모형" />
+      <section className="project-start-section" aria-label="New project setup">
+        <h2>New Project</h2>
+        <label htmlFor="project-name">Project name</label>
+        <input id="project-name" value={name} maxLength={200} onChange={event => setName(event.target.value)} placeholder="e.g. Quantum Spin Model" />
         <div className="project-start-folder">
-          <button type="button" disabled={busy || !supported} onClick={() => void chooseFolder()}>로컬 폴더 지정</button>
-          <span>{directory ? `선택한 폴더: ${folderName}` : '폴더를 선택하지 않았습니다.'}</span>
+          <button type="button" disabled={busy || !supported} onClick={() => void chooseFolder()}>Choose local folder</button>
+          <span>{directory ? `Selected folder: ${folderName}` : 'No folder selected.'}</span>
         </div>
-        {!supported && <p role="note">이 브라우저에서는 로컬 폴더 선택을 사용할 수 없습니다. 지원 브라우저에서 다시 열어 주세요.</p>}
-        <p className="project-start-warning">현재 화면 구성 단계입니다. 프로젝트별 데이터 분리와 폴더의 .md 정본 저장은 아직 연결되지 않았습니다. 문서·대화는 브라우저 저장소에 남고, 선택한 폴더에 자동 저장되지 않습니다.</p>
+        {!supported && <p role="note">Local folder selection is not supported in this browser. Please reopen in a supported browser.</p>}
+        <p className="project-start-warning">Prototype stage: per-project data isolation and saving canonical .md files to the folder are not yet connected. Documents and chats remain in browser storage and are not automatically saved to the selected folder.</p>
         {(error || initialError) && <p role="alert" className="project-start-error">{error || initialError}</p>}
         <button type="button" className="project-start-primary" disabled={busy || !name.trim() || !directory}
-          onClick={() => void run(() => onOpen({ name: name.trim(), folderName, directory: directory! }))}>채팅 화면 열기</button>
+          onClick={() => void run(() => onOpen({ name: name.trim(), folderName, directory: directory! }))}>Open workspace</button>
       </section>
     </div>
   </main>;

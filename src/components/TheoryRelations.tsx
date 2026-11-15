@@ -11,8 +11,8 @@ import { qaxiomDatabase } from '../services/database';
 import { hashText } from '../services/theory/blocks';
 
 const ReferenceSource = lazy(() => import('./ReferenceSource'));
-const kindLabels = { depends_on: '의존', defines: '정의 연결', supports: '지지 후보', contradicts: '상충 후보' };
-const statusLabels = { active: '현재 승인 관계', stale: '오래된 버전 — 재확인 필요', retracted: '사용자 철회', claim_unaccepted: '주장 채택 철회/미채택 — 사용 제외' };
+const kindLabels = { depends_on: 'Depends on', defines: 'Defines', supports: 'Support candidate', contradicts: 'Conflict candidate' };
+const statusLabels = { active: 'Active approved relation', stale: 'Stale version — re-verification needed', retracted: 'User retracted', claim_unaccepted: 'Claim unaccepted/retracted — excluded' };
 
 export default function TheoryRelations({ snapshot, dirty }: { snapshot: TheorySnapshot; dirty: boolean }) {
   const [wiki, setWiki] = useState<Awaited<ReturnType<typeof loadRelationWiki>> | null>(null);
@@ -30,7 +30,7 @@ export default function TheoryRelations({ snapshot, dirty }: { snapshot: TheoryS
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [status, setStatus] = useState('');
   useEffect(() => {
     let active = true;
-    const refresh = () => void loadRelationWiki(snapshot.document.id).then(value => { if (active) setWiki(value); }).catch(() => { if (active) setError('주장 관계를 읽지 못했습니다.'); });
+    const refresh = () => void loadRelationWiki(snapshot.document.id).then(value => { if (active) setWiki(value); }).catch(() => { if (active) setError('Failed to load claim relations.'); });
     refresh(); const timer = window.setInterval(refresh, 2000);
     return () => { active = false; window.clearInterval(timer); };
   }, [snapshot.document.id, snapshot.version.id]);
@@ -45,101 +45,101 @@ export default function TheoryRelations({ snapshot, dirty }: { snapshot: TheoryS
   const execute = async (task: () => Promise<void>) => {
     setBusy(true); setError(''); setStatus('');
     try { await task(); setWiki(await loadRelationWiki(snapshot.document.id)); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : '관계 작업 실패'); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : 'Relation operation failed'); }
     finally { setBusy(false); }
   };
   const openReference = (relation: ResearchRelation) => {
     if (!wiki || relation.to.type !== 'reference') return;
     const target = relation.to;
     const source = wiki.references.find(s => s.id === target.sourceId), span = wiki.spans.find(s => s.id === target.spanId);
-    if (!source || !span) { setError('고정한 원문 구간이 없습니다.'); return; }
+    if (!source || !span) { setError('Anchored source span not found.'); return; }
     const own = wiki.snapshot.history.find(v => v.contentHash === source.contentHash);
-    const item = createContextBundle('관계 원문 확인', [source.id], [{ source: own ? { ...source, role: 'theory_snapshot', originVersionId: own.id } : source, span, score: 0 }]);
+    const item = createContextBundle('Inspect relation source text', [source.id], [{ source: own ? { ...source, role: 'theory_snapshot', originVersionId: own.id } : source, span, score: 0 }]);
     setEvidence(item.evidence[0]);
   };
-  const claimName = (node: typeof claims[number]) => `${node.run.versionId === snapshot.version.id ? '현재' : '과거'} · ${node.claim.kind} · ${node.claim.statement.slice(0, 70)} · ${node.claim.id.slice(0, 8)}`;
-  return <section aria-label="주장 관계와 Wiki" className="theory-review">
-    <h3>주장 관계 · Wiki · 외부 대조</h3>
-    <p>원문에 고정된 채택 주장과 직접 선택한 근거를 연결합니다. 관계 승인과 호환성 표시는 사용자 판단이며 참·증명·내부 정합성 보증이 아닙니다. 자동 API 호출은 없습니다.</p>
-    {dirty && <p>미저장 변경이 있습니다. 저장 후 현재 버전의 주장을 검토·채택하고 관계를 다시 승인하세요.</p>}
-    {!current && wiki && <p>다른 탭에서 정본 버전을 변경했습니다. 문서를 다시 열어 주세요.</p>}
+  const claimName = (node: typeof claims[number]) => `${node.run.versionId === snapshot.version.id ? 'Current' : 'Past'} · ${node.claim.kind} · ${node.claim.statement.slice(0, 70)} · ${node.claim.id.slice(0, 8)}`;
+  return <section aria-label="Claim relations and Wiki" className="theory-review">
+    <h3>Claim Relations · Wiki · External Comparison</h3>
+    <p>Links accepted claims anchored to source text with directly selected evidence. Relation approvals and compatibility labels reflect user judgment and do not guarantee truth, proof, or internal consistency. No automatic API calls are made.</p>
+    {dirty && <p>You have unsaved changes. Save first, then review/accept claims for the current version and re-approve relations.</p>}
+    {!current && wiki && <p>The canonical version was changed in another tab. Please reopen the document.</p>}
     {error && <p role="alert">{error}</p>}{status && <p role="status">{status}</p>}
     <fieldset disabled={busy || dirty || !current}>
-      <legend>관계 작성 — 현재 채택 주장만</legend>
-      {!accepted.length && <p>문서 검토에서 주장 후보를 채택한 뒤 ‘관계 목록 새로고침’을 눌러 주세요.</p>}
-      <button type="button" onClick={() => void execute(async () => {})}>관계 목록 새로고침</button>
-      <label>출발 주장<select aria-label="출발 주장" value={fromKey} onChange={event => setFrom(event.target.value)}><option value="">선택</option>{accepted.map(n => <option key={n.key} value={n.key}>{claimName(n)}</option>)}</select></label>
-      <label>연결 대상 종류<select value={targetType} onChange={event => { const type = event.target.value as typeof targetType; setTargetType(type); setTarget(''); setKind(type === 'claim' ? 'depends_on' : 'supports'); }}><option value="claim">채택 주장</option><option value="reference">선택 원문 구간</option></select></label>
-      {targetType === 'reference' && <label>연결할 레퍼런스<select value={sourceId} onChange={event => { setSource(event.target.value); setTarget(''); }}><option value="">자료를 직접 선택</option>{wiki?.references.map(s => <option key={s.id} value={s.id}>{s.name} · {s.role}</option>)}</select></label>}
-      <label>도착 주장 또는 구간<select value={targetKey} onChange={event => setTarget(event.target.value)}><option value="">선택</option>{targetType === 'claim'
+      <legend>Create relation — currently accepted claims only</legend>
+      {!accepted.length && <p>Accept claim candidates in Document Review, then click &ldquo;Refresh relation list&rdquo;.</p>}
+      <button type="button" onClick={() => void execute(async () => {})}>Refresh relation list</button>
+      <label>Source claim<select aria-label="Source claim" value={fromKey} onChange={event => setFrom(event.target.value)}><option value="">Select</option>{accepted.map(n => <option key={n.key} value={n.key}>{claimName(n)}</option>)}</select></label>
+      <label>Target type<select value={targetType} onChange={event => { const type = event.target.value as typeof targetType; setTargetType(type); setTarget(''); setKind(type === 'claim' ? 'depends_on' : 'supports'); }}><option value="claim">Accepted claim</option><option value="reference">Selected source span</option></select></label>
+      {targetType === 'reference' && <label>Reference to link<select value={sourceId} onChange={event => { setSource(event.target.value); setTarget(''); }}><option value="">Select a source</option>{wiki?.references.map(s => <option key={s.id} value={s.id}>{s.name} · {s.role}</option>)}</select></label>}
+      <label>Target claim or span<select value={targetKey} onChange={event => setTarget(event.target.value)}><option value="">Select</option>{targetType === 'claim'
         ? accepted.filter(n => n.key !== fromKey).map(n => <option key={n.key} value={n.key}>{claimName(n)}</option>)
         : wiki?.spans.filter(s => s.sourceId === sourceId).map(s => <option key={s.id} value={s.id}>{spanLocation(s)} · {s.text.slice(0, 70)}</option>)}</select></label>
-      <label>관계 종류<select value={kind} onChange={event => setKind(event.target.value as typeof kind)}>{RELATION_KINDS.filter(k => targetType === 'claim' || ['supports', 'contradicts'].includes(k)).map(k => <option key={k} value={k}>{kindLabels[k]}</option>)}</select></label>
-      {kind === 'depends_on' && <label>의존성 종류<select value={dependencyType} onChange={event => setDependencyType(event.target.value as typeof dependencyType)}><option value="concept">개념 연결 — 순환 허용</option><option value="proof">증명 의존성 — 순환 후보 검사</option></select></label>}
+      <label>Relation type<select value={kind} onChange={event => setKind(event.target.value as typeof kind)}>{RELATION_KINDS.filter(k => targetType === 'claim' || ['supports', 'contradicts'].includes(k)).map(k => <option key={k} value={k}>{kindLabels[k]}</option>)}</select></label>
+      {kind === 'depends_on' && <label>Dependency type<select value={dependencyType} onChange={event => setDependencyType(event.target.value as typeof dependencyType)}><option value="concept">Conceptual link — cycles allowed</option><option value="proof">Proof dependency — check cycle candidates</option></select></label>}
       {targetType === 'reference' && <>
-        <label>외부 대조 분류<select value={label} onChange={event => setLabel(event.target.value as typeof label)}>{COMPATIBILITY_LABELS.map(l => <option key={l} value={l}>{l}</option>)}</select></label>
-        <label>자체 주장 가정·정의·범위<textarea value={theoryConditions} maxLength={2000} onChange={event => setTheoryConditions(event.target.value)} /></label>
-        <label>원문 결과의 가정·정의·범위<textarea value={referenceConditions} maxLength={2000} onChange={event => setReferenceConditions(event.target.value)} /></label>
-        <p>메모·자체 문서 및 같은 hash의 정본은 독립 외부 증거로 집계하지 않습니다. conflict_candidate는 내부 모순 판정이 아닙니다.</p>
+        <label>External comparison classification<select value={label} onChange={event => setLabel(event.target.value as typeof label)}>{COMPATIBILITY_LABELS.map(l => <option key={l} value={l}>{l}</option>)}</select></label>
+        <label>Own claim assumptions, definitions, and scope<textarea value={theoryConditions} maxLength={2000} onChange={event => setTheoryConditions(event.target.value)} /></label>
+        <label>Source result assumptions, definitions, and scope<textarea value={referenceConditions} maxLength={2000} onChange={event => setReferenceConditions(event.target.value)} /></label>
+        <p>Notes, self-authored documents, and canonical documents with the same hash are not counted as independent external evidence. conflict_candidate is not an internal contradiction ruling.</p>
       </>}
-      <label>관계 승인 사유<textarea value={note} maxLength={2000} onChange={event => setNote(event.target.value)} /></label>
+      <label>Reason for approving relation<textarea value={note} maxLength={2000} onChange={event => setNote(event.target.value)} /></label>
       <button type="button" disabled={!fromKey || !targetKey || !note.trim()} onClick={() => void execute(async () => {
-        const from = accepted.find(n => n.key === fromKey); if (!from || !wiki) throw new Error('현재 채택 주장을 다시 선택하세요.');
+        const from = accepted.find(n => n.key === fromKey); if (!from || !wiki) throw new Error('Please re-select a currently accepted claim.');
         const target = accepted.find(n => n.key === targetKey);
         const source = wiki.references.find(s => s.id === sourceId), span = wiki.spans.find(s => s.id === targetKey && s.sourceId === sourceId);
         const to = targetType === 'claim' && target ? claimAnchor(target.run, target.claim.id)
           : targetType === 'reference' && source && span ? { type: 'reference' as const, sourceId: source.id, sourceHash: source.contentHash, spanId: span.id, spanHash: span.contentHash, quote: span.text } : null;
-        if (!to) throw new Error('도착 주장/선택 원문을 다시 확인하세요.');
-        if (to.type === 'reference' && (!theoryConditions.trim() || !referenceConditions.trim())) throw new Error('대조하는 양쪽의 가정·정의·범위를 기록하세요.');
+        if (!to) throw new Error('Please check the target claim or selected source text.');
+        if (to.type === 'reference' && (!theoryConditions.trim() || !referenceConditions.trim())) throw new Error('Please record assumptions, definitions, and scope for both sides.');
         setPreview({ key, proposal: { documentId: snapshot.document.id, from: claimAnchor(from.run, from.claim.id), to, kind,
           dependencyType: kind === 'depends_on' ? dependencyType : null, note: note.trim(),
           assessment: to.type === 'reference' ? { label, theoryConditions: theoryConditions.trim(), referenceConditions: referenceConditions.trim() } : null } });
-      })}>관계 승인 미리보기</button>
+      })}>Preview relation approval</button>
     </fieldset>
-    {visiblePreview && <section aria-label="관계 승인 미리보기">
-      <p>{kindLabels[visiblePreview.kind]} · 정본 {visiblePreview.from.versionId} · 출발/도착 원문을 확인하세요.</p>
+    {visiblePreview && <section aria-label="Preview relation approval">
+      <p>{kindLabels[visiblePreview.kind]} · Canonical {visiblePreview.from.versionId} · Verify source and target quotes.</p>
       <pre>{visiblePreview.from.quote}</pre><pre>{visiblePreview.to.quote}</pre>
-      <p>사유: {visiblePreview.note}</p>
-      {visiblePreview.assessment && <p>사용자 대조 {visiblePreview.assessment.label} · 자체 조건: {visiblePreview.assessment.theoryConditions} · 원문 조건: {visiblePreview.assessment.referenceConditions}</p>}
-      <button type="button" disabled={busy} onClick={() => void execute(async () => { await approveRelation(visiblePreview); setPreview(null); setStatus('원문 고정 관계를 승인·저장했습니다. 증명 또는 정합성 판정이 아닙니다.'); })}>이 관계 승인·저장</button>
+      <p>Reason: {visiblePreview.note}</p>
+      {visiblePreview.assessment && <p>User comparison: {visiblePreview.assessment.label} · Own conditions: {visiblePreview.assessment.theoryConditions} · Source conditions: {visiblePreview.assessment.referenceConditions}</p>}
+      <button type="button" disabled={busy} onClick={() => void execute(async () => { await approveRelation(visiblePreview); setPreview(null); setStatus('Approved and saved source-anchored relation. This is not a proof or consistency ruling.'); })}>Approve &amp; save this relation</button>
     </section>}
     <section aria-label="Research Wiki">
-      <h4>Research Wiki — 원문과 승인 관계의 파생 뷰</h4>
+      <h4>Research Wiki — derived view of source text and approved relations</h4>
       <button type="button" disabled={busy || !wiki} onClick={() => void execute(async () => {
         const currentWiki = await loadRelationWiki(snapshot.document.id);
         const url = URL.createObjectURL(new Blob([relationWikiToMarkdown(currentWiki)], { type: 'text/markdown;charset=utf-8' }));
         const link = document.createElement('a'); link.href = url; link.download = `qaxiom-wiki-v${currentWiki.snapshot.version.number}.md`; link.click();
         window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-      })}>Research Wiki 내보내기</button>
-      <label>Wiki 주장<select aria-label="Wiki 주장" value={focusKey} onChange={event => setFocus(event.target.value)}><option value="">탐색할 주장 선택</option>{claims.map(n => <option key={n.key} value={n.key}>{claimName(n)} · {n.claim.acceptance}</option>)}</select></label>
+      })}>Export Research Wiki</button>
+      <label>Wiki claim<select aria-label="Wiki claim" value={focusKey} onChange={event => setFocus(event.target.value)}><option value="">Select a claim to explore</option>{claims.map(n => <option key={n.key} value={n.key}>{claimName(n)} · {n.claim.acceptance}</option>)}</select></label>
       {focus && <>
-        <p>검토 {focus.run.id} · 버전 {focus.run.versionId} · 블록 {focus.claim.blockId} · {focus.claim.acceptance}</p>
+        <p>Review {focus.run.id} · Version {focus.run.versionId} · Block {focus.claim.blockId} · {focus.claim.acceptance}</p>
         <pre>{focus.claim.statement}</pre>
         <button type="button" disabled={busy} onClick={() => void execute(async () => {
           const block = await qaxiomDatabase.document_blocks.get([focus.run.versionId, focus.claim.blockId]);
-          if (!block || block.contentHash !== focus.claim.blockHash || await hashText(block.text) !== focus.claim.blockHash) throw new Error('해당 버전의 주장 원문이 없거나 변경되었습니다.');
+          if (!block || block.contentHash !== focus.claim.blockHash || await hashText(block.text) !== focus.claim.blockHash) throw new Error('The claim source text for this version is missing or modified.');
           setRawBlock({ key: focus.key, text: block.text });
-        })}>주장 원문 블록 확인</button>
-        {rawBlock?.key === focusKey && <pre aria-label="Wiki 주장 전체 블록">{rawBlock.text}</pre>}
-        <p>현재 승인 링크: 출발 {graph.outgoing.length} · 역참조 {graph.incoming.length} · 의존 전제 {graph.dependencies.length} · 수정 영향 주장 {graph.impacted.length}. 미선언 관계는 포함하지 않습니다.</p>
-        <details><summary>의존 전제와 수정 영향 목록</summary>{[...graph.dependencies.map(id => ({ id, label: '전제' })), ...graph.impacted.map(id => ({ id, label: '영향' }))].map(n => <p key={n.label + n.id}>{n.label}: {claims.find(c => c.key === n.id)?.claim.statement ?? n.id}</p>)}</details>
+        })}>Inspect claim source block</button>
+        {rawBlock?.key === focusKey && <pre aria-label="Full Wiki claim block">{rawBlock.text}</pre>}
+        <p>Current approved links: Outgoing {graph.outgoing.length} · Backlinks {graph.incoming.length} · Prerequisite dependencies {graph.dependencies.length} · Impacted claims {graph.impacted.length}. Undeclared relations are excluded.</p>
+        <details><summary>Prerequisite dependencies and impacted claims</summary>{[...graph.dependencies.map(id => ({ id, label: 'Premise' })), ...graph.impacted.map(id => ({ id, label: 'Impacted' }))].map(n => <p key={n.label + n.id}>{n.label}: {claims.find(c => c.key === n.id)?.claim.statement ?? n.id}</p>)}</details>
       </>}
-      {!!graph.proofCycleRelationIds.length && <p role="alert">승인된 증명 의존성에 순환 후보 {graph.proofCycleRelationIds.length}개가 있습니다. 개념 연결 순환은 오류로 처리하지 않습니다. 자동 증명 판정이 아닙니다.</p>}
-      <p>독립 외부 대조: {wiki?.entries.filter(e => e.status === 'active' && e.independent).length ?? 0}개 · 외부 불일치는 내부 모순과 구분합니다.</p>
+      {!!graph.proofCycleRelationIds.length && <p role="alert">{graph.proofCycleRelationIds.length} cycle candidate(s) detected in approved proof dependencies. Conceptual link cycles are not treated as errors. This is not an automated proof ruling.</p>}
+      <p>Independent external comparisons: {wiki?.entries.filter(e => e.status === 'active' && e.independent).length ?? 0} · External disagreements are distinguished from internal contradictions.</p>
     </section>
-    <section aria-label="승인 관계 이력">
-      <h4>승인 관계 · 역참조 · 이력</h4>
-      <label>관계 철회 사유<textarea value={retractionNote} maxLength={2000} onChange={event => setRetractionNote(event.target.value)} /></label>
+    <section aria-label="Approved relation history">
+      <h4>Approved Relations · Backlinks · History</h4>
+      <label>Reason for retracting relation<textarea value={retractionNote} maxLength={2000} onChange={event => setRetractionNote(event.target.value)} /></label>
       {wiki?.entries.filter(e => !focusKey || anchorKey(e.relation.from) === focusKey || anchorKey(e.relation.to) === focusKey).map(({ relation, status: relationStatus, independent, source }) => <article key={relation.id}>
         <p>{kindLabels[relation.kind]} · {statusLabels[relationStatus]} · {relation.id}</p>
         <pre>{relation.from.quote} → {relation.to.quote}</pre><p>{relation.note}</p>
-        {relation.externalReviewOrigin && <p>외부 대조 계보: {relation.externalReviewOrigin.runId} · 쌍 {relation.externalReviewOrigin.pairId} · 사용자 별도 승인 (모델 분류 자동 채택 아님)</p>}
-        {relation.assessment && <><p>사용자 대조: {relation.assessment.label} · {independent ? '독립 외부 자료' : '메모/자체 문서 — 독립 외부 증거 아님'}</p><p>자체 조건: {relation.assessment.theoryConditions} · 원문 조건: {relation.assessment.referenceConditions}</p></>}
-        {source && <button type="button" onClick={() => openReference(relation)}>관계 근거 원문: {source.name}</button>}
-        {relation.retractedAt !== null ? <p>철회 사유: {relation.retractionNote}</p> : <button type="button" disabled={busy || !retractionNote.trim()} onClick={() => void execute(async () => { await retractRelation(relation.id, retractionNote); setStatus('관계를 철회했습니다. 기존 승인·원문 이력은 보존합니다.'); })}>이 관계 철회</button>}
+        {relation.externalReviewOrigin && <p>External comparison lineage: {relation.externalReviewOrigin.runId} · Pair {relation.externalReviewOrigin.pairId} · Separately approved by user (not auto-accepted from model)</p>}
+        {relation.assessment && <><p>User comparison: {relation.assessment.label} · {independent ? 'Independent external source' : 'Note/self-authored document — not independent external evidence'}</p><p>Own conditions: {relation.assessment.theoryConditions} · Source conditions: {relation.assessment.referenceConditions}</p></>}
+        {source && <button type="button" onClick={() => openReference(relation)}>Relation evidence source: {source.name}</button>}
+        {relation.retractedAt !== null ? <p>Retraction reason: {relation.retractionNote}</p> : <button type="button" disabled={busy || !retractionNote.trim()} onClick={() => void execute(async () => { await retractRelation(relation.id, retractionNote); setStatus('Relation retracted. Existing approval and source history are preserved.'); })}>Retract this relation</button>}
       </article>)}
-      {!wiki?.entries.length && <p>승인된 관계가 없습니다.</p>}
+      {!wiki?.entries.length && <p>No approved relations.</p>}
     </section>
-    {evidence && <Suspense fallback={<p>원문 보기 준비 중…</p>}><ReferenceSource evidence={evidence} onClose={() => setEvidence(null)} /></Suspense>}
+    {evidence && <Suspense fallback={<p>Loading source view…</p>}><ReferenceSource evidence={evidence} onClose={() => setEvidence(null)} /></Suspense>}
   </section>;
 }

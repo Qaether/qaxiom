@@ -90,9 +90,9 @@ interface AppProps {
 
 function getStorageErrorMessage(error: unknown): string {
   if (error instanceof DOMException && error.name === 'QuotaExceededError') {
-    return '브라우저 저장 공간이 부족해 대화를 저장하지 못했습니다. 불필요한 데이터를 정리하거나 대화를 내보내 주세요.';
+    return 'Could not save chat because browser storage is full. Please clear unnecessary data or export your chats.';
   }
-  return '대화를 브라우저 저장소에 기록하지 못했습니다. 사생활 보호 모드 또는 브라우저 저장소 설정을 확인해 주세요.';
+  return 'Could not write chat to browser storage. Please check private browsing mode or browser storage settings.';
 }
 
 export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning }) => {
@@ -171,7 +171,7 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
       const preview = await prepareTheoryDeletion(pendingDeleteDocumentId, snapshot.version.id);
       if (active) setDocumentDeletePreview(preview);
     })().catch(cause => {
-      if (active) setDocumentDeleteError(cause instanceof Error ? cause.message : '문서 삭제 범위를 확인하지 못했습니다.');
+      if (active) setDocumentDeleteError(cause instanceof Error ? cause.message : 'Failed to check document deletion scope.');
     }).finally(() => { if (active) setIsPreparingDocumentDelete(false); });
     return () => { active = false; };
   }, [pendingDeleteDocumentId, documentDraft?.dirty, documentDraft?.documentId, isStreaming]);
@@ -260,7 +260,7 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
       if (permission === 'granted') setOpenedProject(project);
       else setRememberedProject(project);
     }).catch(cause => {
-      if (active) setProjectLoadError(cause instanceof Error ? cause.message : '프로젝트 폴더를 불러오지 못했습니다.');
+      if (active) setProjectLoadError(cause instanceof Error ? cause.message : 'Failed to load project folder.');
     }).finally(() => { if (active) setProjectLoading(false); });
     return () => { active = false; };
   }, []);
@@ -274,7 +274,7 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
           if (active) setPersistenceError(null);
         })
         .catch(error => {
-          console.error('세션 저장 실패:', error);
+          console.error('Failed to save session:', error);
           if (active) setPersistenceError(getStorageErrorMessage(error));
         });
     }
@@ -305,7 +305,7 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
         setIsTheoryOpen(true);
       }
     }).catch(() => {
-      if (active) setPersistenceError('연구노트 목록을 읽지 못했습니다.');
+      if (active) setPersistenceError('Failed to load research notes list.');
     });
     return () => { active = false; };
   }, [openedProject, isTheoryOpen]);
@@ -374,7 +374,7 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
 
   const requestDeleteSession = (id: string, trigger: HTMLButtonElement) => {
     if (deletingSessionRef.current) return;
-    if (isStreaming) { window.alert('응답 생성이 끝난 뒤 세션을 삭제해 주세요.'); return; }
+    if (isStreaming) { window.alert('Please wait until response generation finishes before deleting a session.'); return; }
     const target = visibleSessions.find(session => session.id === id);
     if (!target) return;
     deleteDialogTriggerRef.current = trigger;
@@ -399,7 +399,7 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
       setPersistenceError(null);
       setPendingDeleteSessionId(null);
     } catch (error) {
-      setPersistenceError(`세션 삭제를 저장하지 못했습니다. ${getStorageErrorMessage(error)}`);
+      setPersistenceError(`Failed to save session deletion. ${getStorageErrorMessage(error)}`);
     } finally {
       deletingSessionRef.current = false;
       setIsDeletingSession(false);
@@ -416,8 +416,8 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
     if (isDeletingDocument || !theoryDocuments.some(row => row.id === id)) return;
     documentDeleteTriggerRef.current = trigger;
     const reason = documentDraft?.dirty && documentDraft.documentId === id
-      ? '현재 문서에 저장되지 않은 변경사항이 있습니다. 먼저 저장하거나 변경사항을 버린 뒤 삭제하세요.'
-      : isStreaming ? '응답 생성이 끝난 뒤 문서를 삭제해 주세요.' : '';
+      ? 'The current document has unsaved changes. Save or discard changes before deleting.'
+      : isStreaming ? 'Please wait until response generation finishes before deleting a document.' : '';
     setDocumentDeletePreview(null);
     setDocumentDeleteError(reason);
     setIsPreparingDocumentDelete(!reason);
@@ -427,7 +427,7 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
   const handleDeleteDocument = async () => {
     if (!documentDeletePreview || isDeletingDocument || isPreparingDocumentDelete) return;
     if (isStreaming || documentDraft?.dirty && documentDraft.documentId === documentDeletePreview.documentId) {
-      setDocumentDeleteError('응답 생성 또는 미저장 문서 수정이 끝난 뒤 다시 시도하세요.');
+      setDocumentDeleteError('Please wait until response generation or unsaved document edits finish, then try again.');
       return;
     }
     const preview = documentDeletePreview;
@@ -462,7 +462,7 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
         (next ?? document.getElementById('new-theory-btn'))?.focus();
       });
     } catch (cause) {
-      setDocumentDeleteError(cause instanceof Error ? cause.message : '문서를 삭제하지 못했습니다.');
+      setDocumentDeleteError(cause instanceof Error ? cause.message : 'Failed to delete document.');
     } finally {
       setIsDeletingDocument(false);
     }
@@ -607,17 +607,17 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
     let documentContext;
     try {
       if (route === 'research') {
-        if (documentDraft?.documentId !== theoryDocumentId) throw new Error('기준 연구노트를 불러오는 중입니다. 잠시 후 다시 질문해 주세요.');
+        if (documentDraft?.documentId !== theoryDocumentId) throw new Error('Loading reference research note. Please ask again in a moment.');
         const prior = priorAnswer?.documentContext;
-        if (prior && prior.documentId !== theoryDocumentId) throw new Error('재시도할 답변의 기준 연구노트가 현재 노트와 다릅니다.');
+        if (prior && prior.documentId !== theoryDocumentId) throw new Error('The reference research note for the retried response differs from the current note.');
         documentContext = prior ?? await captureDocumentContext(theoryDocumentId, documentDraft);
         await verifyDocumentContext(documentContext);
         if (contextBundle?.assembly?.research && contextBundle.assembly.research.documentId !== theoryDocumentId)
-          throw new Error('선택한 검색 문맥의 연구노트가 현재 노트와 다릅니다.');
+          throw new Error('The research note of the selected retrieval context differs from the current note.');
         withDocumentContext(contextBundle ? withReferenceContext(updatedMessages, contextBundle) : updatedMessages, documentContext);
       }
     } catch (cause) {
-      window.alert(cause instanceof Error ? cause.message : '연구노트 문맥을 확인하지 못했습니다.');
+      window.alert(cause instanceof Error ? cause.message : 'Failed to verify research note context.');
       return;
     }
     if (documentContext) assistantMessage.documentContext = documentContext;
@@ -745,8 +745,8 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
   };
 
   const handleExportWorkspace = async () => {
-    if (deletingSessionRef.current) throw new Error('세션 삭제 저장이 끝난 뒤 백업해 주세요.');
-    if (isStreaming) throw new Error('응답 생성이 끝난 뒤 작업공간을 백업해 주세요.');
+    if (deletingSessionRef.current) throw new Error('Please wait until session deletion is saved before backing up.');
+    if (isStreaming) throw new Error('Please wait until response generation finishes before backing up the workspace.');
     await saveSessions(sessions);
     const bundle = await createWorkspaceBundle();
     const blob = new Blob([serializeWorkspaceBundle(bundle)], { type: 'application/json;charset=utf-8' });
@@ -759,8 +759,8 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
   };
 
   const handleExportWorkspaceToFolder = async (): Promise<string> => {
-    if (deletingSessionRef.current) throw new Error('세션 삭제 저장이 끝난 뒤 백업해 주세요.');
-    if (isStreaming) throw new Error('응답 생성이 끝난 뒤 작업공간을 백업해 주세요.');
+    if (deletingSessionRef.current) throw new Error('Please wait until session deletion is saved before backing up.');
+    if (isStreaming) throw new Error('Please wait until response generation finishes before backing up the workspace.');
     // The picker must be opened directly from the click before asynchronous database work.
     const directory = await chooseWorkspaceDirectory();
     await saveSessions(sessions);
@@ -769,8 +769,8 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
   };
 
   const handleExportTheoryToFolder = async (): Promise<{ folderName: string; documentCount: number }> => {
-    if (deletingSessionRef.current) throw new Error('세션 삭제 저장이 끝난 뒤 내보내 주세요.');
-    if (isStreaming) throw new Error('응답 생성이 끝난 뒤 연구노트를 내보내 주세요.');
+    if (deletingSessionRef.current) throw new Error('Please wait until session deletion is saved before exporting.');
+    if (isStreaming) throw new Error('Please wait until response generation finishes before exporting research notes.');
     const directory = await chooseWorkspaceDirectory();
     await saveSessions(sessions);
     const bundle = await createWorkspaceBundle();
@@ -778,16 +778,16 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
   };
 
   const handleRestoreWorkspace = async (file: File): Promise<number> => {
-    if (deletingSessionRef.current) throw new Error('세션 삭제 저장이 끝난 뒤 복원해 주세요.');
-    if (isStreaming) throw new Error('응답 생성이 끝난 뒤 작업공간을 복원해 주세요.');
+    if (deletingSessionRef.current) throw new Error('Please wait until session deletion is saved before restoring.');
+    if (isStreaming) throw new Error('Please wait until response generation finishes before restoring the workspace.');
     if (file.size > 100 * 1024 * 1024) {
-      throw new Error('백업 파일은 100 MB 이하여야 합니다.');
+      throw new Error('Backup file must be 100 MB or smaller.');
     }
     let parsed: unknown;
     try {
       parsed = JSON.parse(await file.text());
     } catch {
-      throw new Error('올바른 JSON 백업 파일이 아닙니다.');
+      throw new Error('Invalid JSON backup file.');
     }
 
     await saveSessions(sessions);
@@ -802,7 +802,7 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
     return restoredSessions.length;
   };
 
-  if (projectLoading) return <main className="project-start" role="status">프로젝트 연결 확인 중…</main>;
+  if (projectLoading) return <main className="project-start" role="status">Checking project connection…</main>;
 
   if (!openedProject) return <ProjectStart
     remembered={rememberedProject}
@@ -817,7 +817,7 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
     }}
     onSelectProject={async project => {
       if (!await requestFolderPermission(project.directory)) {
-        throw new Error('폴더 접근 권한이 없어 프로젝트를 열 수 없습니다. 다시 허용하거나 다른 폴더를 지정해 주세요.');
+        throw new Error('Folder access permission is required to open this project. Please grant permission again or choose another folder.');
       }
       await rememberProjectFolder(project);
       await refreshRecentProjects();
@@ -839,7 +839,7 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
     }}
     onReconnect={async () => {
       if (!rememberedProject || !await requestFolderPermission(rememberedProject.directory)) {
-        throw new Error('폴더 접근 권한이 없어 프로젝트를 열 수 없습니다. 다시 허용하거나 다른 폴더를 지정해 주세요.');
+        throw new Error('Folder access permission is required to open this project. Please grant permission again or choose another folder.');
       }
       await rememberProjectFolder(rememberedProject);
       await refreshRecentProjects();
@@ -879,17 +879,17 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
           className="pane-resizer pane-resizer-left"
           onMouseDown={handleLeftResizerMouseDown}
           onDoubleClick={() => setSidebarWidth(260)}
-          title="좌우로 드래그하여 탐색기 너비 조절 (더블클릭 시 260px 초기화)"
+          title="Drag left or right to resize explorer width (double-click to reset to 260px)"
           role="separator"
           aria-orientation="vertical"
-          aria-label="탐색기 사이드바 너비 조절"
+          aria-label="Resize explorer sidebar"
         />
 
         {/* Pane 2: Center Research Document Editor */}
         <main className="center-document-pane">
           {/* Center Pane Content */}
           {isTheoryOpen || theoryDocumentId ? (
-            <React.Suspense fallback={<div className="pane-loading" role="status">연구노트 불러오는 중…</div>}>
+            <React.Suspense fallback={<div className="pane-loading" role="status">Loading research note…</div>}>
               <TheoryWorkspace
                 key={newDocumentToken}
                 onClose={() => { setIsTheoryOpen(false); setTheoryDocumentId(null); }}
@@ -922,15 +922,15 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
                     id="mobile-menu-btn"
                     className="mobile-menu-btn topbar-tooltip"
                     onClick={() => setIsMobileSidebarOpen(true)}
-                    data-tooltip="대화 메뉴 열기"
-                    aria-label="대화 메뉴 열기"
+                    data-tooltip="Open chat menu"
+                    aria-label="Open chat menu"
                     aria-expanded={isMobileSidebarOpen}
                     aria-controls="chat-sidebar"
                   >
                     <Menu size={18} />
                   </button>
 
-                  <div className="header-project-chip header-project-label" aria-label={`현재 프로젝트: ${openedProject.name}`}>
+                  <div className="header-project-chip header-project-label" aria-label={`Current project: ${openedProject.name}`}>
                     <Folder size={13} className="header-project-icon" />
                     <span className="header-project-name">{openedProject.name}</span>
                   </div>
@@ -941,11 +941,11 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
                     type="button"
                     className="center-header-new-btn topbar-tooltip"
                     onClick={() => { setTheoryDocumentId(null); setIsTheoryOpen(true); }}
-                    data-tooltip="새 문서"
-                    aria-label="새 문서 작성"
+                    data-tooltip="New document"
+                    aria-label="Create new document"
                   >
                     <Plus size={14} />
-                    <span>새 문서</span>
+                    <span>New Document</span>
                   </button>
                 </div>
               </div>
@@ -955,9 +955,9 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
                   <div className="center-empty-icon">
                     <FileText size={40} />
                   </div>
-                  <h3 className="center-empty-title">열려 있는 연구노트가 없습니다</h3>
+                  <h3 className="center-empty-title">No research note open</h3>
                   <p className="center-empty-desc">
-                    왼쪽 탐색기에서 정본 문서를 선택하거나, 새로운 연구노트를 작성하여 가설과 수식을 체계적으로 정립하세요.
+                    Select a canonical document from the left explorer, or create a new research note to systematically formalize hypotheses and equations.
                   </p>
                   <button
                     type="button"
@@ -965,7 +965,7 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
                     onClick={() => { setTheoryDocumentId(null); setIsTheoryOpen(true); }}
                   >
                     <Plus size={16} />
-                    <span>새 문서 시작</span>
+                    <span>Start New Document</span>
                   </button>
                 </div>
               </div>
@@ -978,10 +978,10 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
           className="pane-resizer pane-resizer-right"
           onMouseDown={handleRightResizerMouseDown}
           onDoubleClick={() => setChatWidth(380)}
-          title="좌우로 드래그하여 채팅창 너비 조절 (더블클릭 시 380px 초기화)"
+          title="Drag left or right to resize chat pane width (double-click to reset to 380px)"
           role="separator"
           aria-orientation="vertical"
-          aria-label="채팅창 너비 조절"
+          aria-label="Resize chat pane"
         />
 
         {/* Pane 3: Right Research Chat Sidebar */}
@@ -1004,9 +1004,9 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
           {/* Global Key Alert Banner if no keys configured */}
           {!(settings.apiKeys.gemini.trim() || settings.apiKeys.openai.trim() || settings.apiKeys.anthropic.trim()) && (
             <div className="global-key-banner">
-              <span>🔑 AI API 키가 아직 등록되지 않았습니다. 원활한 연구 대화를 위해 최소 1개의 키를 등록해 주세요.</span>
+              <span>🔑 No AI API key configured yet. Add at least one key to start researching.</span>
               <button className="banner-settings-btn" onClick={() => setIsSettingsOpen(true)}>
-                키 설정하기 →
+                Configure Keys →
               </button>
             </div>
           )}
@@ -1023,18 +1023,18 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
                       .catch(error => setPersistenceError(getStorageErrorMessage(error)));
                   }}
                 >
-                  저장 다시 시도
+                  Retry Save
                 </button>
               )}
             </div>
           )}
 
           {isHistoryOpen ? (
-            <div className="chat-history-drawer" role="region" aria-label="대화 기록 목록">
+            <div className="chat-history-drawer" role="region" aria-label="Chat history list">
               <div className="chat-history-drawer-header">
                 <div className="chat-history-drawer-title">
                   <History size={15} />
-                  <span>대화 기록 ({visibleSessions.length})</span>
+                  <span>Chat History ({visibleSessions.length})</span>
                 </div>
                 <div className="chat-history-drawer-actions">
                   <button
@@ -1044,18 +1044,18 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
                       handleNewSession();
                       setIsHistoryOpen(false);
                     }}
-                    title="새 대화 시작"
-                    aria-label="새 대화"
+                    title="Start new chat"
+                    aria-label="New chat"
                   >
                     <Plus size={14} />
-                    <span>새 대화</span>
+                    <span>New Chat</span>
                   </button>
                   <button
                     type="button"
                     className="chat-history-drawer-close-btn"
                     onClick={() => setIsHistoryOpen(false)}
-                    title="닫기"
-                    aria-label="대화 기록 닫기"
+                    title="Close"
+                    aria-label="Close chat history"
                   >
                     <X size={15} />
                   </button>
@@ -1064,7 +1064,7 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
 
               <div className="chat-history-drawer-list">
                 {visibleSessions.length === 0 ? (
-                  <div className="chat-history-drawer-empty">저장된 연구 대화가 없습니다.</div>
+                  <div className="chat-history-drawer-empty">No saved research chats.</div>
                 ) : (
                   visibleSessions.map(session => (
                     <div
@@ -1078,15 +1078,15 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
                           handleSelectSession(session.id);
                           setIsHistoryOpen(false);
                         }}
-                        aria-label={`${session.title || '새로운 연구 대화'} 선택`}
+                        aria-label={`Select ${session.title || 'New research chat'}`}
                       >
                         <MessageSquare size={14} className="chat-history-drawer-item-icon" />
                         <div className="chat-history-drawer-item-text">
                           <span className="chat-history-drawer-item-title">
-                            {session.title || '새로운 연구 대화'}
+                            {session.title || 'New research chat'}
                           </span>
                           <span className="chat-history-drawer-item-meta">
-                            {session.messages.length}개 메시지 · {new Date(session.updatedAt).toLocaleDateString()}
+                            {session.messages.length} messages · {new Date(session.updatedAt).toLocaleDateString('en-US')}
                           </span>
                         </div>
                       </button>
@@ -1097,8 +1097,8 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
                           event.stopPropagation();
                           requestDeleteSession(session.id, event.currentTarget);
                         }}
-                        title="대화 삭제"
-                        aria-label={`${session.title || '새로운 연구 대화'} 세션 삭제`}
+                        title="Delete chat"
+                        aria-label={`Delete session ${session.title || 'New research chat'}`}
                       >
                         <Trash2 size={13} />
                       </button>
@@ -1118,7 +1118,7 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
                 ) : (
                   <div className="messages-list">
                     <React.Suspense
-                      fallback={<div className="message-renderer-loading" role="status">대화 렌더러 불러오는 중…</div>}
+                      fallback={<div className="message-renderer-loading" role="status">Loading chat renderer…</div>}
                     >
                       {currentSession.messages.map((message, index) => (
                         <ChatMessage
@@ -1192,14 +1192,14 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
                 }
               }}
             >
-              <h3 id="session-delete-title">대화를 삭제할까요?</h3>
+              <h3 id="session-delete-title">Delete chat?</h3>
               <p id="session-delete-description">
-                연구 세션 “{target.title || '새로운 연구 대화'}”와 메시지 {target.messages.length}개를 삭제합니다. 이 작업은 되돌릴 수 없습니다.
+                This will delete the research session “{target.title || 'New research chat'}” and its {target.messages.length} message(s). This action cannot be undone.
               </p>
               <div className="session-delete-actions">
-                <button ref={deleteDialogCancelRef} type="button" onClick={closeDeleteSessionDialog} disabled={isDeletingSession}>취소</button>
+                <button ref={deleteDialogCancelRef} type="button" onClick={closeDeleteSessionDialog} disabled={isDeletingSession}>Cancel</button>
                 <button type="button" className="session-delete-confirm" onClick={() => void handleDeleteSession()} disabled={isDeletingSession}>
-                  {isDeletingSession ? '삭제 중…' : '대화 삭제'}
+                  {isDeletingSession ? 'Deleting…' : 'Delete Chat'}
                 </button>
               </div>
             </div>
@@ -1235,22 +1235,22 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
               }
             }}
           >
-            <h3 id="document-delete-title">연구노트를 삭제할까요?</h3>
+            <h3 id="document-delete-title">Delete research note?</h3>
             <p id="document-delete-description">
-              “{documentDeletePreview?.title ?? theoryDocuments.find(row => row.id === pendingDeleteDocumentId)?.title ?? '선택한 문서'}”
-              {documentDeletePreview && <>의 버전 {documentDeletePreview.versionCount}개, 문단 {documentDeletePreview.blockCount}개, 검토 기록 {documentDeletePreview.reviewCount}개를 삭제합니다.
-                {' '}{documentDeletePreview.projectAction === 'remove' ? '이 문서만 있는 프로젝트도 삭제됩니다.'
-                  : documentDeletePreview.projectAction === 'choose_representative' ? '다른 문서가 프로젝트 대표가 됩니다.' : '다른 문서는 유지됩니다.'}
+              “{documentDeletePreview?.title ?? theoryDocuments.find(row => row.id === pendingDeleteDocumentId)?.title ?? 'Selected document'}”
+              {documentDeletePreview && <>: {documentDeletePreview.versionCount} version(s), {documentDeletePreview.blockCount} block(s), and {documentDeletePreview.reviewCount} review record(s) will be deleted.
+                {' '}{documentDeletePreview.projectAction === 'remove' ? 'The project containing only this document will also be deleted.'
+                  : documentDeletePreview.projectAction === 'choose_representative' ? 'Another document will become the project representative.' : 'Other documents will be preserved.'}
               </>}
-              {' '}이 작업은 현재 작업공간에서 되돌릴 수 없습니다.
+              {' '}This action cannot be undone in the current workspace.
             </p>
-            {isPreparingDocumentDelete && <p role="status" className="document-delete-feedback">삭제 범위 확인 중…</p>}
+            {isPreparingDocumentDelete && <p role="status" className="document-delete-feedback">Checking deletion scope…</p>}
             {documentDeleteError && <p role="alert" className="document-delete-feedback">{documentDeleteError}</p>}
             <div className="session-delete-actions">
-              <button ref={documentDeleteCancelRef} type="button" onClick={closeDeleteDocumentDialog} disabled={isDeletingDocument}>취소</button>
+              <button ref={documentDeleteCancelRef} type="button" onClick={closeDeleteDocumentDialog} disabled={isDeletingDocument}>Cancel</button>
               <button type="button" className="session-delete-confirm" onClick={() => void handleDeleteDocument()}
                 disabled={!documentDeletePreview || isPreparingDocumentDelete || isDeletingDocument}>
-                {isDeletingDocument ? '삭제 중…' : '문서 삭제'}
+                {isDeletingDocument ? 'Deleting…' : 'Delete Document'}
               </button>
             </div>
           </div>
@@ -1259,19 +1259,19 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
 
       {/* Settings & Other Modals */}
       {isReferencesOpen && (
-        <React.Suspense fallback={<div role="status">레퍼런스 불러오는 중…</div>}>
+        <React.Suspense fallback={<div role="status">Loading references…</div>}>
           <ReferenceLibrary
             onClose={() => setIsReferencesOpen(false)}
             embeddingApiKey={settings.apiKeys.openai}
             canAsk={!isStreaming && Boolean(findAvailableModel(settings.apiKeys))}
             canDelete={!isStreaming}
-            modelName={(AVAILABLE_MODELS.find(model => model.id === currentSession?.selectedModel && settings.apiKeys[model.provider as keyof typeof settings.apiKeys]?.trim()) || findAvailableModel(settings.apiKeys))?.name || 'API 키 설정 필요'}
+            modelName={(AVAILABLE_MODELS.find(model => model.id === currentSession?.selectedModel && settings.apiKeys[model.provider as keyof typeof settings.apiKeys]?.trim()) || findAvailableModel(settings.apiKeys))?.name || 'API key required'}
             onAsk={(query, bundle) => { setIsReferencesOpen(false); void handleSendMessage(query, { contextBundle: bundle }); }}
           />
         </React.Suspense>
       )}
       {sourceEvidence && (
-        <React.Suspense fallback={<div role="status">원문 불러오는 중…</div>}>
+        <React.Suspense fallback={<div role="status">Loading source…</div>}>
           <ReferenceSource evidence={sourceEvidence} onClose={() => setSourceEvidence(null)} />
         </React.Suspense>
       )}

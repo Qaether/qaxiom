@@ -75,7 +75,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       style={{ width: width ? `${width}px` : undefined }}
       role={mobileOpen ? 'dialog' : undefined}
       aria-modal={mobileOpen ? 'true' : undefined}
-      aria-label="대화 메뉴"
+      aria-label="Chat menu"
       onKeyDown={handleMobileKeyDown}
     >
       {/* Top Section: Brand, Project Switcher, New Theory Action */}
@@ -86,8 +86,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
             type="button"
             className="sidebar-brand-btn topbar-tooltip"
             onClick={onChangeProject}
-            data-tooltip="프로젝트 관리"
-            aria-label="프로젝트 관리 / 전환 화면으로 이동"
+            data-tooltip="Manage projects"
+            aria-label="Go to project management / switcher"
           >
             <div className="brand-logo">
               <QaxiomLogo size={24} />
@@ -98,7 +98,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           </button>
           {mobileOpen && (
-            <button ref={closeButtonRef} type="button" className="mobile-menu-close topbar-tooltip" onClick={onCloseMobile} data-tooltip="대화 메뉴 닫기" aria-label="대화 메뉴 닫기">
+            <button ref={closeButtonRef} type="button" className="mobile-menu-close topbar-tooltip" onClick={onCloseMobile} data-tooltip="Close chat menu" aria-label="Close chat menu">
               <X size={20} />
             </button>
           )}
@@ -109,12 +109,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
           type="button"
           className="sidebar-project-card"
           onClick={onChangeProject}
-          title="클릭하여 프로젝트 전환 또는 관리"
-          aria-label={`현재 프로젝트: ${projectName}. 클릭하여 프로젝트 관리 화면으로 이동`}
+          title="Click to switch or manage projects"
+          aria-label={`Current project: ${projectName}. Click to open project management`}
         >
           <div className="project-card-header">
             <Folder size={14} className="project-icon" />
-            <span className="project-label">현재 프로젝트</span>
+            <span className="project-label">Current Project</span>
             <ArrowRightLeft size={12} className="project-switch-icon" />
           </div>
           <strong className="project-name">{projectName}</strong>
@@ -124,15 +124,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="sidebar-actions">
           <button id="new-theory-btn" className="new-chat-button" onClick={onOpenTheory}>
             <Plus size={18} />
-            <span>새 연구노트</span>
+            <span>New Research Note</span>
           </button>
         </div>
 
-        {/* Research Documents moved right below 새 연구노트 */}
+        {/* Research Documents moved right below New Research Note */}
         <div className="sidebar-section sidebar-documents">
-          <div className="section-label"><BookMarked size={13} /><span>연구노트 ({documents.length})</span></div>
+          <div className="section-label"><BookMarked size={13} /><span>Research Notes ({documents.length})</span></div>
           <div className="session-list">
-            {!documents.length && <p className="empty-sessions">아직 만든 연구노트가 없습니다.</p>}
+            {!documents.length && <p className="empty-sessions">No research notes yet.</p>}
             {documents.map(document => (
               <div className="sidebar-document-row" key={document.id}>
                 <button
@@ -146,8 +146,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <button
                   type="button"
                   className="sidebar-document-delete"
-                  aria-label={`${document.title} 문서 삭제`}
-                  title={`${document.title} 문서 삭제`}
+                  aria-label={`Delete document ${document.title}`}
+                  title={`Delete document ${document.title}`}
                   onClick={event => onDeleteDocument(document.id, event.currentTarget)}
                 >
                   <Trash2 size={15} />
@@ -174,8 +174,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <button
               type="button"
               className="sidebar-action-btn signin"
-              onClick={() => alert('클라우드 동기화 및 협업 서비스는 준비 중입니다.')}
-              title="클라우드 로그인 (준비 중)"
+              onClick={() => alert('Cloud sync and collaboration features are coming soon.')}
+              title="Cloud sign-in (coming soon)"
               aria-label="Sign In"
             >
               <Cloud size={14} />
@@ -187,17 +187,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
               type="button"
               className="sidebar-action-btn settings"
               onClick={onOpenSettings}
-              title="설정 (API 키)"
-              aria-label="설정 (API 키)"
+              title="Settings (API Keys)"
+              aria-label="Settings (API Keys)"
             >
               <Settings size={14} />
-              <span>설정</span>
+              <span>Settings</span>
             </button>
           </div>
 
           <div className="storage-badge">
             <ShieldCheck size={12} className="shield-icon" />
-            <span>Local-First (PC 로컬 저장)</span>
+            <span>Local-First (Saved Locally)</span>
           </div>
         </div>
       </div>

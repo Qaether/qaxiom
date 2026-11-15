@@ -40,7 +40,7 @@
   display: none;
 }
 
-/* 1. 상단 헤더 툴바 */
+/* 1. Top Header Toolbar */
 .theory-header {
   display: flex;
   align-items: center;
@@ -274,7 +274,7 @@
   border-color: #818cf8 !important;
 }
 
-/* 상태 배너 */
+/* Status Banner */
 .theory-status-banner {
   padding: 7px 18px;
   background: rgba(16, 185, 129, 0.1);
@@ -293,7 +293,7 @@
   margin: 0;
 }
 
-/* 2. 에디터 컨테이너: VCS 스타일의 풀스크린 마크다운 편집기 */
+/* 2. Editor Container: VCS-style Fullscreen Markdown Editor */
 .theory-editor-container.vcs-mode {
   flex: 1;
   display: flex;
@@ -500,7 +500,7 @@
   text-align: center;
 }
 
-/* 툴바 & 탭 */
+/* Toolbar & Tabs */
 .theory-math-renderer-select {
   min-height: 30px;
   padding: 3px 8px;
@@ -577,7 +577,7 @@
   background: rgba(255, 255, 255, 0.08) !important;
 }
 
-/* 에디터 푸터 바 */
+/* Editor Footer Bar */
 .theory-editor-footer-bar {
   display: flex;
   align-items: center;
@@ -610,7 +610,7 @@
   text-decoration: underline;
 }
 
-/* 3. 모달 다이얼로그 (분석/도구 절차) */
+/* 3. Modal Dialogs (Analysis / Tool Workflows) */
 .theory-modal-backdrop {
   position: fixed;
   inset: 0;
@@ -708,7 +708,7 @@
 }
 
 /* ==========================================================================
-   AI 정합성 분석 (Analysis) 모달 전용 스타일
+   AI Consistency Analysis Modal Styles
    ========================================================================== */
 
 .theory-analysis-modal-view {
@@ -1029,7 +1029,7 @@
 }
 
 /* ==========================================================================
-   연구 기준 (ResearchContract) 모달 전용 디테일 스타일
+   Research Criteria (ResearchContract) Modal Detail Styles
    ========================================================================== */
 
 .theory-contract-modal-view {
@@ -1207,7 +1207,7 @@
 }
 
 /* ==========================================================================
-   AI 연구 기준 제안 도우미 (ContractSuggestionAssistant) 카드 스타일
+   AI Research Criteria Assistant (ContractSuggestionAssistant) Card Styles
    ========================================================================== */
 
 .theory-suggestions {
@@ -1570,7 +1570,7 @@
 }
 
 /* ==========================================================================
-   모달 푸터 스타일
+   Modal Footer Styles
    ========================================================================== */
 
 .theory-modal-footer {
@@ -1627,7 +1627,7 @@
   box-shadow: none;
 }
 
-/* 버전 비교 뷰 */
+/* Version Comparison View */
 .theory-history-comparison-view {
   margin-top: 16px;
 }
@@ -1689,8 +1689,8 @@
   overflow-y: auto;
 }
 
-/* 프로젝트 및 위험 구역 */
-/* AI Review 서브 컴포넌트 스타일 유지 및 개선 */
+/* Project & Danger Zone */
+/* AI Review Subcomponent Styles */
 .theory-review {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -1824,7 +1824,7 @@
 }
 
 /* ==========================================================================
-   AI 문서 정합성 분석 뷰 (Diff-Centric Feed & Context View)
+   AI Document Consistency Analysis View (Diff-Centric Feed & Context View)
    ========================================================================== */
 
 .document-analysis {
@@ -1861,7 +1861,7 @@
   gap: 12px;
 }
 
-/* 뷰 모드 토글 (Diff 모아보기 vs 전체 문맥) */
+/* View Mode Toggle (Diff Feed vs Full Context) */
 .analysis-view-mode-toggle {
   display: flex;
   background: rgba(15, 23, 42, 0.6);
@@ -1997,7 +1997,7 @@
 }
 
 /* ==========================================================================
-   Diff 모아보기 피드 (Diff Cards Feed)
+   Diff Cards Feed
    ========================================================================== */
 
 .document-analysis-diff-feed {
@@ -2173,7 +2173,7 @@
 }
 
 /* ==========================================================================
-   원문 vs 수정안 2열 Side-by-Side Diff 뷰어
+   Original vs Suggested Revision Side-by-Side Diff Viewer
    ========================================================================== */
 
 .document-analysis-diff-viewer {
@@ -2249,7 +2249,7 @@
 }
 
 /* ==========================================================================
-   전체 문맥 보기 뷰 (Full Context Blocks)
+   Full Context Blocks View
    ========================================================================== */
 
 .document-analysis-blocks {
@@ -2331,7 +2331,7 @@
   background: #16a34a;
 }
 
-/* 상태 배지 및 되돌리기 버튼 */
+/* Status Badge & Revert Button */
 .analysis-status-badge {
   display: flex;
   align-items: center;

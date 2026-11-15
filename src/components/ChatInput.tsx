@@ -81,7 +81,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           <textarea
             ref={textareaRef}
             id="chat-textarea"
-            aria-label="연구 질문 입력"
+            aria-label="Enter research question"
             value={input}
             onChange={e => setInput(e.target.value)}
             onCompositionStart={handleCompositionStart}
@@ -89,12 +89,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             onKeyDown={handleKeyDown}
             placeholder={
               currentMode === 'peer_review'
-                ? "피어 리뷰를 받고 싶은 연구 아이디어, 초록, 가설을 입력하세요..."
+                ? "Enter your research idea, abstract, or hypothesis for peer review..."
                 : currentMode === 'math_proof'
-                ? "증명이나 유도가 필요한 수식 또는 이론적 가정을 입력하세요..."
+                ? "Enter equations or theoretical assumptions to prove or derive..."
                 : currentMode === 'proofreader'
-                ? "교정할 영문 문장 또는 한글 학술 텍스트를 입력하세요..."
-                : "연구 주제, 논문 질문, 또는 분석할 가설을 입력하세요 (Shift+Enter로 줄바꿈)..."
+                ? "Enter academic text to proofread..."
+                : "Enter a research topic, paper question, or hypothesis to analyze (Shift+Enter for new line)..."
             }
             rows={1}
             disabled={isStreaming}
@@ -105,8 +105,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             id="send-message-btn"
             className={`send-button ${isStreaming ? 'stop-state' : ''}`}
             disabled={!isStreaming && !input.trim()}
-            title={isStreaming ? "생성 중단" : "전송 (Enter)"}
-            aria-label={isStreaming ? "생성 중단" : "메시지 전송"}
+            title={isStreaming ? "Stop generation" : "Send (Enter)"}
+            aria-label={isStreaming ? "Stop generation" : "Send message"}
           >
             {isStreaming ? <Square size={16} /> : <Send size={16} />}
           </button>
@@ -120,7 +120,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
               <select
                 id="header-model-select"
                 className="compact-model-select"
-                aria-label="대화 모델 선택"
+                aria-label="Select chat model"
                 value={selectedModel}
                 onChange={e => onModelChange(e.target.value)}
                 onKeyDown={event => {
@@ -137,14 +137,14 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                   const mHasKey = apiKeys && Boolean((apiKeys[m.provider] || '').trim());
                   return (
                     <option key={m.id} value={m.id}>
-                      {m.name} {m.status === 'preview' ? '[Preview]' : ''} {mHasKey ? '✓' : '(키 필요)'}
+                      {m.name} {m.status === 'preview' ? '[Preview]' : ''} {mHasKey ? '✓' : '(Key required)'}
                     </option>
                   );
                 })}
               </select>
             </div>
             <span className={`compact-model-badge ${hasKey ? 'active' : 'need-key'}`}>
-              {hasKey ? '키 등록됨' : '키 필요'}
+              {hasKey ? 'Key configured' : 'Key required'}
             </span>
           </div>
         )}

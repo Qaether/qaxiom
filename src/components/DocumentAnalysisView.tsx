@@ -29,18 +29,18 @@ function ProgressDetails({ run, progress, elapsedSeconds }: {
     <details ref={details} className="document-analysis-progress">
       <summary>
         {run.status === 'running' && <span className="spinner" aria-hidden="true" />}
-        <strong>분석 진행 · {progress.stage}</strong>
-        <span>{run.status === 'running' ? `${elapsedSeconds}초 경과` : '세부 내용 보기'}</span>
+        <strong>Analysis in progress · {progress.stage}</strong>
+        <span>{run.status === 'running' ? `${elapsedSeconds}s elapsed` : 'View details'}</span>
       </summary>
       <div className="document-analysis-progress-body">
-        <p role="status">{progress.stage}{progress.receivedChars > 0 ? ` · 결과 ${progress.receivedChars.toLocaleString()}자 수신` : ''}</p>
+        <p role="status">{progress.stage}{progress.receivedChars > 0 ? ` · Received ${progress.receivedChars.toLocaleString()} chars` : ''}</p>
         {progress.reasoningSummary ? (
           <div className="document-analysis-reasoning">
-            <strong>모델이 제공한 추론 요약</strong>
+            <strong>Model reasoning summary</strong>
             <div className="analysis-source-text">{progress.reasoningSummary}</div>
-            {progress.summaryTruncated && <p className="document-analysis-progress-note">긴 요약은 최근 2만 자만 표시합니다.</p>}
+            {progress.summaryTruncated && <p className="document-analysis-progress-note">Long summaries are truncated to the last 20,000 characters.</p>}
           </div>
-        ) : <p className="document-analysis-progress-note">이 모델에서 공개된 추론 요약이 없거나 아직 도착하지 않았습니다.</p>}
+        ) : <p className="document-analysis-progress-note">No public reasoning summary from this model yet.</p>}
       </div>
     </details>
   );
@@ -65,10 +65,10 @@ function changedSpan(before: string = '', after: string = '') {
 function SuggestionDiffViewer({ before, after }: { before: string; after: string }) {
   const change = changedSpan(before, after);
   return (
-    <div className="document-analysis-diff-viewer" aria-label="원문과 수정안 비교">
+    <div className="document-analysis-diff-viewer" aria-label="Compare original and suggested revision">
       <div className="diff-side diff-before">
         <div className="diff-header">
-          <span className="diff-tag minus">− 원문</span>
+          <span className="diff-tag minus">− Original</span>
         </div>
         <pre className="diff-content">
           {change.prefix}
@@ -78,7 +78,7 @@ function SuggestionDiffViewer({ before, after }: { before: string; after: string
       </div>
       <div className="diff-side diff-after">
         <div className="diff-header">
-          <span className="diff-tag plus">+ AI 수정안</span>
+          <span className="diff-tag plus">+ AI Suggestion</span>
         </div>
         <pre className="diff-content">
           {change.prefix}
@@ -144,7 +144,7 @@ export default function DocumentAnalysisView({
     : findings;
 
   return (
-    <section className="document-analysis" aria-label="AI 분석 결과">
+    <section className="document-analysis" aria-label="AI analysis results">
       <header className="document-analysis-header">
         <div className="document-analysis-title-group">
           <div className="document-analysis-title-row">
@@ -159,11 +159,11 @@ export default function DocumentAnalysisView({
                     const selected = history.find(h => h.id === e.target.value);
                     if (selected) onSelectHistory(selected);
                   }}
-                  title="이전 정합성 분석 결과 보기"
+                  title="View previous consistency analysis results"
                 >
                   {history.map((item, idx) => (
                     <option key={item.id} value={item.id}>
-                      {idx === 0 ? '최신 분석' : `${idx + 1}회차`} · {new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} ({item.findings.length}건 지적)
+                      {idx === 0 ? 'Latest' : `Run #${idx + 1}`} · {new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} ({item.findings.length} findings)
                     </option>
                   ))}
                 </select>
@@ -172,10 +172,10 @@ export default function DocumentAnalysisView({
           </div>
           <p className="document-analysis-meta">
             {run?.status === 'running'
-              ? '문서 전체를 AI가 검토 중입니다. 편집 탭으로 이동해도 분석은 계속됩니다.'
+              ? 'AI is reviewing the full document. Analysis continues even if you switch to the Edit tab.'
               : run?.status === 'complete'
-              ? `검토 의견 ${findings.length}건 (적용 ${appliedCount} · 기각 ${dismissedCount}) · ${run.modelId}`
-              : run?.error || '저장된 문서의 분석 결과가 없습니다.'}
+              ? `${findings.length} findings (Applied ${appliedCount} · Dismissed ${dismissedCount}) · ${run.modelId}`
+              : run?.error || 'No saved analysis results for this document.'}
           </p>
         </div>
 
@@ -183,19 +183,19 @@ export default function DocumentAnalysisView({
 
           {run?.status === 'running' ? (
             <button type="button" className="analysis-action-btn cancel" onClick={onCancel}>
-              분석 취소
+              Cancel analysis
             </button>
           ) : (
             <button type="button" className="analysis-action-btn retry" onClick={onRetry}>
               <RefreshCw size={13} />
-              <span>다시 분석</span>
+              <span>Re-analyze</span>
             </button>
           )}
 
           {run && onDelete && (
             isConfirmingDelete ? (
               <div className="analysis-delete-confirm-group">
-                <span className="confirm-label">삭제할까요?</span>
+                <span className="confirm-label">Delete?</span>
                 <button
                   type="button"
                   className="analysis-action-btn delete-confirm-yes"
@@ -203,17 +203,17 @@ export default function DocumentAnalysisView({
                     setIsConfirmingDelete(false);
                     onDelete(run);
                   }}
-                  title="분석 결과 영구 삭제"
+                  title="Permanently delete analysis result"
                 >
-                  확인
+                  Confirm
                 </button>
                 <button
                   type="button"
                   className="analysis-action-btn delete-confirm-no"
                   onClick={() => setIsConfirmingDelete(false)}
-                  title="삭제 취소"
+                  title="Cancel deletion"
                 >
-                  취소
+                  Cancel
                 </button>
               </div>
             ) : (
@@ -221,10 +221,10 @@ export default function DocumentAnalysisView({
                 type="button"
                 className="analysis-action-btn delete"
                 onClick={() => setIsConfirmingDelete(true)}
-                title="이 분석 결과 삭제"
+                title="Delete this analysis result"
               >
                 <Trash2 size={13} />
-                <span>삭제</span>
+                <span>Delete</span>
               </button>
             )
           )}
@@ -232,7 +232,7 @@ export default function DocumentAnalysisView({
       </header>
 
       <p className="document-analysis-disclaimer">
-        AI의 검토 의견이며 이론의 참·증명 또는 완전한 정합성을 보장하지 않습니다. 외부 문헌은 대조하지 않았습니다.
+        These are AI review suggestions and do not guarantee truth, proof, or full consistency. External literature was not checked.
       </p>
 
       {run && visibleProgress && <ProgressDetails key={`${run.id}-${run.status}`} run={run} progress={visibleProgress} elapsedSeconds={elapsedSeconds} />}
@@ -240,7 +240,7 @@ export default function DocumentAnalysisView({
       {run?.status === 'running' && !visibleProgress && (
         <div className="document-analysis-running-banner" role="status">
           <div className="spinner" />
-          <span>분석 요청을 처리하고 있습니다…</span>
+          <span>Processing analysis request…</span>
         </div>
       )}
 
@@ -249,35 +249,35 @@ export default function DocumentAnalysisView({
           {!!unchecked && (
             <p role="status" className="document-analysis-warning">
               <AlertCircle size={14} />
-              <span>{unchecked}개 블록은 모델이 검토했다고 보고하지 않았습니다.</span>
+              <span>{unchecked} block(s) were not reported as reviewed by the model.</span>
             </p>
           )}
           {run.limitations?.map((item, index) => (
             <p key={index} className="document-analysis-warning">
               <AlertCircle size={14} />
-              <span>검토 한계: {item}</span>
+              <span>Review limitation: {item}</span>
             </p>
           ))}
           {!findings.length && (
             <div className="document-analysis-empty">
               <Check size={28} className="empty-check-icon" />
-              <h3>지적된 정합성 오류가 없습니다</h3>
-              <p>선택한 검토 기준에 따른 모순이나 반례 후보가 발견되지 않았습니다. (이론의 참을 보증하는 것은 아닙니다)</p>
+              <h3>No consistency issues found</h3>
+              <p>No contradictions or counterexample candidates were found under the selected criteria. (Does not guarantee the theory is true.)</p>
             </div>
           )}
 
-          {/* 모두 처리 완료 시 표시되는 축하 배너 */}
+          {/* Banner shown when all findings are resolved */}
           {allCompleted && (
             <div className="document-analysis-all-completed-banner" role="status">
               <CheckCircle2 size={24} className="all-completed-icon" />
               <div className="all-completed-content">
-                <strong>모든 검토 의견이 처리되었습니다! (적용 {appliedCount}건 · 기각 {dismissedCount}건)</strong>
-                <p>선택한 검토 지적 사항에 대한 처리가 모두 완료되었습니다. 아래 목록에서 언제든지 기각/적용 상태를 재조정할 수 있습니다.</p>
+                <strong>All review findings have been processed! (Applied {appliedCount} · Dismissed {dismissedCount})</strong>
+                <p>All selected findings have been handled. You can adjust applied/dismissed statuses anytime below.</p>
               </div>
             </div>
           )}
 
-          {/* 필터 탭: 전체 / 검토 필요 / 처리 완료 */}
+          {/* Filter tabs: All / Pending / Completed */}
           {findings.length > 0 && (
             <div className="analysis-filter-bar">
               <div className="analysis-filter-tabs" role="tablist">
@@ -286,45 +286,45 @@ export default function DocumentAnalysisView({
                   className={`analysis-filter-tab ${filterMode === 'all' ? 'active' : ''}`}
                   onClick={() => setFilterMode('all')}
                 >
-                  <span>전체 ({findings.length})</span>
+                  <span>All ({findings.length})</span>
                 </button>
                 <button
                   type="button"
                   className={`analysis-filter-tab ${filterMode === 'pending' ? 'active' : ''}`}
                   onClick={() => setFilterMode('pending')}
                 >
-                  <span>검토 필요 ({pendingFindings.length})</span>
+                  <span>Pending ({pendingFindings.length})</span>
                 </button>
                 <button
                   type="button"
                   className={`analysis-filter-tab ${filterMode === 'completed' ? 'active' : ''}`}
                   onClick={() => setFilterMode('completed')}
                 >
-                  <span>처리 완료 ({completedFindings.length})</span>
+                  <span>Completed ({completedFindings.length})</span>
                 </button>
               </div>
               <button type="button" className="analysis-math-toggle" aria-pressed={renderMath} onClick={() => setRenderMath(value => !value)}>
                 <Sigma size={15} aria-hidden="true" />
-                <span>{renderMath ? '원문 보기' : '수식 보기'}</span>
+                <span>{renderMath ? 'View Source' : 'Render Math'}</span>
               </button>
             </div>
           )}
 
-          {/* 필터 선택 시 지적 사항 없음 안내 */}
+          {/* Empty state for selected filter */}
           {findings.length > 0 && displayedFindings.length === 0 && (
             <div className="document-analysis-filter-empty" role="status">
               <CheckCircle2 size={20} className="filter-empty-icon" />
               <span>
                 {filterMode === 'pending'
-                  ? '검토가 필요한 미해결 지적 사항이 없습니다. (모든 의견 처리 완료)'
+                  ? 'No pending findings to review. (All findings processed.)'
                   : filterMode === 'completed'
-                  ? '아직 처리 완료(적용 또는 기각)된 지적 사항이 없습니다.'
-                  : '표시할 지적 사항이 없습니다.'}
+                  ? 'No completed (applied or dismissed) findings yet.'
+                  : 'No findings to display.'}
               </span>
             </div>
           )}
 
-          {/* 전체 문맥 보기 (Full Document Context View) */}
+          {/* Full Document Context View */}
           <div className="document-analysis-blocks">
             {(filterMode === 'all'
               ? snapshot.blocks
@@ -349,24 +349,24 @@ export default function DocumentAnalysisView({
                       >
                         <span className="document-analysis-arrow" aria-hidden="true">==&gt;</span>
                         <div>
-                          <div className="analysis-finding-quote"><strong>AI 검토</strong> · 원문 인용:<div><AnalysisText content={finding.quote} renderMath={renderMath} /></div></div>
+                          <div className="analysis-finding-quote"><strong>AI Review</strong> · Source quote:<div><AnalysisText content={finding.quote} renderMath={renderMath} /></div></div>
                           <div className="analysis-finding-prose"><AnalysisText content={finding.explanation} renderMath={renderMath} /></div>
-                          <div className="analysis-finding-prose"><strong>확인할 조건</strong><AnalysisText content={finding.resolution} renderMath={renderMath} /></div>
+                          <div className="analysis-finding-prose"><strong>Condition to check</strong><AnalysisText content={finding.resolution} renderMath={renderMath} /></div>
                           {isApplied || isDismissed ? (
                             <div className={`analysis-status-badge ${finding.decision}`}>
                               <span className="status-text">
                                 {isDismissed
-                                  ? '🚫 기각 처리된 지적 사항입니다.'
-                                  : `✓ ${finding.replacement ? '편집 내용에 적용되었습니다.' : '확인 완료 처리되었습니다.'}`}
+                                  ? '🚫 Dismissed finding.'
+                                  : `✓ ${finding.replacement ? 'Applied to draft.' : 'Marked as checked.'}`}
                               </span>
                               <button
                                 type="button"
                                 className="status-revert-btn"
                                 onClick={() => onDecision(finding, 'open')}
-                                title="이 결정을 취소하고 다시 검토"
+                                title="Undo this decision and review again"
                               >
                                 <RotateCcw size={13} />
-                                <span>다시 검토</span>
+                                <span>Review again</span>
                               </button>
                             </div>
                           ) : (
@@ -374,7 +374,7 @@ export default function DocumentAnalysisView({
                               {finding.replacement ? (
                                 <div className="inline-diff-box">
                                   <SuggestionDiffViewer before={block.text} after={finding.replacement} />
-                                  {renderMath && <div className="analysis-replacement-preview"><strong>수정안 수식 미리보기</strong><AnalysisText content={finding.replacement} renderMath /></div>}
+                                  {renderMath && <div className="analysis-replacement-preview"><strong>Suggested revision math preview</strong><AnalysisText content={finding.replacement} renderMath /></div>}
                                   <button
                                     type="button"
                                     className="inline-apply-btn"
@@ -382,12 +382,12 @@ export default function DocumentAnalysisView({
                                     onClick={() => onApply(finding)}
                                   >
                                     <Check size={14} />
-                                    <span>편집 내용에 적용</span>
+                                    <span>Apply to draft</span>
                                   </button>
                                 </div>
                               ) : (
                                 <p className="no-replacement-note">
-                                  💡 텍스트 교체안 없이 확인 조건만 제시된 지적 사항입니다.
+                                  💡 Finding provides a condition to check without a text replacement.
                                 </p>
                               )}
                               <div className="document-analysis-decisions">
@@ -398,27 +398,27 @@ export default function DocumentAnalysisView({
                                     onClick={() => onDecision(finding, 'applied')}
                                   >
                                     <Check size={14} />
-                                    <span>확인 완료</span>
+                                    <span>Mark checked</span>
                                   </button>
                                 )}
                                 <button
                                   type="button"
                                   className="card-decision-btn"
                                   onClick={() => onDecision(finding, 'dismissed')}
-                                  title="지적 무시/기각"
+                                  title="Ignore/dismiss finding"
                                 >
                                   <X size={14} />
-                                  <span>기각</span>
+                                  <span>Dismiss</span>
                                 </button>
                                 <button
                                   type="button"
                                   className={`card-decision-btn ${isLater ? 'active' : ''}`}
                                   aria-pressed={isLater}
                                   onClick={() => onDecision(finding, isLater ? 'open' : 'later')}
-                                  title="나중에 검토"
+                                  title="Review later"
                                 >
                                   <Clock size={14} />
-                                  <span>나중에</span>
+                                  <span>Later</span>
                                 </button>
                               </div>
                             </>

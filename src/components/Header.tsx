@@ -31,7 +31,7 @@ export const Header: React.FC<HeaderProps> = ({
           id="mobile-menu-btn"
           className="mobile-menu-btn"
           onClick={onOpenSidebar}
-          aria-label="대화 메뉴 열기"
+          aria-label="Open chat menu"
           aria-expanded={sidebarOpen}
           aria-controls="chat-sidebar"
         >
@@ -42,8 +42,8 @@ export const Header: React.FC<HeaderProps> = ({
           type="button"
           className="top-navbar-brand-btn"
           onClick={onOpenProject}
-          title="프로젝트 관리 / 전환 화면으로 이동"
-          aria-label="Qaxiom 홈 및 프로젝트 관리 화면으로 이동"
+          title="Go to project management / switcher"
+          aria-label="Go to Qaxiom home and project management"
         >
           <div className="top-brand-icon">
             <QaxiomLogo size={18} />
@@ -56,8 +56,8 @@ export const Header: React.FC<HeaderProps> = ({
             type="button"
             className="header-project-chip"
             onClick={onOpenProject}
-            title="프로젝트 관리 / 전환 화면으로 이동"
-            aria-label={`현재 프로젝트: ${projectName}. 클릭하여 프로젝트 관리 화면으로 이동`}
+            title="Go to project management / switcher"
+            aria-label={`Current project: ${projectName}. Click to open project management`}
           >
             <Folder size={13} className="header-project-icon" />
             <span className="header-project-name">{projectName}</span>
@@ -68,14 +68,14 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Center: Current active document title or workspace status */}
       <div className="header-center">
         {activeDocumentTitle ? (
-          <div className="active-doc-badge" title={`현재 연구노트: ${activeDocumentTitle}`}>
+          <div className="active-doc-badge" title={`Current research note: ${activeDocumentTitle}`}>
             <FileText size={13} className="active-doc-icon" />
             <span className="active-doc-title">{activeDocumentTitle}</span>
           </div>
         ) : (
-          <div className="active-doc-badge empty" title="연구노트 작업 공간">
+          <div className="active-doc-badge empty" title="Research note workspace">
             <FileText size={13} className="active-doc-icon" />
-            <span className="active-doc-title">연구노트 작업공간</span>
+            <span className="active-doc-title">Research Note Workspace</span>
           </div>
         )}
       </div>
@@ -86,8 +86,8 @@ export const Header: React.FC<HeaderProps> = ({
         <button
           type="button"
           className="header-signin-btn"
-          onClick={() => alert('클라우드 동기화 및 협업 서비스는 준비 중입니다.')}
-          title="클라우드 로그인 (준비 중)"
+          onClick={() => alert('Cloud sync and collaboration features are coming soon.')}
+          title="Cloud sign-in (coming soon)"
           aria-label="Sign In"
         >
           <Cloud size={14} />
@@ -99,8 +99,8 @@ export const Header: React.FC<HeaderProps> = ({
           id="open-settings-btn"
           className="header-btn primary"
           onClick={onOpenSettings}
-          title="설정 (API 키)"
-          aria-label="설정 (API 키)"
+          title="Settings (API Keys)"
+          aria-label="Settings (API Keys)"
         >
           <Settings size={15} />
         </button>

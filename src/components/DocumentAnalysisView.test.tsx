@@ -23,8 +23,8 @@ const mockSnapshot: TheorySnapshot = {
     number: 1,
     parentVersionId: null,
     restoredFromVersionId: null,
-    title: '양자격자공간 이론 v1',
-    markdown: '기존 진공의 정의에 모순이 존재한다.\n\nFCC 격자 구조에서 게이지 대칭성이 보존된다.',
+    title: 'Quantum Lattice Space Theory v1',
+    markdown: 'There is a contradiction in the existing definition of vacuum.\n\nGauge symmetry is preserved in the FCC lattice structure.',
     contentHash: 'hash-v1',
     contract: { purpose: '', assumptions: '', definitions: '', symbols: '', scope: '', openQuestions: '' },
     contractAnchors: {},
@@ -38,8 +38,8 @@ const mockSnapshot: TheorySnapshot = {
       kind: 'paragraph',
       position: 0,
       startOffset: 0,
-      endOffset: 21,
-      text: '기존 진공의 정의에 모순이 존재한다.',
+      endOffset: 59,
+      text: 'There is a contradiction in the existing definition of vacuum.',
       contentHash: 'b-hash-1',
       predecessorIds: [],
     },
@@ -49,9 +49,9 @@ const mockSnapshot: TheorySnapshot = {
       documentId: 'doc-1',
       kind: 'paragraph',
       position: 1,
-      startOffset: 23,
-      endOffset: 50,
-      text: 'FCC 격자 구조에서 게이지 대칭성이 보존된다.',
+      startOffset: 61,
+      endOffset: 118,
+      text: 'Gauge symmetry is preserved in the FCC lattice structure.',
       contentHash: 'b-hash-2',
       predecessorIds: [],
     },
@@ -66,17 +66,17 @@ const mockRun: AnalysisRun = {
   versionHash: 'hash-v1',
   modelId: 'gemini-2.5-flash',
   status: 'complete',
-  limitations: ['검토 한계 예시'],
+  limitations: ['Example review limitation'],
   checkedBlockIds: ['blk-1'],
   error: '',
   findings: [
     {
       id: 'f-1',
       blockId: 'blk-1',
-      quote: '기존 진공의 정의에 모순이 존재한다.',
-      explanation: '진공 정의의 모순 범위를 명확히 한정해야 합니다.',
-      resolution: '국소 게이지 장 하에서의 진공 정의로 한정할 것',
-      replacement: '국소 게이지 장 하에서의 진공 정의에 모순이 존재한다.',
+      quote: 'There is a contradiction in the existing definition of vacuum.',
+      explanation: 'The scope of the contradiction in the vacuum definition must be clearly bounded.',
+      resolution: 'Restrict to the vacuum definition under a local gauge field',
+      replacement: 'There is a contradiction in the vacuum definition under a local gauge field.',
       decision: 'open',
     },
   ],
@@ -97,12 +97,12 @@ describe('DocumentAnalysisView', () => {
       />
     );
 
-    expect(screen.getByText(/진공 정의의 모순 범위를 명확히 한정해야 합니다/)).toBeDefined();
+    expect(screen.getByText(/The scope of the contradiction in the vacuum definition must be clearly bounded/)).toBeDefined();
 
-    // 1-클릭 결정 버튼 노출 확인
-    expect(screen.getByRole('button', { name: /편집 내용에 적용/ })).toBeDefined();
-    expect(screen.getByRole('button', { name: /기각/ })).toBeDefined();
-    expect(screen.getByRole('button', { name: /나중에/ })).toBeDefined();
+    // Verify 1-click decision buttons are visible
+    expect(screen.getByRole('button', { name: /Apply to draft/ })).toBeDefined();
+    expect(screen.getByRole('button', { name: /Dismiss/ })).toBeDefined();
+    expect(screen.getByRole('button', { name: /Later/ })).toBeDefined();
   });
 
   it('calls onApply when 1-click apply button is clicked', () => {
@@ -119,7 +119,7 @@ describe('DocumentAnalysisView', () => {
       />
     );
 
-    const applyBtn = screen.getByRole('button', { name: /편집 내용에 적용/ });
+    const applyBtn = screen.getByRole('button', { name: /Apply to draft/ });
     fireEvent.click(applyBtn);
 
     expect(handleApply).toHaveBeenCalledTimes(1);
@@ -129,36 +129,36 @@ describe('DocumentAnalysisView', () => {
   it('renders analysis math by default and switches to source text without changing the diff', async () => {
     const mathRun: AnalysisRun = {
       ...mockRun,
-      findings: [{ ...mockRun.findings[0], explanation: '에너지 $E=mc^2$를 확인하세요.', replacement: '에너지 $E=mc^2$를 확인한다.' }]
+      findings: [{ ...mockRun.findings[0], explanation: 'Check energy $E=mc^2$.', replacement: 'Verify energy $E=mc^2$.' }]
     };
     const { container } = render(
       <DocumentAnalysisView snapshot={mockSnapshot} run={mathRun} onDecision={vi.fn()} onApply={vi.fn()}
         canApply onRetry={vi.fn()} onCancel={vi.fn()} />
     );
     await waitFor(() => expect(container.querySelectorAll('mjx-container.MathJax').length).toBeGreaterThan(0));
-    expect(screen.getByText('수정안 수식 미리보기')).toBeDefined();
-    expect(screen.getByLabelText('원문과 수정안 비교')).toBeDefined();
-    fireEvent.click(screen.getByRole('button', { name: '원문 보기' }));
-    expect(screen.getByRole('button', { name: '수식 보기' })).toBeDefined();
-    expect(screen.getByText('에너지 $E=mc^2$를 확인하세요.')).toBeDefined();
-    expect(screen.queryByText('수정안 수식 미리보기')).toBeNull();
+    expect(screen.getByText('Suggested revision math preview')).toBeDefined();
+    expect(screen.getByLabelText('Compare original and suggested revision')).toBeDefined();
+    fireEvent.click(screen.getByRole('button', { name: 'View Source' }));
+    expect(screen.getByRole('button', { name: 'Render Math' })).toBeDefined();
+    expect(screen.getByText('Check energy $E=mc^2$.')).toBeDefined();
+    expect(screen.queryByText('Suggested revision math preview')).toBeNull();
   });
 
   it('shows live progress and a provider summary above the result, then collapses it on completion', () => {
-    const progress = { runId: mockRun.id, stage: '결과 수신 중', startedAt: Date.now(), receivedChars: 120, reasoningSummary: '전제와 수식을 확인 중입니다.' };
+    const progress = { runId: mockRun.id, stage: 'Receiving results', startedAt: Date.now(), receivedChars: 120, reasoningSummary: 'Checking premises and equations.' };
     const { container, rerender } = render(
       <DocumentAnalysisView snapshot={mockSnapshot} run={{ ...mockRun, status: 'running' }} progress={progress}
         onDecision={vi.fn()} onApply={vi.fn()} canApply onRetry={vi.fn()} onCancel={vi.fn()} />
     );
     expect(container.querySelector('.document-analysis-progress')).toHaveProperty('open', true);
-    expect(screen.getByText('모델이 제공한 추론 요약')).toBeDefined();
-    expect(screen.getByText('전제와 수식을 확인 중입니다.')).toBeDefined();
+    expect(screen.getByText('Model reasoning summary')).toBeDefined();
+    expect(screen.getByText('Checking premises and equations.')).toBeDefined();
     rerender(
-      <DocumentAnalysisView snapshot={mockSnapshot} run={mockRun} progress={{ ...progress, stage: '분석 완료' }}
+      <DocumentAnalysisView snapshot={mockSnapshot} run={mockRun} progress={{ ...progress, stage: 'Analysis complete' }}
         onDecision={vi.fn()} onApply={vi.fn()} canApply onRetry={vi.fn()} onCancel={vi.fn()} />
     );
     expect(container.querySelector('.document-analysis-progress')).toHaveProperty('open', false);
-    expect(screen.getByRole('button', { name: '원문 보기' })).toBeDefined();
+    expect(screen.getByRole('button', { name: 'View Source' })).toBeDefined();
   });
 
   it('renders history dropdown and notifies onSelectHistory when multiple runs exist', () => {
@@ -183,7 +183,7 @@ describe('DocumentAnalysisView', () => {
       />
     );
 
-    const select = screen.getByTitle('이전 정합성 분석 결과 보기');
+    const select = screen.getByTitle('View previous consistency analysis results');
     expect(select).toBeDefined();
 
     fireEvent.change(select, { target: { value: 'run-0' } });
@@ -206,10 +206,10 @@ describe('DocumentAnalysisView', () => {
       />
     );
 
-    const deleteBtn = screen.getByRole('button', { name: /삭제/ });
+    const deleteBtn = screen.getByRole('button', { name: /Delete/ });
     fireEvent.click(deleteBtn);
 
-    const confirmBtn = screen.getByRole('button', { name: /확인/ });
+    const confirmBtn = screen.getByRole('button', { name: /Confirm/ });
     fireEvent.click(confirmBtn);
 
     expect(handleDelete).toHaveBeenCalledTimes(1);

@@ -6,8 +6,8 @@ import type { ResearchContract } from '../services/theory/types';
 import type { UserSettings } from '../types';
 
 const labels: Record<ContractKey, string> = {
-  purpose: '연구 목적', assumptions: '가정·공리', definitions: '핵심 정의',
-  symbols: '기호표', scope: '적용 범위', openQuestions: '미해결 문제'
+  purpose: 'Purpose', assumptions: 'Assumptions & Axioms', definitions: 'Key Definitions',
+  symbols: 'Symbols', scope: 'Scope', openQuestions: 'Open Questions'
 };
 
 type Source = { title: string; markdown: string; modelId: string };
@@ -35,7 +35,7 @@ export default function ContractSuggestionAssistant({ title, markdown, contract,
     try {
       const parts: ContractSuggestions[] = [];
       for (const [index, request] of preview.requests.entries()) {
-        if (abort.signal.aborted) throw new Error('AI 연구 기준 찾기가 중단되었습니다.');
+        if (abort.signal.aborted) throw new Error('AI research criteria extraction was aborted.');
         setProgress(index + 1);
         let response = '', failure: Error | null = null;
         const timer = window.setTimeout(() => abort.abort(), 120000);
@@ -44,29 +44,29 @@ export default function ContractSuggestionAssistant({ title, markdown, contract,
             preview.source.modelId, 'general', settings, {
               onChunk: chunk => {
                 response += chunk;
-                if (response.length > 20000) { failure = new Error('AI 응답이 너무 깁니다. 다시 시도해 주세요.'); abort.abort(); }
+                if (response.length > 20000) { failure = new Error('AI response is too long. Please try again.'); abort.abort(); }
               },
               onError: cause => { failure = cause; }, onFinish: () => {}
             }, abort.signal);
           if (failure) throw failure;
-          if (abort.signal.aborted) throw new Error('AI 연구 기준 찾기가 중단되었거나 시간 제한을 넘었습니다.');
+          if (abort.signal.aborted) throw new Error('AI research criteria extraction was aborted or timed out.');
           parts.push(parseContractSuggestions(response, preview.source.title, request.markdown));
         } finally { window.clearTimeout(timer); }
       }
       setSuggestions({ source: preview.source, values: combineContractSuggestions(parts) });
       setPreview(null);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : '연구 기준 후보를 찾지 못했습니다.'); }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Failed to find research criteria candidates.'); }
     finally { controller.current = null; setRunning(false); setProgress(0); onBusyChange(false); }
   };
 
-  return <section className="theory-suggestions" aria-label="AI 연구 기준 제안">
+  return <section className="theory-suggestions" aria-label="AI research criteria suggestions">
     <div className="theory-suggestions-header">
       <div className="theory-suggestions-title-group">
         <div className="theory-suggestions-badge">
           <Sparkles size={14} />
-          <span>AI 도우미</span>
+          <span>AI Assistant</span>
         </div>
-        <h4>본문 기반 연구 기준 자동 도출</h4>
+        <h4>Auto-extract research criteria from body</h4>
       </div>
       <button
         type="button"
@@ -77,33 +77,33 @@ export default function ContractSuggestionAssistant({ title, markdown, contract,
           onOpenCriteria();
           setError(''); setSuggestions(null); setSelected([]);
           try { setPreview({ source: { title, markdown, modelId }, requests: prepareContractSuggestionRequests(title, markdown) }); }
-          catch (cause) { setPreview(null); setError(cause instanceof Error ? cause.message : '전송 내용을 준비하지 못했습니다.'); }
+          catch (cause) { setPreview(null); setError(cause instanceof Error ? cause.message : 'Failed to prepare transmission content.'); }
         }}
       >
         <Sparkles size={14} />
-        <span>AI로 연구 기준 후보 찾기</span>
+        <span>Find criteria candidates with AI</span>
       </button>
     </div>
 
     <p className="theory-suggestions-desc">{!title.trim() || !markdown.trim()
-      ? '문서 제목과 본문을 입력하면 AI 도출 기능이 활성화됩니다.'
-      : '제목과 본문을 스캔하여 연구 목적·공리·정의·기호·범위를 자동으로 찾아 제안합니다.'}</p>
+      ? 'Enter a document title and body to enable AI extraction.'
+      : 'Scans the title and body to automatically suggest research purpose, axioms, definitions, symbols, and scope.'}</p>
 
-    {previewCurrent && <section className="theory-suggestions-preview" aria-label="연구 기준 AI 전송 확인">
+    {previewCurrent && <section className="theory-suggestions-preview" aria-label="Confirm AI research criteria transmission">
       <div className="theory-preview-header">
         <FileText size={15} />
-        <h4>AI에 보낼 문서 확인</h4>
-        <span className="theory-model-badge">모델: {modelId}</span>
+        <h4>Confirm document to send to AI</h4>
+        <span className="theory-model-badge">Model: {modelId}</span>
       </div>
       <p className="theory-preview-info">
-        본문 전체를 {preview.requests.length}개 구간으로 나누어 분석합니다. 각 구간마다 원문 근거가 명시된 가정·정의·기호·범위를 도출합니다.
+        Analyzes the full body in {preview.requests.length} section(s), extracting assumptions, definitions, symbols, and scope with source quotes.
       </p>
 
       <div className="theory-preview-sections">
         <strong>{preview.source.title}</strong>
         {preview.requests.map((request, index) => (
           <details key={index} open={preview.requests.length === 1} className="theory-preview-section-details">
-            <summary>전송 구간 {index + 1} / {preview.requests.length}</summary>
+            <summary>Section {index + 1} / {preview.requests.length}</summary>
             <pre>{request.markdown}</pre>
           </details>
         ))}
@@ -112,19 +112,19 @@ export default function ContractSuggestionAssistant({ title, markdown, contract,
       <div className="theory-preview-actions">
         <button type="button" className="theory-suggestions-start-btn" disabled={disabled || running} onClick={() => void start()}>
           <ArrowRight size={14} />
-          <span>이 문서로 AI 제안 받기</span>
+          <span>Get AI suggestions for this document</span>
         </button>
       </div>
     </section>}
 
-    {preview && !previewCurrent && <p className="theory-suggestions-warn">문서나 모델이 변경되었습니다. 전송 내용을 다시 확인해 주세요.</p>}
+    {preview && !previewCurrent && <p className="theory-suggestions-warn">Document or model has changed. Please review the transmission content again.</p>}
 
     {running && <div role="status" className="theory-suggestions-running">
       <Loader2 size={16} className="spin" />
-      <span>AI가 연구 기준 후보를 찾는 중… ({progress} / {preview?.requests.length ?? 0} 구간)</span>
+      <span>Finding research criteria candidates with AI… ({progress} / {preview?.requests.length ?? 0} sections)</span>
       <button type="button" className="theory-suggestions-abort-btn" onClick={() => controller.current?.abort()}>
         <XCircle size={13} />
-        <span>중단</span>
+        <span>Abort</span>
       </button>
     </div>}
 
@@ -133,13 +133,13 @@ export default function ContractSuggestionAssistant({ title, markdown, contract,
       <span>{error}</span>
     </div>}
 
-    {suggestionsCurrent && <section className="theory-suggestions-results" aria-label="연구 기준 AI 제안 결과">
+    {suggestionsCurrent && <section className="theory-suggestions-results" aria-label="AI research criteria suggestion results">
       <div className="theory-results-header">
         <CheckSquare size={16} />
-        <h4>확인할 후보 {available.length}개 발견</h4>
+        <h4>Found {available.length} candidate(s) to review</h4>
       </div>
 
-      {!available.length && <p className="theory-suggestions-empty">원문에서 명시적 연구 기준 후보를 찾지 못했습니다. 직접 작성하시거나 본문 표현을 보완해 보세요.</p>}
+      {!available.length && <p className="theory-suggestions-empty">No explicit research criteria candidates found in the source text. Try writing them directly or clarifying the body text.</p>}
 
       <div className="theory-suggestions-choices">
         {available.map(key => {
@@ -155,12 +155,12 @@ export default function ContractSuggestionAssistant({ title, markdown, contract,
               <div className="theory-choice-body">
                 <div className="theory-choice-head">
                   <span className="theory-choice-label">{labels[key]}</span>
-                  {contract[key].trim() && <span className="theory-choice-override-tag">기존 내용 덮어씀</span>}
+                  {contract[key].trim() && <span className="theory-choice-override-tag">Overwrites existing</span>}
                 </div>
                 <div className="theory-choice-text">{suggestion.text}</div>
-                <div className="theory-choice-quote">원문: “{suggestion.quote}”</div>
+                <div className="theory-choice-quote">Source: &ldquo;{suggestion.quote}&rdquo;</div>
                 {contract[key].trim() && (
-                  <div className="theory-choice-current">현재 입력: {contract[key]}</div>
+                  <div className="theory-choice-current">Current value: {contract[key]}</div>
                 )}
               </div>
             </label>
@@ -179,14 +179,14 @@ export default function ContractSuggestionAssistant({ title, markdown, contract,
             }}
           >
             <Check size={15} />
-            <span>선택한 {selected.length}개 기준 반영</span>
+            <span>Apply {selected.length} selected criteria</span>
           </button>
-          <p className="theory-suggestions-apply-note">반영 후 상단에서 확인하고 [저장]해야 버전에 보존됩니다.</p>
+          <p className="theory-suggestions-apply-note">Review at the top and click [Save] to preserve changes in a version.</p>
         </div>
       )}
     </section>}
 
-    {suggestions && !suggestionsCurrent && <p className="theory-suggestions-warn">본문이 수정되어 이전 제안을 반영할 수 없습니다. 다시 시도해 주세요.</p>}
+    {suggestions && !suggestionsCurrent && <p className="theory-suggestions-warn">The body has been modified, so previous suggestions cannot be applied. Please try again.</p>}
   </section>;
 }
 

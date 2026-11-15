@@ -3,9 +3,9 @@ import type { ModelOption, ResearchModeInfo, UserSettings } from './types';
 export const RESEARCH_MODES: Record<string, ResearchModeInfo> = {
   general: {
     id: 'general',
-    name: '일반 연구 보조',
+    name: 'General Research',
     badge: 'General',
-    description: '학술적이고 엄밀한 답변, 수식(LaTeX) 및 개념 상세 설명',
+    description: 'Rigorous academic answers with LaTeX equations and detailed conceptual explanations',
     systemPrompt: `You are Qaxiom, an elite academic research intelligence AI.
 Your purpose is to assist researchers, scientists, and academics with rigorous, reliable, and deeply structured analysis.
 - Provide clear, logically structured answers with academic precision.
@@ -15,9 +15,9 @@ Your purpose is to assist researchers, scientists, and academics with rigorous, 
   },
   peer_review: {
     id: 'peer_review',
-    name: '피어 리뷰',
+    name: 'Peer Review',
     badge: 'Reviewer #2',
-    description: '논문의 논리적 비약, 방법론 결함, 대조군 부족 등을 엄격하게 비판 검토',
+    description: 'Critical inspection of logical leaps, methodological flaws, and missing controls',
     systemPrompt: `You are an exacting, top-tier journal Peer Reviewer (often known as the rigorous "Reviewer #2").
 Your task is to critically inspect the user's research hypotheses, methodology, assumptions, and claims.
 - Identify weak points, logical leaps, missing controls, potential confounders, and unstated assumptions.
@@ -27,9 +27,9 @@ Your task is to critically inspect the user's research hypotheses, methodology, 
   },
   proofreader: {
     id: 'proofreader',
-    name: '학술 논문 교정',
+    name: 'Academic Proofreading',
     badge: 'Proofread',
-    description: 'Nature/IEEE 스타일의 세련된 학술 영문 교정 및 문맥 개선',
+    description: 'Publication-ready Nature/IEEE academic English editing and clarity improvements',
     systemPrompt: `You are an expert academic editor and proofreader specializing in publications for Nature, IEEE, ACM, and top peer-reviewed journals.
 When the user provides academic text (English or Korean to English translation):
 1. Provide the polished, publication-ready revision.
@@ -38,9 +38,9 @@ When the user provides academic text (English or Korean to English translation):
   },
   math_proof: {
     id: 'math_proof',
-    name: '수식 유도 및 증명',
+    name: 'Math & Proofs',
     badge: 'Math & Theory',
-    description: '엄밀한 수학적 정의, 보조정리, 단계별 수식 유도 및 증명 검증',
+    description: 'Formal definitions, lemmas, step-by-step derivations, and proof verification',
     systemPrompt: `You are a theoretical mathematician and formal reasoning expert.
 Your job is to assist with mathematical derivations, proofs, and theoretical modeling.
 - Write all equations strictly in LaTeX ($...$ for inline, $$...$$ for standalone display).
@@ -49,9 +49,9 @@ Your job is to assist with mathematical derivations, proofs, and theoretical mod
   },
   literature_synth: {
     id: 'literature_synth',
-    name: '문헌 종합 & 연구 갭',
+    name: 'Literature Synthesis',
     badge: 'Synthesis',
-    description: '다양한 연구 동향 비교, 장단점 분석, 미해결 과제(Research Gap) 도출',
+    description: 'Cross-study comparison, trade-off analysis, and research gap identification',
     systemPrompt: `You are a literature synthesis specialist.
 Your goal is to aggregate, synthesize, and compare multiple scientific studies and research paradigms.
 - Synthesize thematic clusters, contrasting perspectives, and methodologies across papers.
@@ -60,9 +60,9 @@ Your goal is to aggregate, synthesize, and compare multiple scientific studies a
   },
   latex_normalizer: {
     id: 'latex_normalizer',
-    name: 'LaTeX 수식 복원 및 정규화',
+    name: 'LaTeX Normalizer',
     badge: 'LaTeX Fix',
-    description: '깨지거나 불완전한 LaTeX 수식 문법, 괄호 쌍, 수식 환경을 KaTeX/MathJax 표준 규격으로 완벽 복원',
+    description: 'Repair and normalize broken or malformed LaTeX syntax to KaTeX/MathJax standards',
     systemPrompt: `You are an expert LaTeX and Mathematical Typography Specialist for academic and scientific publications.
 Your primary objective is to inspect, repair, and normalize all broken, incomplete, or corrupted LaTeX mathematical expressions in the user's research document.
 - Fix unmatched braces, broken macros, unescaped special characters, malformed fractions (\\frac), matrices, integrals, summation indices, and aligned equation environments.
@@ -79,7 +79,7 @@ export const AVAILABLE_MODELS: ModelOption[] = [
     id: 'gpt-6-astra',
     name: 'OpenAI GPT-6 Astra',
     provider: 'openai',
-    description: '최고 난도 연구 추론과 복합 검증을 위한 OpenAI 플래그십',
+    description: 'OpenAI flagship for hardest research reasoning and complex verification',
     status: 'active',
     api: 'responses',
     supportsTemperature: false,
@@ -92,7 +92,7 @@ export const AVAILABLE_MODELS: ModelOption[] = [
     id: 'gpt-6.1-sol',
     name: 'OpenAI GPT-6.1 Sol',
     provider: 'openai',
-    description: '복잡한 연구 작업에서 성능과 비용의 균형을 맞춘 OpenAI 모델',
+    description: 'Balanced OpenAI model for performance and cost on complex research tasks',
     status: 'active',
     api: 'responses',
     supportsTemperature: false,
@@ -104,7 +104,7 @@ export const AVAILABLE_MODELS: ModelOption[] = [
     id: 'gpt-6-luna',
     name: 'OpenAI GPT-6 Luna',
     provider: 'openai',
-    description: '반복적인 연구 보조 작업에 적합한 고효율 OpenAI 모델',
+    description: 'High-efficiency OpenAI model for iterative research assistance',
     status: 'active',
     api: 'responses',
     supportsTemperature: false,
@@ -116,7 +116,7 @@ export const AVAILABLE_MODELS: ModelOption[] = [
     id: 'claude-opus-5',
     name: 'Claude Opus 5',
     provider: 'anthropic',
-    description: '심층 분석, 피어 리뷰와 장기 복합 추론을 위한 Anthropic 모델',
+    description: 'Anthropic model for deep analysis, peer review, and long-horizon reasoning',
     status: 'active',
     api: 'messages',
     supportsTemperature: false,
@@ -127,7 +127,7 @@ export const AVAILABLE_MODELS: ModelOption[] = [
     id: 'claude-sonnet-5',
     name: 'Claude Sonnet 5',
     provider: 'anthropic',
-    description: '학술 글쓰기와 분석에서 속도와 품질의 균형을 맞춘 Anthropic 모델',
+    description: 'Anthropic model balancing speed and quality for academic writing and analysis',
     status: 'active',
     api: 'messages',
     supportsTemperature: false,
@@ -138,7 +138,7 @@ export const AVAILABLE_MODELS: ModelOption[] = [
     id: 'gemini-4-carbon',
     name: 'Gemini 4 Carbon',
     provider: 'gemini',
-    description: '고난도 과학·이론 연구와 장기 복합 추론을 위한 Google 최신 플래그십 모델',
+    description: 'Google flagship model for advanced scientific/theoretical research and long-context reasoning',
     status: 'active',
     api: 'generate-content',
     supportsTemperature: true,
@@ -149,7 +149,7 @@ export const AVAILABLE_MODELS: ModelOption[] = [
     id: 'gemini-4-argon',
     name: 'Gemini 4 Argon',
     provider: 'gemini',
-    description: '복잡한 수학·과학·코딩 추론에서 속도와 정밀도의 균형을 맞춘 Gemini 4 모델',
+    description: 'Gemini 4 model balancing speed and precision for math, science, and coding reasoning',
     status: 'active',
     api: 'generate-content',
     supportsTemperature: true,
@@ -160,7 +160,7 @@ export const AVAILABLE_MODELS: ModelOption[] = [
     id: 'gemini-4-hydrogen',
     name: 'Gemini 4 Hydrogen',
     provider: 'gemini',
-    description: '컨텍스트 캐싱과 빠른 연구 응답에 최적화된 경량 Gemini 4 모델',
+    description: 'Lightweight Gemini 4 model optimized for context caching and fast research responses',
     status: 'active',
     api: 'generate-content',
     supportsTemperature: true,
@@ -171,7 +171,7 @@ export const AVAILABLE_MODELS: ModelOption[] = [
     id: 'gemini-3.8-flash',
     name: 'Gemini 3.8 Flash',
     provider: 'gemini',
-    description: '빠른 연구 보조와 반복 작업을 위한 Google Flash 모델',
+    description: 'Google Flash model for fast research assistance and repetitive tasks',
     status: 'active',
     api: 'generate-content',
     supportsTemperature: true,
@@ -233,8 +233,8 @@ export function estimateTokenCount(text: string): number {
 export function formatTokenLimit(tokens: number): string {
   if (tokens >= 1_000_000) {
     const m = (tokens / 1_000_000).toFixed(tokens % 1_000_000 === 0 ? 0 : 1);
-    return `${m}M (${tokens.toLocaleString()} 토큰)`;
+    return `${m}M (${tokens.toLocaleString()} tokens)`;
   }
   const k = Math.round(tokens / 1000);
-  return `${k}K (${tokens.toLocaleString()} 토큰)`;
+  return `${k}K (${tokens.toLocaleString()} tokens)`;
 }

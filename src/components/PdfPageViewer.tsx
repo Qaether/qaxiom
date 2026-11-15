@@ -16,7 +16,7 @@ export default function PdfPageViewer({ assetId, initialPage = 1 }: { assetId: s
     void (async () => {
       setLoading(true); setError('');
       const asset = await qaxiomDatabase.pdf_assets.get(assetId);
-      if (!asset || await hashBytes(asset.bytes) !== asset.fileHash) throw new Error('PDF 원본이 없거나 해시가 일치하지 않습니다.');
+      if (!asset || await hashBytes(asset.bytes) !== asset.fileHash) throw new Error('The original PDF is missing or its hash does not match.');
       const { openPdf } = await import('../services/retrieval/pdfRuntime');
       if (!active) return;
       task = openPdf(asset.bytes);
@@ -33,17 +33,17 @@ export default function PdfPageViewer({ assetId, initialPage = 1 }: { assetId: s
       render = page.render({ canvas: element, viewport, annotationMode: 0 });
       await render.promise;
       if (active) setLoading(false);
-    })().catch(cause => { if (active) { setError(cause instanceof Error ? cause.message : 'PDF 페이지를 표시하지 못했습니다.'); setLoading(false); } });
+    })().catch(cause => { if (active) { setError(cause instanceof Error ? cause.message : 'Failed to display the PDF page.'); setLoading(false); } });
     return () => { active = false; render?.cancel(); void task?.destroy().catch(() => {}); };
   }, [assetId, pageNumber]);
-  return <section aria-label="PDF 원본 페이지" className="pdf-page-viewer">
-    <p>원본 {pageNumber}쪽{count ? ` / ${count}쪽` : ''} · 추출 순서·수식은 이 화면과 대조해 주세요. 좌표별 인용 강조는 아직 지원하지 않습니다.</p>
+  return <section aria-label="Original PDF Page" className="pdf-page-viewer">
+    <p>Original page {pageNumber}{count ? ` / ${count}` : ''} · Please verify extraction order and formulas against this view. Coordinate-based citation highlighting is not yet supported.</p>
     <div className="pdf-page-actions">
-      <button type="button" disabled={loading || pageNumber <= 1} onClick={() => setPageNumber(number => number - 1)}>이전 페이지</button>
-      <button type="button" disabled={loading || pageNumber >= count} onClick={() => setPageNumber(number => number + 1)}>다음 페이지</button>
+      <button type="button" disabled={loading || pageNumber <= 1} onClick={() => setPageNumber(number => number - 1)}>Previous Page</button>
+      <button type="button" disabled={loading || pageNumber >= count} onClick={() => setPageNumber(number => number + 1)}>Next Page</button>
     </div>
-    {loading && <p role="status">PDF 페이지 렌더링 중…</p>}
+    {loading && <p role="status">Rendering PDF page…</p>}
     {error && <p role="alert">{error}</p>}
-    <canvas ref={canvas} aria-label={`PDF 원본 ${pageNumber}쪽`} hidden={loading || !!error} />
+    <canvas ref={canvas} aria-label={`Original PDF page ${pageNumber}`} hidden={loading || !!error} />
   </section>;
 }

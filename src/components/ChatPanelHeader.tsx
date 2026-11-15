@@ -46,7 +46,7 @@ export const ChatPanelHeader: React.FC<ChatPanelHeaderProps> = ({
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${currentSession.title.replace(/[^a-zA-Z0-9가-힣_-]/g, '_')}.md`;
+    a.download = `${currentSession.title.replace(/[^a-zA-Z0-9\uAC00-\uD7A3_-]/g, '_')}.md`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -56,11 +56,11 @@ export const ChatPanelHeader: React.FC<ChatPanelHeaderProps> = ({
       <div className="chat-panel-header-left">
         {/* Mode Selector */}
         <div className="chat-panel-mode-wrapper">
-          <label htmlFor="chat-panel-mode-select" className="chat-panel-mode-label">모드</label>
+          <label htmlFor="chat-panel-mode-select" className="chat-panel-mode-label">Mode</label>
           <select
             id="chat-panel-mode-select"
             className="chat-panel-mode-select"
-            aria-label="연구 모드 선택"
+            aria-label="Select research mode"
             value={currentMode}
             onChange={e => onModeChange(e.target.value as ResearchMode)}
           >
@@ -72,8 +72,8 @@ export const ChatPanelHeader: React.FC<ChatPanelHeaderProps> = ({
           </select>
         </div>
 
-        <h2 className="sr-only" aria-label={currentSession.title || '새로운 연구 대화'}>
-          {currentSession.title || '새로운 연구 대화'}
+        <h2 className="sr-only" aria-label={currentSession.title || 'New research chat'}>
+          {currentSession.title || 'New research chat'}
         </h2>
 
         {isEditingTitle && (
@@ -81,7 +81,7 @@ export const ChatPanelHeader: React.FC<ChatPanelHeaderProps> = ({
             <input
               type="text"
               className="title-edit-input"
-              aria-label="대화 제목 입력"
+              aria-label="Enter chat title"
               value={titleInput}
               onChange={e => setTitleInput(e.target.value)}
               autoFocus
@@ -92,7 +92,7 @@ export const ChatPanelHeader: React.FC<ChatPanelHeaderProps> = ({
                 if (event.key === 'Escape') finishTitleEditing();
               }}
             />
-            <button type="submit" className="title-save-btn topbar-tooltip" data-tooltip="대화 제목 저장" aria-label="대화 제목 저장">
+            <button type="submit" className="title-save-btn topbar-tooltip" data-tooltip="Save chat title" aria-label="Save chat title">
               <Check size={14} />
             </button>
           </form>
@@ -106,8 +106,8 @@ export const ChatPanelHeader: React.FC<ChatPanelHeaderProps> = ({
             type="button"
             className="title-edit-btn chat-title-toggle-btn topbar-tooltip"
             onClick={() => { setTitleInput(currentSession.title); setIsEditingTitle(true); }}
-            data-tooltip="제목 변경"
-            aria-label={`${currentSession.title || '새로운 연구 대화'} 제목 수정`}
+            data-tooltip="Rename"
+            aria-label={`Rename ${currentSession.title || 'New research chat'}`}
           >
             <Edit3 size={16} aria-hidden="true" />
           </button>
@@ -119,8 +119,8 @@ export const ChatPanelHeader: React.FC<ChatPanelHeaderProps> = ({
             type="button"
             className={`chat-panel-action-btn chat-history-toggle-btn topbar-tooltip ${isHistoryOpen ? 'active' : ''}`}
             onClick={onToggleHistory}
-            data-tooltip="대화 기록"
-            aria-label="대화 기록 보기"
+            data-tooltip="Chat history"
+            aria-label="View chat history"
             aria-expanded={isHistoryOpen}
           >
             <History size={16} />
@@ -132,8 +132,8 @@ export const ChatPanelHeader: React.FC<ChatPanelHeaderProps> = ({
           type="button"
           className="chat-panel-action-btn chat-export-btn topbar-tooltip"
           onClick={handleExportMarkdown}
-          data-tooltip="대화 내보내기"
-          aria-label="대화 내용 Markdown 내보내기"
+          data-tooltip="Export chat"
+          aria-label="Export chat as Markdown"
           disabled={currentSession.messages.length === 0}
         >
           <Download size={16} />
@@ -144,8 +144,8 @@ export const ChatPanelHeader: React.FC<ChatPanelHeaderProps> = ({
           type="button"
           className="chat-panel-action-btn chat-panel-new-chat-btn topbar-tooltip"
           onClick={onNewSession}
-          data-tooltip="새 대화"
-          aria-label="새 대화 시작"
+          data-tooltip="New chat"
+          aria-label="Start new chat"
         >
           <Plus size={16} />
         </button>

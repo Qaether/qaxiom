@@ -15,7 +15,7 @@ export const EmptyState: React.FC<EmptyStateProps> = () => {
         <div className="hero-icon-clean">
           <Cpu size={36} />
         </div>
-        <p className="empty-clean-prompt">연구 주제나 가설에 대해 질문해 보세요</p>
+        <p className="empty-clean-prompt">Ask about your research topic or hypothesis</p>
       </div>
     </div>
   );
