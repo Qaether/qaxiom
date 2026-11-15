@@ -14,7 +14,7 @@ import { sendChatMessage } from '../services/llm';
 import ContractSuggestionAssistant from './ContractSuggestionAssistant';
 import type { UserSettings } from '../types';
 import type { DocumentDraft } from '../services/documentChat';
-import { computeLineDiff, type DiffLine, type DiffStats } from '../services/diffUtils';
+import { computeLineDiff, groupDiffIntoSegments, resolveDiffHunk, type DiffLine, type DiffStats } from '../services/diffUtils';
 
 import { AVAILABLE_MODELS, estimateTokenCount, formatTokenLimit } from '../constants';
 import ReactMarkdown from 'react-markdown';
@@ -170,8 +170,30 @@ export default function TheoryWorkspace({
   const handleRejectSuggestion = () => {
     if (!pendingSuggestion) return;
     setPendingSuggestion(null);
-    setStatus('✕ AI 수정 제안을 거절하고 기존 본문을 유지했습니다.');
+    setStatus('✕ 남은 수정 제안을 거절하고 현재 본문을 유지했습니다.');
     onSuggestionSettled?.('rejected');
+  };
+
+  const handleResolveHunk = (hunkId: string, decision: 'accept' | 'reject') => {
+    if (!pendingSuggestion) return;
+    const { nextOriginal, nextProposed } = resolveDiffHunk(pendingSuggestion.diffLines, hunkId, decision);
+    if (decision === 'accept') {
+      setMarkdown(nextOriginal);
+    }
+    const nextDiff = computeLineDiff(nextOriginal, nextProposed);
+    if (nextDiff.stats.added === 0 && nextDiff.stats.removed === 0) {
+      setPendingSuggestion(null);
+      setStatus('✓ 모든 수정 제안을 검토해 본문에 반영했습니다.');
+      onSuggestionSettled?.('accepted');
+      return;
+    }
+    setPendingSuggestion({
+      ...pendingSuggestion,
+      originalText: nextOriginal,
+      proposedText: nextProposed,
+      diffLines: nextDiff.lines,
+      stats: nextDiff.stats,
+    });
   };
 
   // Keyboard shortcuts for accepting/rejecting suggestions
@@ -891,6 +913,9 @@ export default function TheoryWorkspace({
                   <span className="theory-review-title">AI 수정 제안 검토</span>
                   <span className="theory-diff-stat-badge added">+{pendingSuggestion.stats.added}줄</span>
                   <span className="theory-diff-stat-badge removed">-{pendingSuggestion.stats.removed}줄</span>
+                  <span className="theory-diff-stat-badge hunks">
+                    남은 변경 {groupDiffIntoSegments(pendingSuggestion.diffLines).filter(s => s.kind === 'hunk').length}건
+                  </span>
                 </div>
                 <div className="theory-review-bar-actions">
                   <button
@@ -905,21 +930,21 @@ export default function TheoryWorkspace({
                     type="button"
                     className="theory-review-btn-reject"
                     onClick={handleRejectSuggestion}
-                    title="수정 제안 거절 (Esc)"
-                    aria-label="제안 거절 (Esc)"
+                    title="남은 수정 제안 모두 거절 (Esc)"
+                    aria-label="전체 거절 (Esc)"
                   >
                     <X size={14} />
-                    <span>거절 (Esc)</span>
+                    <span>전체 거절 (Esc)</span>
                   </button>
                   <button
                     type="button"
                     className="theory-review-btn-accept"
                     onClick={handleAcceptSuggestion}
-                    title="수정 제안 수락 (⌘+Enter)"
-                    aria-label="제안 수락 (Cmd+Enter)"
+                    title="남은 수정 제안 모두 수락 (⌘+Enter)"
+                    aria-label="전체 수락 (Cmd+Enter)"
                   >
                     <Check size={14} />
-                    <span>수락 (⌘↵)</span>
+                    <span>전체 수락 (⌘↵)</span>
                   </button>
                 </div>
               </div>
@@ -928,20 +953,64 @@ export default function TheoryWorkspace({
               {diffViewMode === 'diff' ? (
                 <div className="theory-inline-diff-viewer">
                   <div className="theory-diff-lines-wrapper">
-                    {pendingSuggestion.diffLines.map((line, idx) => (
-                      <div key={idx} className={`theory-diff-line-row ${line.type}`}>
-                        <span className="theory-diff-line-num old">
-                          {line.type === 'removed' || line.type === 'unchanged' ? line.oldLineNumber : ''}
-                        </span>
-                        <span className="theory-diff-line-num new">
-                          {line.type === 'added' || line.type === 'unchanged' ? line.newLineNumber : ''}
-                        </span>
-                        <span className="theory-diff-line-sign">
-                          {line.type === 'added' ? '+' : line.type === 'removed' ? '-' : ' '}
-                        </span>
-                        <span className="theory-diff-line-text">{line.text || ' '}</span>
-                      </div>
-                    ))}
+                    {groupDiffIntoSegments(pendingSuggestion.diffLines).map((segment, segIdx) => {
+                      if (segment.kind === 'unchanged') {
+                        return segment.lines.map((line, lineIdx) => (
+                          <div key={`u-${segIdx}-${lineIdx}`} className="theory-diff-line-row unchanged">
+                            <span className="theory-diff-line-num old">{line.oldLineNumber}</span>
+                            <span className="theory-diff-line-num new">{line.newLineNumber}</span>
+                            <span className="theory-diff-line-sign"> </span>
+                            <span className="theory-diff-line-text">{line.text || ' '}</span>
+                          </div>
+                        ));
+                      }
+                      const { hunk } = segment;
+                      return (
+                        <div key={hunk.id} className="theory-diff-hunk-group" data-hunk-id={hunk.id}>
+                          <div className="theory-diff-hunk-bar">
+                            <span className="theory-diff-hunk-label">
+                              변경 #{hunk.index + 1}
+                              {hunk.addedCount > 0 && <span className="theory-diff-hunk-count added"> +{hunk.addedCount}</span>}
+                              {hunk.removedCount > 0 && <span className="theory-diff-hunk-count removed"> -{hunk.removedCount}</span>}
+                            </span>
+                            <div className="theory-diff-hunk-actions">
+                              <button
+                                type="button"
+                                className="theory-diff-hunk-btn reject"
+                                aria-label={`변경 ${hunk.index + 1} 거절`}
+                                onClick={() => handleResolveHunk(hunk.id, 'reject')}
+                              >
+                                <X size={12} />
+                                <span>거절</span>
+                              </button>
+                              <button
+                                type="button"
+                                className="theory-diff-hunk-btn accept"
+                                aria-label={`변경 ${hunk.index + 1} 수락`}
+                                onClick={() => handleResolveHunk(hunk.id, 'accept')}
+                              >
+                                <Check size={12} />
+                                <span>수락</span>
+                              </button>
+                            </div>
+                          </div>
+                          {hunk.lines.map((line, lineIdx) => (
+                            <div key={`${hunk.id}-${lineIdx}`} className={`theory-diff-line-row ${line.type}`}>
+                              <span className="theory-diff-line-num old">
+                                {line.type === 'removed' ? line.oldLineNumber : ''}
+                              </span>
+                              <span className="theory-diff-line-num new">
+                                {line.type === 'added' ? line.newLineNumber : ''}
+                              </span>
+                              <span className="theory-diff-line-sign">
+                                {line.type === 'added' ? '+' : '-'}
+                              </span>
+                              <span className="theory-diff-line-text">{line.text || ' '}</span>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               ) : (

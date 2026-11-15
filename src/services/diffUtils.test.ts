@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeLineDiff } from './diffUtils';
+import { computeLineDiff, groupDiffIntoSegments, resolveDiffHunk } from './diffUtils';
 
 describe('computeLineDiff', () => {
   it('returns unchanged lines when original and proposed are identical', () => {
@@ -36,5 +36,29 @@ describe('computeLineDiff', () => {
       { type: 'added', text: 'New content', newLineNumber: 2 },
       { type: 'unchanged', text: 'Footer', oldLineNumber: 3, newLineNumber: 3 },
     ]);
+  });
+
+  it('groups hunks and resolves individual hunks via accept and reject', () => {
+    const original = 'Title\nOld A\nMiddle\nOld B\nEnd';
+    const proposed = 'Title\nNew A\nMiddle\nNew B\nEnd';
+    const diff1 = computeLineDiff(original, proposed);
+    const segments1 = groupDiffIntoSegments(diff1.lines);
+    const hunks1 = segments1.filter(s => s.kind === 'hunk');
+    expect(hunks1).toHaveLength(2);
+
+    // Accept only hunk-0
+    const step1 = resolveDiffHunk(diff1.lines, 'hunk-0', 'accept');
+    expect(step1.nextOriginal).toBe('Title\nNew A\nMiddle\nOld B\nEnd');
+    expect(step1.nextProposed).toBe('Title\nNew A\nMiddle\nNew B\nEnd');
+
+    // Re-compute diff and reject the remaining hunk-0 (originally hunk-1)
+    const diff2 = computeLineDiff(step1.nextOriginal, step1.nextProposed);
+    expect(diff2.stats).toEqual({ added: 1, removed: 1 });
+    const step2 = resolveDiffHunk(diff2.lines, 'hunk-0', 'reject');
+    expect(step2.nextOriginal).toBe('Title\nNew A\nMiddle\nOld B\nEnd');
+    expect(step2.nextProposed).toBe('Title\nNew A\nMiddle\nOld B\nEnd');
+
+    const finalDiff = computeLineDiff(step2.nextOriginal, step2.nextProposed);
+    expect(finalDiff.stats).toEqual({ added: 0, removed: 0 });
   });
 });

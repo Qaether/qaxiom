@@ -115,3 +115,108 @@ export function computeLineDiff(originalText: string, proposedText: string): Com
 
   return { lines, stats: { added, removed } };
 }
+
+export interface DiffHunk {
+  id: string;
+  index: number;
+  startLineIndex: number;
+  lines: DiffLine[];
+  addedCount: number;
+  removedCount: number;
+}
+
+export type DiffSegment =
+  | { kind: 'unchanged'; lines: DiffLine[]; startLineIndex: number }
+  | { kind: 'hunk'; hunk: DiffHunk };
+
+/**
+ * Groups consecutive unchanged lines and consecutive changed lines (added/removed) into hunks
+ * so users can accept or reject individual change blocks.
+ */
+export function groupDiffIntoSegments(lines: DiffLine[]): DiffSegment[] {
+  const segments: DiffSegment[] = [];
+  let idx = 0;
+  let hunkIndex = 0;
+
+  while (idx < lines.length) {
+    if (lines[idx].type === 'unchanged') {
+      const startLineIndex = idx;
+      const unchangedLines: DiffLine[] = [];
+      while (idx < lines.length && lines[idx].type === 'unchanged') {
+        unchangedLines.push(lines[idx]);
+        idx++;
+      }
+      segments.push({ kind: 'unchanged', lines: unchangedLines, startLineIndex });
+    } else {
+      const startLineIndex = idx;
+      const hunkLines: DiffLine[] = [];
+      let addedCount = 0;
+      let removedCount = 0;
+      while (idx < lines.length && lines[idx].type !== 'unchanged') {
+        const line = lines[idx];
+        hunkLines.push(line);
+        if (line.type === 'added') addedCount++;
+        else removedCount++;
+        idx++;
+      }
+      segments.push({
+        kind: 'hunk',
+        hunk: {
+          id: `hunk-${hunkIndex}`,
+          index: hunkIndex,
+          startLineIndex,
+          lines: hunkLines,
+          addedCount,
+          removedCount,
+        },
+      });
+      hunkIndex++;
+    }
+  }
+
+  return segments;
+}
+
+/**
+ * Resolves a single diff hunk by either accepting it into originalText or rejecting it from proposedText.
+ */
+export function resolveDiffHunk(
+  lines: DiffLine[],
+  hunkId: string,
+  decision: 'accept' | 'reject'
+): { nextOriginal: string; nextProposed: string } {
+  const segments = groupDiffIntoSegments(lines);
+  const nextOriginalLines: string[] = [];
+  const nextProposedLines: string[] = [];
+
+  for (const segment of segments) {
+    if (segment.kind === 'unchanged') {
+      for (const line of segment.lines) {
+        nextOriginalLines.push(line.text);
+        nextProposedLines.push(line.text);
+      }
+      continue;
+    }
+
+    const isTarget = segment.hunk.id === hunkId;
+    for (const line of segment.hunk.lines) {
+      if (isTarget) {
+        if (decision === 'accept' && line.type === 'added') {
+          nextOriginalLines.push(line.text);
+          nextProposedLines.push(line.text);
+        } else if (decision === 'reject' && line.type === 'removed') {
+          nextOriginalLines.push(line.text);
+          nextProposedLines.push(line.text);
+        }
+      } else {
+        if (line.type === 'removed') nextOriginalLines.push(line.text);
+        if (line.type === 'added') nextProposedLines.push(line.text);
+      }
+    }
+  }
+
+  return {
+    nextOriginal: nextOriginalLines.join('\n'),
+    nextProposed: nextProposedLines.join('\n'),
+  };
+}

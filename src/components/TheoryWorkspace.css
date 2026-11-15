@@ -2907,6 +2907,82 @@
   color: var(--text-main, #eee);
 }
 
+.theory-diff-stat-badge.hunks {
+  background: rgba(99, 102, 241, 0.16);
+  color: #c7d2fe;
+}
+
+.theory-diff-hunk-group {
+  margin: 6px 0;
+  border: 1px solid rgba(99, 102, 241, 0.28);
+  border-radius: 6px;
+  overflow: hidden;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.theory-diff-hunk-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 10px;
+  background: rgba(99, 102, 241, 0.1);
+  border-bottom: 1px solid rgba(99, 102, 241, 0.2);
+  font-size: 0.74rem;
+}
+
+.theory-diff-hunk-label {
+  color: #cbd5e1;
+  font-weight: 600;
+}
+
+.theory-diff-hunk-count.added {
+  color: #34d399;
+}
+
+.theory-diff-hunk-count.removed {
+  color: #f87171;
+}
+
+.theory-diff-hunk-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.theory-diff-hunk-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.theory-diff-hunk-btn.accept {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: rgba(16, 185, 129, 0.4);
+  color: #6ee7b7;
+}
+
+.theory-diff-hunk-btn.accept:hover {
+  background: rgba(16, 185, 129, 0.32);
+}
+
+.theory-diff-hunk-btn.reject {
+  background: rgba(239, 68, 68, 0.16);
+  border-color: rgba(239, 68, 68, 0.35);
+  color: #fca5a5;
+}
+
+.theory-diff-hunk-btn.reject:hover {
+  background: rgba(239, 68, 68, 0.28);
+}
+
 
 
 
