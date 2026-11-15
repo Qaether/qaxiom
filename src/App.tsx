@@ -22,6 +22,7 @@ import { deleteTheory, prepareTheoryDeletion, type TheoryDeletionPreview } from 
 import { deleteProjectFolder, folderPermission, getActiveProjectFolder, listRecentProjectFolders, rememberProjectFolder, renameProjectFolder, requestFolderPermission } from './services/projectFolder';
 import type { ContextBundle, ContextEvidence } from './services/retrieval/types';
 import { withReferenceContext } from './services/retrieval/context';
+import { buildPinnedReferenceContextBundle } from './services/retrieval/pinnedContext';
 import { captureDocumentContext, sessionsForDocument, verifyDocumentContext, withDocumentContext, type DocumentDraft } from './services/documentChat';
 import { internalLightModel, LIGHT_CHAT_MODELS, obviousLightGreeting } from './services/chatRouting';
 import {
@@ -549,8 +550,13 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
       }
     }
 
-    const contextBundle = options?.contextBundle || (options?.retryAssistantMessageId
+    const explicitBundle = options?.contextBundle || (options?.retryAssistantMessageId
       ? currentSession.messages.find(message => message.id === options.retryAssistantMessageId)?.contextBundle : undefined);
+    const contextBundle = explicitBundle ?? (
+      !options?.retryAssistantMessageId && (currentSession.researchMode !== 'general' || !obviousLightGreeting(userPrompt))
+        ? await buildPinnedReferenceContextBundle({ documentId: theoryDocumentId, query: userPrompt })
+        : undefined
+    );
     const priorAnswer = options?.retryAssistantMessageId
       ? currentSession.messages.find(message => message.id === options.retryAssistantMessageId) : undefined;
     const route: 'light' | 'research' = contextBundle || currentSession.researchMode !== 'general'
