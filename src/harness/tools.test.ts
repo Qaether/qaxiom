@@ -142,33 +142,36 @@ describe('harness scoped local tools & propose_patch', () => {
   });
 
   it('runs bounded tool loop inside runTurn and stops at maxToolHops', async () => {
-    const encoder = new TextEncoder();
     let callCount = 0;
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockImplementation(async () => {
-        callCount++;
-        const payload =
-          callCount === 1
-            ? '```qaxiom_tool\n{"name":"get_definition","arguments":{"symbol":"kappa"}}\n```'
-            : 'Final answer using kappa = 1.';
-        const stream = new ReadableStream({
-          start(controller) {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'response.output_text.delta', delta: payload })}\n\n`));
-            controller.enqueue(encoder.encode('data: [DONE]\n\n'));
-            controller.close();
-          }
-        });
-        return new Response(stream, { status: 200 });
-      })
-    );
+    let listener: ((event: import('../types/desktop').CliIpcEvent) => void) | null = null;
+    vi.stubGlobal('window', {
+      qaxiomDesktop: {
+        isDesktop: true,
+        getCliStatuses: vi.fn(),
+        openCliLogin: vi.fn(),
+        abortCli: vi.fn().mockResolvedValue(undefined),
+        onCliEvent: (cb: (event: import('../types/desktop').CliIpcEvent) => void) => {
+          listener = cb;
+          return () => { listener = null; };
+        },
+        runCli: vi.fn().mockImplementation(async (req: { runId: string }) => {
+          callCount++;
+          const payload =
+            callCount === 1
+              ? '```qaxiom_tool\n{"name":"get_definition","arguments":{"symbol":"kappa"}}\n```'
+              : 'Final answer using kappa = 1.';
+          listener?.({ runId: req.runId, type: 'chunk', chunk: payload });
+          listener?.({ runId: req.runId, type: 'finish' });
+        })
+      }
+    });
 
     const onToolCall = vi.fn();
     const result = await runTurn(
       {
         kind: 'chat',
         messages: [{ id: 'u1', role: 'user', content: 'Define kappa', timestamp: 1 }],
-        modelId: 'gpt-6-astra',
+        modelId: 'codex-cli',
         researchMode: 'general',
         enableToolLoop: true,
         maxToolHops: 2,
@@ -181,14 +184,12 @@ describe('harness scoped local tools & propose_patch', () => {
           contract: { ...EMPTY_CONTRACT, definitions: 'kappa = coupling constant' },
           capturedAt: 1
         },
-        settings: {
-          ...DEFAULT_SETTINGS,
-          apiKeys: { ...DEFAULT_SETTINGS.apiKeys, openai: 'sk-test-openai-key-123456' }
-        }
+        settings: DEFAULT_SETTINGS
       },
       { callbacks: { onToolCall } }
     );
 
+    vi.unstubAllGlobals();
     expect(result.toolHopsUsed).toBe(1);
     expect(result.text).toBe('Final answer using kappa = 1.');
     expect(onToolCall).toHaveBeenCalledOnce();

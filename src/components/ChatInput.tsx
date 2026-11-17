@@ -13,6 +13,7 @@ interface ChatInputProps {
   onModelChange?: (modelId: string) => void;
   apiKeys?: Record<string, string>;
   cliStatuses?: Record<CliProviderId, CliToolStatus> | null;
+  disabledReason?: string;
 }
 
 export const ChatInput: React.FC<ChatInputProps> = ({
@@ -23,7 +24,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   selectedModel,
   onModelChange,
   apiKeys,
-  cliStatuses
+  cliStatuses,
+  disabledReason
 }) => {
   const [input, setInput] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -106,7 +108,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             onCompositionEnd={handleCompositionEnd}
             onKeyDown={handleKeyDown}
             placeholder={
-              currentMode === 'peer_review'
+              disabledReason
+                ? disabledReason
+                : currentMode === 'peer_review'
                 ? "Enter your research idea, abstract, or hypothesis for peer review..."
                 : currentMode === 'math_proof'
                 ? "Enter equations or theoretical assumptions to prove or derive..."
@@ -115,14 +119,14 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 : "Enter a research topic, paper question, or hypothesis to analyze (Shift+Enter for new line)..."
             }
             rows={1}
-            disabled={isStreaming}
+            disabled={isStreaming || Boolean(disabledReason)}
           />
 
           <button
             type="submit"
             id="send-message-btn"
             className={`send-button ${isStreaming ? 'stop-state' : ''}`}
-            disabled={!isStreaming && !input.trim()}
+            disabled={!isStreaming && (Boolean(disabledReason) || !input.trim())}
             title={isStreaming ? "Stop generation" : "Send (Enter)"}
             aria-label={isStreaming ? "Stop generation" : "Send message"}
           >

@@ -6,6 +6,7 @@ export type CliIpcEvent =
   | { runId: string; type: 'chunk'; chunk: string }
   | { runId: string; type: 'reasoning'; chunk: string }
   | { runId: string; type: 'usage'; usage: CliUsage }
+  | { runId: string; type: 'log'; stream: 'cmd' | 'stdout' | 'stderr'; line: string }
   | { runId: string; type: 'error'; message: string }
   | { runId: string; type: 'finish' };
 
@@ -15,6 +16,8 @@ const desktopApi = {
     ipcRenderer.invoke('cli:status'),
   openCliLogin: (provider: CliProviderId): Promise<CliToolStatus> =>
     ipcRenderer.invoke('cli:login', provider),
+  openCliTerminal: (provider: CliProviderId): Promise<void> =>
+    ipcRenderer.invoke('cli:open-terminal', provider),
   runCli: (request: CliRunRequest): Promise<void> =>
     ipcRenderer.invoke('cli:run', request),
   abortCli: (runId: string): Promise<void> =>

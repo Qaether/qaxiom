@@ -223,7 +223,7 @@ export default function ProjectStart({ onOpen, onReconnect, onSelectProject, onR
           <span>{directory ? `Selected folder: ${folderName}` : 'No folder selected.'}</span>
         </div>
         {!supported && <p role="note">Local folder selection is not supported in this browser. Please reopen in a supported browser.</p>}
-        <p className="project-start-warning">Prototype stage: per-project data isolation and saving canonical .md files to the folder are not yet connected. Documents and chats remain in browser storage and are not automatically saved to the selected folder.</p>
+        <p className="project-start-warning">Prototype stage: per-project data isolation and saving canonical .md files to the folder are not yet connected. Documents and chats remain in local app storage and are not automatically saved to the selected folder.</p>
         {(error || initialError) && <p role="alert" className="project-start-error">{error || initialError}</p>}
         <button type="button" className="project-start-primary" disabled={busy || !name.trim() || !directory}
           onClick={() => void run(() => onOpen({ name: name.trim(), folderName, directory: directory! }))}>Open workspace</button>

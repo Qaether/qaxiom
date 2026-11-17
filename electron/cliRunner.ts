@@ -46,6 +46,7 @@ export interface CliRunCallbacks {
   onChunk: (chunk: string) => void;
   onReasoningSummary?: (chunk: string) => void;
   onUsage?: (usage: CliUsage) => void;
+  onLog?: (entry: { stream: 'cmd' | 'stdout' | 'stderr'; line: string }) => void;
   onError: (error: Error) => void;
   onFinish: () => void;
 }
@@ -342,6 +343,7 @@ export function spawnCliTurn(
   };
 
   try {
+    callbacks.onLog?.({ stream: 'cmd', line: `$ ${binaryName} ${args.join(' ')}` });
     child = spawn(binaryPath, args, { cwd, env, stdio: ['pipe', 'pipe', 'pipe'] });
   } catch (error) {
     finishOnce(error instanceof Error ? error : new Error(String(error)));
@@ -349,12 +351,23 @@ export function spawnCliTurn(
   }
 
   const handleParsed = (line: string) => {
-    for (const evt of parseCodexJsonLine(line)) {
+    const trimmed = line.trim();
+    if (!trimmed) return;
+    const events = parseCodexJsonLine(trimmed);
+    if (events.length === 0 && !trimmed.startsWith('{')) {
+      callbacks.onLog?.({ stream: 'stdout', line: trimmed });
+    }
+    for (const evt of events) {
       if (evt.type === 'session') {
+        callbacks.onLog?.({ stream: 'cmd', line: `[session] ${evt.sessionId}` });
         callbacks.onSessionId(evt.sessionId);
       } else if (evt.type === 'reasoning') {
+        callbacks.onLog?.({ stream: 'stdout', line: `[reasoning] ${evt.text}` });
         callbacks.onReasoningSummary?.(evt.text);
       } else if (evt.type === 'text') {
+        if (evt.mode === 'full') {
+          callbacks.onLog?.({ stream: 'stdout', line: `[response] ${evt.text.length} chars received` });
+        }
         if (evt.mode === 'delta') {
           emittedText += evt.text;
           callbacks.onChunk(evt.text);
@@ -371,8 +384,13 @@ export function spawnCliTurn(
           }
         }
       } else if (evt.type === 'usage') {
+        callbacks.onLog?.({
+          stream: 'cmd',
+          line: `[usage] in=${evt.usage.inputTokens ?? 0}, cached=${evt.usage.cacheReadTokens ?? 0}, out=${evt.usage.outputTokens ?? 0}`
+        });
         callbacks.onUsage?.(evt.usage);
       } else if (evt.type === 'error') {
+        callbacks.onLog?.({ stream: 'stderr', line: `[error] ${evt.message}` });
         finishOnce(new Error(evt.message));
       }
     }
@@ -391,6 +409,9 @@ export function spawnCliTurn(
   child.stderr?.setEncoding('utf8');
   child.stderr?.on('data', (chunk: string) => {
     stderrText += chunk;
+    for (const line of chunk.split('\n')) {
+      if (line.trim()) callbacks.onLog?.({ stream: 'stderr', line: line.trim() });
+    }
   });
 
   child.on('error', err => {
@@ -402,6 +423,7 @@ export function spawnCliTurn(
       handleParsed(buffer);
       buffer = '';
     }
+    callbacks.onLog?.({ stream: 'cmd', line: `[${binaryName} exited with code ${code ?? 'null'}]` });
     if (aborted) {
       finishOnce(new Error('Aborted'));
       return;

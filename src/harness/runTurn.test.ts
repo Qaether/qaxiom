@@ -1,9 +1,29 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_SETTINGS } from '../constants';
+import type { CliIpcEvent, QaxiomDesktopBridge } from '../types/desktop';
 import { runTurn, TASK_SPECS } from './runTurn';
+
+function stubCliDesktop(runImpl: (runId: string, emit: (ev: CliIpcEvent) => void) => Promise<void>) {
+  let listener: ((event: CliIpcEvent) => void) | null = null;
+  const bridge: QaxiomDesktopBridge = {
+    isDesktop: true,
+    getCliStatuses: vi.fn(),
+    openCliLogin: vi.fn(),
+    abortCli: vi.fn().mockResolvedValue(undefined),
+    onCliEvent: cb => {
+      listener = cb;
+      return () => {
+        listener = null;
+      };
+    },
+    runCli: vi.fn().mockImplementation(req => runImpl(req.runId, ev => listener?.(ev)))
+  };
+  vi.stubGlobal('window', { qaxiomDesktop: bridge });
+}
 
 describe('harness runTurn', () => {
   afterEach(() => {
+    vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
 
@@ -15,29 +35,22 @@ describe('harness runTurn', () => {
   });
 
   it('accumulates streamed text and returns TurnResult', async () => {
-    const encoder = new TextEncoder();
-    const stream = new ReadableStream({
-      start(controller) {
-        controller.enqueue(encoder.encode('data: {"type":"response.output_text.delta","delta":"Hello "}\n\n'));
-        controller.enqueue(encoder.encode('data: {"type":"response.output_text.delta","delta":"world"}\n\n'));
-        controller.enqueue(encoder.encode('data: {"type":"response.completed","response":{"usage":{"input_tokens":10,"output_tokens":2,"total_tokens":12}}}\n\n'));
-        controller.enqueue(encoder.encode('data: [DONE]\n\n'));
-        controller.close();
-      }
+    stubCliDesktop(async (runId, emit) => {
+      emit({ runId, type: 'session', sessionId: 'thread-1' });
+      emit({ runId, type: 'chunk', chunk: 'Hello ' });
+      emit({ runId, type: 'chunk', chunk: 'world' });
+      emit({ runId, type: 'usage', usage: { inputTokens: 10, outputTokens: 2, totalTokens: 12 } });
+      emit({ runId, type: 'finish' });
     });
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(stream, { status: 200 })));
 
     const chunks: string[] = [];
     const result = await runTurn(
       {
         kind: 'chat',
         messages: [{ id: 'm1', role: 'user', content: 'Hi', timestamp: 1 }],
-        modelId: 'gpt-6-astra',
+        modelId: 'codex-cli',
         researchMode: 'general',
-        settings: {
-          ...DEFAULT_SETTINGS,
-          apiKeys: { ...DEFAULT_SETTINGS.apiKeys, openai: 'sk-test-openai-key-123456' }
-        }
+        settings: DEFAULT_SETTINGS
       },
       {
         callbacks: {
@@ -47,38 +60,30 @@ describe('harness runTurn', () => {
     );
 
     expect(result.text).toBe('Hello world');
+    expect(result.cliSessionId).toBe('thread-1');
     expect(result.aborted).toBe(false);
     expect(result.timedOut).toBe(false);
     expect(result.usage).toEqual({
       inputTokens: 10,
       outputTokens: 2,
-      cacheReadTokens: undefined,
       totalTokens: 12
     });
     expect(chunks).toEqual(['Hello ', 'world']);
   });
 
   it('enforces maxResponseChars and throws cleanly', async () => {
-    const encoder = new TextEncoder();
-    const stream = new ReadableStream({
-      start(controller) {
-        controller.enqueue(encoder.encode('data: {"type":"response.output_text.delta","delta":"1234567890"}\n\n'));
-        controller.close();
-      }
+    stubCliDesktop(async (runId, emit) => {
+      emit({ runId, type: 'chunk', chunk: '1234567890' });
     });
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(stream, { status: 200 })));
 
     await expect(
       runTurn({
         kind: 'contract_suggestion',
         messages: [{ id: 'm1', role: 'user', content: 'Extract', timestamp: 1 }],
-        modelId: 'gpt-6-astra',
+        modelId: 'codex-cli',
         researchMode: 'general',
         maxResponseChars: 5,
-        settings: {
-          ...DEFAULT_SETTINGS,
-          apiKeys: { ...DEFAULT_SETTINGS.apiKeys, openai: 'sk-test-openai-key-123456' }
-        }
+        settings: DEFAULT_SETTINGS
       })
     ).rejects.toThrow('Response exceeded maximum length');
   });
@@ -86,18 +91,15 @@ describe('harness runTurn', () => {
   it('returns aborted=true when AbortSignal is already aborted', async () => {
     const controller = new AbortController();
     controller.abort();
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new DOMException('Aborted', 'AbortError')));
+    stubCliDesktop(async () => {});
 
     const result = await runTurn(
       {
         kind: 'document_analysis',
         messages: [{ id: 'm1', role: 'user', content: 'Analyze', timestamp: 1 }],
-        modelId: 'gpt-6-astra',
+        modelId: 'codex-cli',
         researchMode: 'document_analysis',
-        settings: {
-          ...DEFAULT_SETTINGS,
-          apiKeys: { ...DEFAULT_SETTINGS.apiKeys, openai: 'sk-test-openai-key-123456' }
-        }
+        settings: DEFAULT_SETTINGS
       },
       { signal: controller.signal }
     );

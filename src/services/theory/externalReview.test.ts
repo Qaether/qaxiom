@@ -17,9 +17,7 @@ import { DEFAULT_SETTINGS, AVAILABLE_MODELS } from '../../constants';
 import { externalAssessmentHash } from './relationValidation';
 
 const provider = vi.hoisted(() => vi.fn());
-vi.mock('../providers/gemini', () => ({ streamGemini: provider }));
-vi.mock('../providers/openai', () => ({ streamOpenAI: provider }));
-vi.mock('../providers/anthropic', () => ({ streamAnthropic: provider }));
+vi.mock('../providers/cli', () => ({ streamCli: provider }));
 
 let db: QaxiomDatabase, target: QaxiomDatabase;
 beforeEach(() => { db = new QaxiomDatabase(`external-${crypto.randomUUID()}`); target = new QaxiomDatabase(`external-target-${crypto.randomUUID()}`); });
@@ -215,16 +213,15 @@ it('imports genuine v14 ledgers and upgrades populated v14 without fabricating e
   legacy.close(); await target.open(); expect(target.verno).toBe(26); expect(await target.document_versions.get(snapshot.version.id)).toEqual(snapshot.version);
 });
 
-it('routes the same approved selected-pair request to all three existing provider adapters without extra conversation or real network calls', async () => {
+it('routes the same approved selected-pair request to all CLI provider adapters without extra conversation or real network calls', async () => {
   const { snapshot, inputs } = await fixture(); const prepared = await prepareExternalReview(snapshot, inputs, db);
   const fetchMock = vi.spyOn(globalThis, 'fetch');
-  const settings = { ...DEFAULT_SETTINGS, apiKeys: { ...DEFAULT_SETTINGS.apiKeys, gemini: 'fake', openai: 'fake', anthropic: 'fake' } };
-  for (const name of ['gemini', 'openai', 'anthropic']) {
+  for (const name of ['codex-cli', 'claude-cli']) {
     provider.mockClear();
     provider.mockImplementation(async (...args: unknown[]) => { const callbacks = args.find(a => !!a && typeof a === 'object' && 'onFinish' in a) as { onFinish: () => void }; callbacks.onFinish(); });
     const model = AVAILABLE_MODELS.find(m => m.provider === name)!;
     const onFinish = vi.fn(), onError = vi.fn();
-    await sendChatMessage([{ id: 'selected-pairs', role: 'user', content: prepared.request, timestamp: 0 }], model.id, 'peer_review', settings, { onChunk: () => {}, onFinish, onError });
+    await sendChatMessage([{ id: 'selected-pairs', role: 'user', content: prepared.request, timestamp: 0 }], model.id, 'peer_review', DEFAULT_SETTINGS, { onChunk: () => {}, onFinish, onError });
     expect(provider).toHaveBeenCalledTimes(1); expect(provider.mock.calls[0][0]).toHaveLength(1);
     expect(provider.mock.calls[0][0][0].content).toBe(prepared.request); expect(provider.mock.calls[0][1].provider).toBe(name);
     expect(onFinish).toHaveBeenCalledTimes(1); expect(onError).not.toHaveBeenCalled();

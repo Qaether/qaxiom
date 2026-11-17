@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { X, Key, Shield, ExternalLink, Save, CheckCircle2, Download, Upload } from 'lucide-react';
+import { X, Terminal, Shield, Save, CheckCircle2, Download, Upload } from 'lucide-react';
 import type { UserSettings } from '../types';
+import type { CliProviderId, CliToolStatus } from '../types/desktop';
 import { AVAILABLE_MODELS } from '../constants';
 import { workspaceDirectoryPicker } from '../services/folderExport';
-import { validateApiKeyFormat } from '../services/providers/apiKey';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -14,6 +14,11 @@ interface SettingsModalProps {
   onExportWorkspaceToFolder: () => Promise<string>;
   onExportTheoryToFolder: () => Promise<{ folderName: string; documentCount: number }>;
   onRestoreWorkspace: (file: File) => Promise<number>;
+  cliStatuses?: Record<CliProviderId, CliToolStatus> | null;
+  onRefreshCliStatuses?: () => Promise<unknown>;
+  onCliLogin?: (provider: CliProviderId) => Promise<void>;
+  isCheckingCli?: boolean;
+  cliLoginInFlight?: boolean;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -24,11 +29,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onExportWorkspace,
   onExportWorkspaceToFolder,
   onExportTheoryToFolder,
-  onRestoreWorkspace
+  onRestoreWorkspace,
+  cliStatuses,
+  onRefreshCliStatuses,
+  onCliLogin,
+  isCheckingCli,
+  cliLoginInFlight
 }) => {
   const [formState, setFormState] = useState<UserSettings>(settings);
   const [savedSuccess, setSavedSuccess] = useState(false);
-  const [keyError, setKeyError] = useState<string | null>(null);
   const [workspaceStatus, setWorkspaceStatus] = useState<string | null>(null);
   const [isWorkspaceBusy, setIsWorkspaceBusy] = useState(false);
   const restoreInputRef = useRef<HTMLInputElement>(null);
@@ -69,24 +78,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    setKeyError(null);
-    const trimmedKeys = {
-      ...formState.apiKeys,
-      gemini: formState.apiKeys.gemini.trim(),
-      openai: formState.apiKeys.openai.trim(),
-      anthropic: formState.apiKeys.anthropic.trim(),
-      customUrl: formState.apiKeys.customUrl.trim(),
-      customKey: formState.apiKeys.customKey.trim()
-    };
-    try {
-      if (trimmedKeys.gemini) validateApiKeyFormat(trimmedKeys.gemini, 'Google Gemini');
-      if (trimmedKeys.openai) validateApiKeyFormat(trimmedKeys.openai, 'OpenAI');
-      if (trimmedKeys.anthropic) validateApiKeyFormat(trimmedKeys.anthropic, 'Anthropic');
-    } catch (error) {
-      setKeyError(error instanceof Error ? error.message : 'Invalid API key format.');
-      return;
-    }
-    const nextSettings: UserSettings = { ...formState, apiKeys: trimmedKeys };
+    const nextSettings: UserSettings = { ...formState };
     setFormState(nextSettings);
     onSaveSettings(nextSettings);
     setSavedSuccess(true);
@@ -156,8 +148,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         {/* Modal Header */}
         <div className="modal-header">
           <div className="modal-header-title">
-            <Key size={18} className="modal-icon" />
-            <h3 id="settings-dialog-title">Research AI Settings (BYOK)</h3>
+            <Terminal size={18} className="modal-icon" />
+            <h3 id="settings-dialog-title">Qaxiom Desktop Settings</h3>
           </div>
           <button ref={closeButtonRef} type="button" className="modal-close-btn" onClick={onClose} aria-label="Close settings">
             <X size={18} />
@@ -166,116 +158,65 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
         {/* Modal Content */}
         <form onSubmit={handleSave} className="modal-body">
-          {/* Welcome Onboarding Box (shown if no keys exist yet) */}
-          {(!settings.apiKeys.gemini && !settings.apiKeys.openai && !settings.apiKeys.anthropic) && (
-            <div className="onboarding-banner">
-              <div className="onboarding-badge">👋 Getting Started</div>
-              <h4>Welcome to Qaxiom!</h4>
-              <p>
-                Qaxiom is a <strong>BYOK Research AI</strong> with no separate backend.
-                Enter <strong>at least one API key</strong> from the providers below to start asking research questions.
-              </p>
-            </div>
-          )}
-
           {/* Privacy Note */}
           <div className="security-notice">
             <Shield size={16} className="security-icon" />
             <div>
-              <strong>Local Key Storage & Direct Provider Connection</strong>
+              <strong>Local CLI Execution Only</strong>
               <p>
-                API keys are stored in this browser profile&apos;s local storage. Your prompts and selected content are
-                sent directly to the chosen AI provider under that provider&apos;s data policy.
+                Qaxiom runs all LLM requests exclusively through your locally installed and authenticated
+                <code>codex</code> or <code>claude</code> CLI inside the Electron desktop app. No API keys are required.
               </p>
             </div>
           </div>
 
-          {/* API Keys */}
+          {/* Local CLI Status */}
           <div className="form-group">
             <div className="form-label-row">
-              <label htmlFor="gemini-key">Google Gemini API Key</label>
-              <a
-                href="https://aistudio.google.com/app/apikey"
-                target="_blank"
-                rel="noreferrer"
-                className="external-link"
-              >
-                <span>Get API Key</span>
-                <ExternalLink size={11} />
-              </a>
+              <label>
+                <Terminal size={14} style={{ verticalAlign: 'middle', marginRight: 6 }} />
+                Local CLI Tools
+              </label>
+              {onRefreshCliStatuses && (
+                <button
+                  type="button"
+                  className="secondary-btn"
+                  onClick={() => void onRefreshCliStatuses()}
+                  disabled={isCheckingCli}
+                >
+                  {isCheckingCli ? 'Checking…' : 'Re-check'}
+                </button>
+              )}
             </div>
-            <input
-              id="gemini-key"
-              type="password"
-              className="text-input"
-              placeholder="AIzaSy..."
-              value={formState.apiKeys.gemini}
-              onChange={e =>
-                setFormState({
-                  ...formState,
-                  apiKeys: { ...formState.apiKeys, gemini: e.target.value }
-                })
-              }
-            />
-            <span className="input-hint">Used for Gemini 3.8 Flash and Gemini 3.1 Pro Preview.</span>
-          </div>
-
-          <div className="form-group">
-            <div className="form-label-row">
-              <label htmlFor="openai-key">OpenAI API Key</label>
-              <a
-                href="https://platform.openai.com/api-keys"
-                target="_blank"
-                rel="noreferrer"
-                className="external-link"
-              >
-                <span>Get API Key</span>
-                <ExternalLink size={11} />
-              </a>
-            </div>
-            <input
-              id="openai-key"
-              type="password"
-              className="text-input"
-              placeholder="sk-proj-..."
-              value={formState.apiKeys.openai}
-              onChange={e =>
-                setFormState({
-                  ...formState,
-                  apiKeys: { ...formState.apiKeys, openai: e.target.value }
-                })
-              }
-            />
-            <span className="input-hint">Used for GPT-6 Astra, GPT-6.1 Sol, and GPT-6 Luna.</span>
-          </div>
-
-          <div className="form-group">
-            <div className="form-label-row">
-              <label htmlFor="anthropic-key">Anthropic Claude API Key</label>
-              <a
-                href="https://console.anthropic.com/"
-                target="_blank"
-                rel="noreferrer"
-                className="external-link"
-              >
-                <span>Get API Key</span>
-                <ExternalLink size={11} />
-              </a>
-            </div>
-            <input
-              id="anthropic-key"
-              type="password"
-              className="text-input"
-              placeholder="sk-ant-..."
-              value={formState.apiKeys.anthropic}
-              onChange={e =>
-                setFormState({
-                  ...formState,
-                  apiKeys: { ...formState.apiKeys, anthropic: e.target.value }
-                })
-              }
-            />
-            <span className="input-hint">Used for Claude Opus 5 and Claude Sonnet 5.</span>
+            {(['codex-cli', 'claude-cli'] as CliProviderId[]).map(providerId => {
+              const status = cliStatuses?.[providerId];
+              const label = providerId === 'codex-cli' ? 'Codex CLI (codex)' : 'Claude Code CLI (claude)';
+              return (
+                <div key={providerId} className="cli-status-banner" style={{ margin: '6px 0 0' }}>
+                  <span>
+                    <strong>{label}</strong>:{' '}
+                    {!status
+                      ? 'Desktop app required'
+                      : !status.installed
+                        ? `Not installed (${status.binaryName})`
+                        : !status.loggedIn
+                          ? `Not logged in (${status.statusMessage})`
+                          : `Ready (${status.statusMessage})`}
+                  </span>
+                  {status?.installed && !status.loggedIn && onCliLogin && (
+                    <div className="cli-status-actions">
+                      <button
+                        type="button"
+                        onClick={() => void onCliLogin(providerId)}
+                        disabled={cliLoginInFlight}
+                      >
+                        {cliLoginInFlight ? 'Signing in…' : 'Sign in'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
           {/* Default Model */}
@@ -385,12 +326,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
             {workspaceStatus && <div className="workspace-transfer-status" role="status">{workspaceStatus}</div>}
           </div>
-
-          {keyError && (
-            <div className="workspace-transfer-status" role="alert" style={{ color: '#fda4af', margin: '0 20px 10px' }}>
-              {keyError}
-            </div>
-          )}
 
           {/* Modal Footer */}
           <div className="modal-footer">

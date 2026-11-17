@@ -70,28 +70,13 @@ export const TASK_SPECS: Record<TaskKind, TaskSpec> = {
   }
 };
 
-function resolveProviderApiKey(provider: string, settings: TurnRequest['settings']): string {
+function resolveProviderApiKey(provider: string, _settings: TurnRequest['settings']): string {
   switch (provider) {
-    case 'gemini': {
-      const key = settings.apiKeys.gemini.trim();
-      if (!key) throw new Error('Google Gemini API 키가 설정되지 않았습니다. [설정]에서 API 키를 입력해 주세요.');
-      return key;
-    }
-    case 'openai': {
-      const key = settings.apiKeys.openai.trim();
-      if (!key) throw new Error('OpenAI API 키가 설정되지 않았습니다. [설정]에서 API 키를 입력해 주세요.');
-      return key;
-    }
-    case 'anthropic': {
-      const key = settings.apiKeys.anthropic.trim();
-      if (!key) throw new Error('Anthropic Claude API 키가 설정되지 않았습니다. [설정]에서 API 키를 입력해 주세요.');
-      return key;
-    }
     case 'codex-cli':
     case 'claude-cli':
       return '';
     default:
-      throw new Error(`지원되지 않는 프로바이더입니다: ${provider}`);
+      throw new Error(`Direct API providers are disabled. Use Codex CLI or Claude Code CLI (received: ${provider}).`);
   }
 }
 

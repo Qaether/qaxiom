@@ -17,9 +17,7 @@ import { prepareGraphContext } from './graphContext';
 import type { ProviderCallbacks } from '../providers/gemini';
 
 const provider = vi.hoisted(() => vi.fn());
-vi.mock('../providers/gemini', () => ({ streamGemini: provider }));
-vi.mock('../providers/openai', () => ({ streamOpenAI: provider }));
-vi.mock('../providers/anthropic', () => ({ streamAnthropic: provider }));
+vi.mock('../providers/cli', () => ({ streamCli: provider }));
 let target: QaxiomDatabase;
 beforeEach(async () => { vi.clearAllMocks(); await db.delete(); await db.open(); target = new QaxiomDatabase(`scope-target-${crypto.randomUUID()}`); });
 afterEach(async () => { vi.restoreAllMocks(); await db.delete(); await target.delete(); });
@@ -53,7 +51,7 @@ it('enforces the full selected range before search and preview, and never sends 
 });
 it('denies pre-policy previews and empty research lists before any adapter call', async () => {
   const f = await fixture(); await saveProjectSources(f.snapshot, null, [f.a.id], db, 'research');
-  const cb = callbacks(); await sendChatMessage(messages, 'gemini-4-carbon', 'general', settings, cb, undefined, f.bundle);
+  const cb = callbacks(); await sendChatMessage(messages, 'codex-cli', 'general', settings, cb, undefined, f.bundle);
   expect(provider).not.toHaveBeenCalled(); expect(cb.onError).toHaveBeenCalled();
   await saveProjectSources(f.snapshot, 1, [], db, 'research');
   await expect(prepareRagProjectScope(f.bundle, db)).rejects.toThrow('허용 목록');
@@ -77,7 +75,7 @@ it('invalidates even still-allowed policy revisions, project moves and canonical
   await saveTheoryVersion(split.document.id, split.version.id, { title: 'Scope', markdown: 'New canonical.', contract: EMPTY_CONTRACT }, db);
   await expect(assertRagProjectScopeCurrent(beforeVersion, db)).rejects.toThrow('변경');
 });
-it.each(['gemini-4-carbon', 'gpt-6-astra', 'claude-sonnet-5'])('withholds successful completion after in-flight revocation for %s', async model => {
+it.each(['codex-cli', 'claude-cli'])('withholds successful completion after in-flight revocation for %s', async model => {
   const f = await fixture(); await saveProjectSources(f.snapshot, null, [f.a.id], db, 'research');
   const prepared = await prepareRagProjectScope(f.bundle, db), cb = callbacks();
   provider.mockImplementationOnce(async (...args: unknown[]) => {
@@ -94,13 +92,13 @@ it('detects in-flight activation even for legacy bundles without scope metadata'
     await saveProjectSources(f.snapshot, null, [f.a.id], db, 'research');
     (args.find(a => !!a && typeof a === 'object' && 'onFinish' in a) as ProviderCallbacks).onFinish();
   });
-  await sendChatMessage(messages, 'gemini-4-carbon', 'general', settings, cb, undefined, f.bundle);
+  await sendChatMessage(messages, 'codex-cli', 'general', settings, cb, undefined, f.bundle);
   expect(cb.onFinish).not.toHaveBeenCalled(); expect(cb.onError).toHaveBeenCalled();
 });
 it('completes an unchanged approved scope and rejects tampered evidence/criteria', async () => {
   const f = await fixture(), prepared = await prepareRagProjectScope(f.bundle, db), cb = callbacks();
   provider.mockImplementationOnce(async (...args: unknown[]) => (args.find(a => !!a && typeof a === 'object' && 'onFinish' in a) as ProviderCallbacks).onFinish());
-  await sendChatMessage(messages, 'gemini-4-carbon', 'general', settings, cb, undefined, prepared);
+  await sendChatMessage(messages, 'codex-cli', 'general', settings, cb, undefined, prepared);
   expect(cb.onFinish).toHaveBeenCalledOnce(); expect(cb.onError).not.toHaveBeenCalled();
   const bad = structuredClone(prepared); bad.assembly!.research!.contract.scope = 'forged';
   await expect(assertRagProjectScopeCurrent(bad, db)).rejects.toThrow('연구');
@@ -165,7 +163,7 @@ it('does not finish a project-only answer when its policy is revoked during the 
     const handlers = args.find(a => !!a && typeof a === 'object' && 'onFinish' in a) as ProviderCallbacks;
     handlers.onChunk('unverified partial'); await saveProjectSources(f.snapshot, 1, [], db, 'research'); handlers.onFinish();
   });
-  await sendChatMessage(messages, 'gemini-4-carbon', 'general', settings, cb, undefined, bundle);
+  await sendChatMessage(messages, 'codex-cli', 'general', settings, cb, undefined, bundle);
   expect(provider).toHaveBeenCalledOnce(); expect(cb.onFinish).not.toHaveBeenCalled();
   expect(cb.onError).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringContaining('완료 처리하지 않습니다') }));
 });

@@ -31,6 +31,7 @@ export type CliIpcEvent =
   | { runId: string; type: 'chunk'; chunk: string }
   | { runId: string; type: 'reasoning'; chunk: string }
   | { runId: string; type: 'usage'; usage: CliUsage }
+  | { runId: string; type: 'log'; stream: 'cmd' | 'stdout' | 'stderr'; line: string }
   | { runId: string; type: 'error'; message: string }
   | { runId: string; type: 'finish' };
 
@@ -38,6 +39,7 @@ export interface QaxiomDesktopBridge {
   isDesktop: boolean;
   getCliStatuses: () => Promise<Record<CliProviderId, CliToolStatus>>;
   openCliLogin: (provider: CliProviderId) => Promise<CliToolStatus>;
+  openCliTerminal?: (provider: CliProviderId) => Promise<void>;
   runCli: (request: CliRunRequest) => Promise<void>;
   abortCli: (runId: string) => Promise<void>;
   onCliEvent: (listener: (event: CliIpcEvent) => void) => () => void;

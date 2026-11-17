@@ -187,8 +187,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
               type="button"
               className="sidebar-action-btn settings"
               onClick={onOpenSettings}
-              title="Settings (API Keys)"
-              aria-label="Settings (API Keys)"
+              title="Settings (Local CLI)"
+              aria-label="Settings (Local CLI)"
             >
               <Settings size={14} />
               <span>Settings</span>

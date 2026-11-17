@@ -76,109 +76,6 @@ Your primary objective is to inspect, repair, and normalize all broken, incomple
 
 export const AVAILABLE_MODELS: ModelOption[] = [
   {
-    id: 'gpt-6-astra',
-    name: 'OpenAI GPT-6 Astra',
-    provider: 'openai',
-    description: 'OpenAI flagship for hardest research reasoning and complex verification',
-    status: 'active',
-    api: 'responses',
-    supportsTemperature: false,
-    reasoningEffort: 'medium',
-    verifiedAt: '2026-10-03',
-    recommended: true,
-    contextWindowTokens: 200000
-  },
-  {
-    id: 'gpt-6.1-sol',
-    name: 'OpenAI GPT-6.1 Sol',
-    provider: 'openai',
-    description: 'Balanced OpenAI model for performance and cost on complex research tasks',
-    status: 'active',
-    api: 'responses',
-    supportsTemperature: false,
-    reasoningEffort: 'medium',
-    verifiedAt: '2026-10-03',
-    contextWindowTokens: 128000
-  },
-  {
-    id: 'gpt-6-luna',
-    name: 'OpenAI GPT-6 Luna',
-    provider: 'openai',
-    description: 'High-efficiency OpenAI model for iterative research assistance',
-    status: 'active',
-    api: 'responses',
-    supportsTemperature: false,
-    reasoningEffort: 'low',
-    verifiedAt: '2026-10-03',
-    contextWindowTokens: 128000
-  },
-  {
-    id: 'claude-opus-5',
-    name: 'Claude Opus 5',
-    provider: 'anthropic',
-    description: 'Anthropic model for deep analysis, peer review, and long-horizon reasoning',
-    status: 'active',
-    api: 'messages',
-    supportsTemperature: false,
-    verifiedAt: '2026-10-03',
-    contextWindowTokens: 200000
-  },
-  {
-    id: 'claude-sonnet-5',
-    name: 'Claude Sonnet 5',
-    provider: 'anthropic',
-    description: 'Anthropic model balancing speed and quality for academic writing and analysis',
-    status: 'active',
-    api: 'messages',
-    supportsTemperature: false,
-    verifiedAt: '2026-10-03',
-    contextWindowTokens: 200000
-  },
-  {
-    id: 'gemini-4-carbon',
-    name: 'Gemini 4 Carbon',
-    provider: 'gemini',
-    description: 'Google flagship model for advanced scientific/theoretical research and long-context reasoning',
-    status: 'active',
-    api: 'generate-content',
-    supportsTemperature: true,
-    verifiedAt: '2026-11-14',
-    contextWindowTokens: 1048576
-  },
-  {
-    id: 'gemini-4-argon',
-    name: 'Gemini 4 Argon',
-    provider: 'gemini',
-    description: 'Gemini 4 model balancing speed and precision for math, science, and coding reasoning',
-    status: 'active',
-    api: 'generate-content',
-    supportsTemperature: true,
-    verifiedAt: '2026-11-14',
-    contextWindowTokens: 1048576
-  },
-  {
-    id: 'gemini-4-hydrogen',
-    name: 'Gemini 4 Hydrogen',
-    provider: 'gemini',
-    description: 'Lightweight Gemini 4 model optimized for context caching and fast research responses',
-    status: 'active',
-    api: 'generate-content',
-    supportsTemperature: true,
-    verifiedAt: '2026-11-14',
-    contextWindowTokens: 1048576
-  },
-  {
-    id: 'gemini-3.8-flash',
-    name: 'Gemini 3.8 Flash',
-    provider: 'gemini',
-    description: 'Google Flash model for fast research assistance and repetitive tasks',
-    status: 'active',
-    api: 'generate-content',
-    supportsTemperature: true,
-    verifiedAt: '2026-11-14',
-    contextWindowTokens: 1000000
-  },
-  {
     id: 'codex-cli',
     name: 'Codex CLI (Local)',
     provider: 'codex-cli',
@@ -230,7 +127,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
     customUrl: '',
     customKey: ''
   },
-  defaultModel: 'gpt-6-astra',
+  defaultModel: 'codex-cli',
   defaultMode: 'general',
   streamResponses: true,
   temperature: 0.7

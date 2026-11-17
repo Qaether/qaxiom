@@ -1,10 +1,54 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { AVAILABLE_MODELS } from '../../constants';
-import type { ChatMessage } from '../../types';
+import type { ChatMessage, ModelOption } from '../../types';
 import { streamAnthropic } from './anthropic';
 import { streamGemini, type ProviderCallbacks } from './gemini';
 import { streamOpenAI } from './openai';
 import { LIGHT_CHAT_MODELS } from '../chatRouting';
+
+const TEST_MODELS: Record<string, ModelOption> = {
+  'gpt-6-astra': {
+    id: 'gpt-6-astra',
+    name: 'OpenAI GPT-6 Astra',
+    provider: 'openai',
+    description: 'OpenAI test model',
+    status: 'active',
+    api: 'responses',
+    supportsTemperature: false,
+    reasoningEffort: 'medium',
+    verifiedAt: '2026-10-03'
+  },
+  'gpt-6-luna': {
+    id: 'gpt-6-luna',
+    name: 'OpenAI GPT-6 Luna',
+    provider: 'openai',
+    description: 'OpenAI test model',
+    status: 'active',
+    api: 'responses',
+    supportsTemperature: false,
+    reasoningEffort: 'low',
+    verifiedAt: '2026-10-03'
+  },
+  'claude-sonnet-5': {
+    id: 'claude-sonnet-5',
+    name: 'Claude Sonnet 5',
+    provider: 'anthropic',
+    description: 'Anthropic test model',
+    status: 'active',
+    api: 'messages',
+    supportsTemperature: false,
+    verifiedAt: '2026-10-03'
+  },
+  'gemini-3.8-flash': {
+    id: 'gemini-3.8-flash',
+    name: 'Gemini 3.8 Flash',
+    provider: 'gemini',
+    description: 'Gemini test model',
+    status: 'active',
+    api: 'generate-content',
+    supportsTemperature: true,
+    verifiedAt: '2026-11-14'
+  }
+};
 
 const messages: ChatMessage[] = [
   { id: 'u1', role: 'user', content: '질문', timestamp: 1 },
@@ -31,7 +75,7 @@ function callbacks() {
 }
 
 function model(id: string) {
-  const found = AVAILABLE_MODELS.find(candidate => candidate.id === id);
+  const found = TEST_MODELS[id];
   if (!found) throw new Error(`Missing test model: ${id}`);
   return found;
 }

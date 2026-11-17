@@ -44,7 +44,6 @@ describe('wikiService curation via harness', () => {
       contentHash: 'hash-span-1'
     });
 
-    const encoder = new TextEncoder();
     const curatedJson = JSON.stringify({
       title: 'Symmetry Memo',
       summary: 'Summary from approved spans.',
@@ -52,24 +51,29 @@ describe('wikiService curation via harness', () => {
       tags: ['symmetry', 'draft'],
       backlinks: ['wiki-other']
     });
-    const stream = new ReadableStream({
-      start(controller) {
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'response.output_text.delta', delta: curatedJson })}\n\n`));
-        controller.enqueue(encoder.encode('data: [DONE]\n\n'));
-        controller.close();
-      }
-    });
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(stream, { status: 200 })));
+    let listener: ((event: import('../../types/desktop').CliIpcEvent) => void) | null = null;
+    window.qaxiomDesktop = {
+      isDesktop: true,
+      getCliStatuses: vi.fn(),
+      openCliLogin: vi.fn(),
+      abortCli: vi.fn().mockResolvedValue(undefined),
+      onCliEvent: cb => {
+        listener = cb;
+        return () => { listener = null; };
+      },
+      runCli: vi.fn().mockImplementation(async req => {
+        listener?.({ runId: req.runId, type: 'chunk', chunk: curatedJson });
+        listener?.({ runId: req.runId, type: 'finish' });
+      })
+    };
 
     const page = await curateWikiEntry({
       sourceId: 'ref-note-1',
-      modelId: 'gpt-6-astra',
-      settings: {
-        ...DEFAULT_SETTINGS,
-        apiKeys: { ...DEFAULT_SETTINGS.apiKeys, openai: 'sk-test-openai-key-123456' }
-      },
+      modelId: 'codex-cli',
+      settings: DEFAULT_SETTINGS,
       db
     });
+    delete window.qaxiomDesktop;
 
     expect(page.entryType).toBe('note');
     expect(page.sourceId).toBe('ref-note-1');

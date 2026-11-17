@@ -1,16 +1,12 @@
-import { streamAnthropic } from './anthropic';
 import { streamCli } from './cli';
-import { streamGemini } from './gemini';
-import { streamOpenAI } from './openai';
 import type { NormalizedProviderRequest, ProviderUsage } from './types';
 
 /**
  * Normalized provider invocation router.
- * Dispatches a unified request (including cacheable system blocks) to the configured provider
- * and returns normalized token/cache usage if reported by the stream.
+ * Enforces CLI-only execution (codex-cli / claude-cli) through the Electron desktop bridge.
  */
 export async function invokeProvider(request: NormalizedProviderRequest): Promise<ProviderUsage | undefined> {
-  const { model, messages, system, apiKey, temperature, cliSessionId, callbacks, signal } = request;
+  const { model, messages, system, cliSessionId, callbacks, signal } = request;
   let capturedUsage: ProviderUsage | undefined;
 
   const wrappedCallbacks = {
@@ -22,20 +18,11 @@ export async function invokeProvider(request: NormalizedProviderRequest): Promis
   };
 
   switch (model.provider) {
-    case 'gemini':
-      await streamGemini(messages, model, system, apiKey, temperature, wrappedCallbacks, signal);
-      return capturedUsage;
-    case 'openai':
-      await streamOpenAI(messages, model, system, apiKey, wrappedCallbacks, signal);
-      return capturedUsage;
-    case 'anthropic':
-      await streamAnthropic(messages, model, system, apiKey, temperature, wrappedCallbacks, signal);
-      return capturedUsage;
     case 'codex-cli':
     case 'claude-cli':
       await streamCli(messages, model, system, wrappedCallbacks, { cliSessionId, signal });
       return capturedUsage;
     default:
-      throw new Error(`지원되지 않는 프로바이더입니다: ${model.provider}`);
+      throw new Error(`Direct API providers are disabled. Use Codex CLI or Claude Code CLI (received: ${model.provider}).`);
   }
 }

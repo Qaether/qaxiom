@@ -10,7 +10,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "electron:build": "npm run build && node scripts/build-electron.mjs",
-    "electron:start": "npm run electron:build && electron .",
+    "electron:start": "npm run electron:build && env -u ELECTRON_RUN_AS_NODE electron .",
     "lint": "oxlint",
     "test": "vitest run",
     "test:retrieval": "vitest run src/services/retrieval/evaluation.test.ts --disableConsoleIntercept",

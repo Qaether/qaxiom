@@ -89,6 +89,19 @@ app.whenReady().then(() => {
     return runCliLogin(provider);
   });
 
+  ipcMain.handle('cli:open-terminal', async (_event, provider: CliProviderId) => {
+    const binaryName = provider === 'codex-cli' ? 'codex' : 'claude';
+    const binaryPath = resolveCliBinary(binaryName) || binaryName;
+    if (process.platform === 'darwin') {
+      spawn('osascript', ['-e', `tell application "Terminal" to do script "${binaryPath}"`, '-e', 'tell application "Terminal" to activate'], {
+        stdio: 'ignore',
+        detached: true
+      });
+    } else if (process.platform === 'win32') {
+      spawn('cmd.exe', ['/c', 'start', 'cmd.exe', '/k', binaryPath], { stdio: 'ignore', detached: true });
+    }
+  });
+
   ipcMain.handle('cli:run', async (event, request: CliRunRequest) => {
     const sender = event.sender;
     const send = (payload: Record<string, unknown>) => {
@@ -102,6 +115,7 @@ app.whenReady().then(() => {
       onChunk: chunk => send({ type: 'chunk', chunk }),
       onReasoningSummary: chunk => send({ type: 'reasoning', chunk }),
       onUsage: usage => send({ type: 'usage', usage }),
+      onLog: entry => send({ type: 'log', stream: entry.stream, line: entry.line }),
       onError: error => {
         activeRuns.delete(request.runId);
         send({ type: 'error', message: error.message });

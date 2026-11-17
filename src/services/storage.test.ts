@@ -24,7 +24,7 @@ describe('localStorage persistence', () => {
 
     const settings = loadSettings();
 
-    expect(settings.defaultModel).toBe('claude-sonnet-5');
+    expect(settings.defaultModel).toBe('codex-cli');
     expect(settings.apiKeys.anthropic).toBe('test-key');
     expect(settings.apiKeys.openai).toBe('');
     expect(settings.defaultMode).toBe(DEFAULT_SETTINGS.defaultMode);
@@ -33,9 +33,9 @@ describe('localStorage persistence', () => {
   it('round-trips settings', () => {
     saveSettings({
       ...DEFAULT_SETTINGS,
-      defaultModel: 'gemini-3.8-flash',
+      defaultModel: 'claude-cli',
       apiKeys: { ...DEFAULT_SETTINGS.apiKeys, gemini: 'gemini-key' }
     });
-    expect(loadSettings().defaultModel).toBe('gemini-3.8-flash');
+    expect(loadSettings().defaultModel).toBe('claude-cli');
   });
 });

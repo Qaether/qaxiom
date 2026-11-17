@@ -40,12 +40,6 @@ const TheoryWorkspace = React.lazy(() => import('./components/TheoryWorkspace'))
 const ReferenceLibrary = React.lazy(() => import('./components/ReferenceLibrary'));
 const ReferenceSource = React.lazy(() => import('./components/ReferenceSource'));
 
-function findAvailableModel(apiKeys: Record<string, string>) {
-  const hasProviderKey = (provider: string) => Boolean((apiKeys[provider] || '').trim());
-  return AVAILABLE_MODELS.find(model => model.status === 'active' && hasProviderKey(model.provider))
-    || AVAILABLE_MODELS.find(model => hasProviderKey(model.provider));
-}
-
 interface InitialAppState {
   sessions: ChatSession[];
   currentSessionId: string;
@@ -56,28 +50,19 @@ interface InitialAppState {
 function createInitialAppState(initialSessions: ChatSession[] = []): InitialAppState {
   const settings = loadSettings();
   const loaded = initialSessions;
-  const firstActiveModel = findAvailableModel(settings.apiKeys);
+  const defaultModel = resolveModelId(settings.defaultModel);
 
   const sessions = loaded.length > 0
-    ? loaded.map(session => {
-      const selectedModel = resolveModelId(session.selectedModel);
-      const currentModel = AVAILABLE_MODELS.find(model => model.id === selectedModel);
-      const hasKey = currentModel
-        && Boolean((settings.apiKeys[currentModel.provider as keyof typeof settings.apiKeys] || '').trim());
-
-      return !hasKey && firstActiveModel
-        ? { ...session, selectedModel: firstActiveModel.id }
-        : { ...session, selectedModel };
-    })
-    : [createNewSession(
-      settings.defaultMode,
-      firstActiveModel?.id || settings.defaultModel
-    )];
+    ? loaded.map(session => ({
+      ...session,
+      selectedModel: resolveModelId(session.selectedModel)
+    }))
+    : [createNewSession(settings.defaultMode, defaultModel)];
 
   return {
     sessions,
     currentSessionId: sessions[0].id,
-    settings,
+    settings: { ...settings, defaultModel },
     isSettingsOpen: false
   };
 }
@@ -120,6 +105,10 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
   const [cliStatuses, setCliStatuses] = useState<Record<CliProviderId, CliToolStatus> | null>(null);
   const [isCheckingCli, setIsCheckingCli] = useState(false);
   const [cliLoginInFlight, setCliLoginInFlight] = useState(false);
+  const [cliLogs, setCliLogs] = useState<Array<{ id: number; stream: 'cmd' | 'stdout' | 'stderr'; line: string }>>([]);
+  const [isCliTerminalOpen, setIsCliTerminalOpen] = useState(false);
+  const cliLogSeqRef = useRef(0);
+  const cliTerminalEndRef = useRef<HTMLDivElement>(null);
   const mobileMenuButtonRef = useRef<HTMLButtonElement>(null);
 
   const [sidebarWidth, setSidebarWidth] = useState(() => {
@@ -185,6 +174,13 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
   useEffect(() => {
     const desktop = window.qaxiomDesktop;
     if (!desktop?.isDesktop) return;
+    const unsubscribe = desktop.onCliEvent(event => {
+      if (event.type !== 'log') return;
+      setCliLogs(prev => {
+        const next = [...prev, { id: ++cliLogSeqRef.current, stream: event.stream, line: event.line }];
+        return next.length > 200 ? next.slice(next.length - 200) : next;
+      });
+    });
     void desktop.getCliStatuses().then(statuses => {
       setCliStatuses(statuses);
       const readyCli = (['codex-cli', 'claude-cli'] as CliProviderId[]).find(
@@ -201,7 +197,14 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
         })
       );
     }).catch(() => undefined);
+    return unsubscribe;
   }, []);
+
+  useEffect(() => {
+    if (isCliTerminalOpen) {
+      cliTerminalEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [cliLogs, isCliTerminalOpen]);
 
   useEffect(() => {
     if (pendingDeleteSessionId) deleteDialogCancelRef.current?.focus();
@@ -355,15 +358,15 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
   }, [openedProject, isTheoryOpen]);
 
   useEffect(() => {
-    if (!openedProject || !theoryDocumentId) return;
+    if (!openedProject) return;
     const scoped = sessionsForDocument(sessions, theoryDocumentId);
     if (scoped.some(session => session.id === currentSessionId)) return;
     let active = true;
     queueMicrotask(() => {
       if (!active) return;
       if (scoped.length) { setCurrentSessionId(scoped[0].id); return; }
-      const created = createNewSession(settings.defaultMode, settings.defaultModel, theoryDocumentId);
-      setSessions(previous => previous.some(session => session.documentId === theoryDocumentId)
+      const created = createNewSession(settings.defaultMode, settings.defaultModel, theoryDocumentId ?? undefined);
+      setSessions(previous => previous.some(session => (session.documentId ?? null) === theoryDocumentId)
         ? previous : [created, ...previous]);
       setCurrentSessionId(created.id);
     });
@@ -569,60 +572,37 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
     options?: { retryAssistantMessageId?: string; contextBundle?: ContextBundle }
   ) => {
     if (!currentSession || isStreaming || deletingSessionRef.current) return;
-    if (!theoryDocumentId || currentSession.documentId !== theoryDocumentId) return;
+    if (theoryDocumentId && currentSession.documentId !== theoryDocumentId) return;
 
     const retryContext = options?.retryAssistantMessageId
       ? getRetryContext(currentSession.messages, options.retryAssistantMessageId)
       : null;
     if (options?.retryAssistantMessageId && !retryContext) return;
 
-    // Check if the required CLI login or API key for the selected model exists
-    const currentModelId = currentSession.selectedModel;
-    let model = AVAILABLE_MODELS.find(m => m.id === currentModelId) || AVAILABLE_MODELS[0];
+    // Enforce CLI-only execution (codex-cli / claude-cli)
+    const currentModelId = resolveModelId(currentSession.selectedModel);
+    const model = AVAILABLE_MODELS.find(m => m.id === currentModelId) || AVAILABLE_MODELS[0];
 
-    if (isCliProvider(model.provider)) {
-      const desktop = window.qaxiomDesktop;
-      if (!desktop?.isDesktop) {
-        window.alert('Local CLI models require the Qaxiom Electron desktop app.');
-        return;
-      }
-      const statuses = cliStatuses ?? await refreshCliStatuses();
-      const status = statuses?.[model.provider];
-      if (!status?.installed || !status?.loggedIn) {
-        window.alert(
-          !status?.installed
-            ? `${model.name} is not installed on this machine.`
-            : `${model.name} is not logged in. Please sign in first.`
-        );
-        return;
-      }
-    } else {
-      let providerKey = model.provider as keyof typeof settings.apiKeys;
-      let apiKey = (settings.apiKeys[providerKey] || '').trim();
-
-      if (!apiKey) {
-        if (options?.contextBundle || (options?.retryAssistantMessageId && currentSession.messages.find(message => message.id === options.retryAssistantMessageId)?.contextBundle)) { setIsSettingsOpen(true); return; }
-        // Smart Fallback: Check if user has registered a key for any other provider (e.g. OpenAI)
-        const alternativeModel = findAvailableModel(settings.apiKeys);
-
-        if (alternativeModel) {
-          // Automatically switch current session to the available model
-          handleModelChange(alternativeModel.id);
-          model = alternativeModel;
-          providerKey = alternativeModel.provider as keyof typeof settings.apiKeys;
-          apiKey = (settings.apiKeys[providerKey] || '').trim();
-        } else {
-          // No keys at all -> Open settings modal cleanly
-          setIsSettingsOpen(true);
-          return;
-        }
-      }
+    const desktop = window.qaxiomDesktop;
+    if (!desktop?.isDesktop) {
+      window.alert('Qaxiom uses local CLI models and requires the Electron desktop app.');
+      return;
+    }
+    const statuses = cliStatuses ?? await refreshCliStatuses();
+    const status = statuses?.[model.provider as CliProviderId];
+    if (!status?.installed || !status?.loggedIn) {
+      window.alert(
+        !status?.installed
+          ? `${model.name} is not installed on this machine.`
+          : `${model.name} is not logged in. Please sign in first.`
+      );
+      return;
     }
 
     const explicitBundle = options?.contextBundle || (options?.retryAssistantMessageId
       ? currentSession.messages.find(message => message.id === options.retryAssistantMessageId)?.contextBundle : undefined);
     const contextBundle = explicitBundle ?? (
-      !options?.retryAssistantMessageId && (currentSession.researchMode !== 'general' || !obviousLightGreeting(userPrompt))
+      theoryDocumentId && !options?.retryAssistantMessageId && (currentSession.researchMode !== 'general' || !obviousLightGreeting(userPrompt))
         ? await buildPinnedReferenceContextBundle({ documentId: theoryDocumentId, query: userPrompt })
         : undefined
     );
@@ -650,7 +630,7 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
 
     let documentContext;
     try {
-      if (route === 'research') {
+      if (route === 'research' && theoryDocumentId) {
         if (documentDraft?.documentId !== theoryDocumentId) throw new Error('Loading reference research note. Please ask again in a moment.');
         const prior = priorAnswer?.documentContext;
         if (prior && prior.documentId !== theoryDocumentId) throw new Error('The reference research note for the retried response differs from the current note.');
@@ -710,18 +690,6 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
   const handleSaveSettings = (newSettings: UserSettings) => {
     setSettings(newSettings);
     saveSettings(newSettings);
-
-    // If current session's model has no key, auto-switch to a model that has an active key
-    const currentModel = AVAILABLE_MODELS.find(m => m.id === currentSession?.selectedModel);
-    const currentProvider = currentModel?.provider as keyof typeof newSettings.apiKeys;
-    const hasCurrentKey = currentProvider && Boolean(newSettings.apiKeys[currentProvider]?.trim());
-
-    if (!hasCurrentKey) {
-      const activeModel = findAvailableModel(newSettings.apiKeys);
-      if (activeModel) {
-        handleModelChange(activeModel.id);
-      }
-    }
   };
 
   const handleExportWorkspace = async () => {
@@ -981,16 +949,6 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
             />
           )}
 
-          {/* Global Key Alert Banner if no keys configured */}
-          {!(settings.apiKeys.gemini.trim() || settings.apiKeys.openai.trim() || settings.apiKeys.anthropic.trim()) && (
-            <div className="global-key-banner">
-              <span>🔑 No AI API key configured yet. Add at least one key to start researching.</span>
-              <button className="banner-settings-btn" onClick={() => setIsSettingsOpen(true)}>
-                Configure Keys →
-              </button>
-            </div>
-          )}
-
           {(initialStorageWarning || persistenceError) && (
             <div className="storage-warning" role="alert">
               <span>{initialStorageWarning || persistenceError}</span>
@@ -1087,99 +1045,183 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
                 )}
               </div>
             </div>
-          ) : (
-            <>
-              <div className="chat-scroll-area">
-                {!currentSession || currentSession.messages.length === 0 ? (
-                  <EmptyState
-                    onSelectPrompt={handleSendMessage}
-                    currentMode={currentSession?.researchMode || 'general'}
-                  />
-                ) : (
-                  <div className="messages-list">
-                    <React.Suspense
-                      fallback={<div className="message-renderer-loading" role="status">Loading chat renderer…</div>}
-                    >
-                      {currentSession.messages.map((message, index) => (
-                        <ChatMessage
-                          key={message.id}
-                          message={message}
-                          originalDocumentContent={documentDraft?.markdown || ''}
-                          onOpenSource={setSourceEvidence}
-                          onApplyToDocument={handleApplyToDocument}
-                          onDirectAcceptDocument={handleDirectAcceptToDocument}
-                          onAppendToDocument={handleAppendToDocument}
-                          onRejectDocumentChange={handleRejectDocumentChange}
-                          changeStatus={index === currentSession.messages.length - 1 ? activeChangeStatus : undefined}
-                          onRetry={
-                            index === currentSession.messages.length - 1
-                              && message.role === 'assistant'
-                              && (message.status === 'error' || message.status === 'stopped')
-                              ? () => handleRetryMessage(message.id)
-                              : undefined
-                          }
-                        />
-                      ))}
-                    </React.Suspense>
-                    <div ref={messagesEndRef} />
+          ) : (() => {
+            const activeModel = AVAILABLE_MODELS.find(m => m.id === currentSession?.selectedModel);
+            const provider = (activeModel && isCliProvider(activeModel.provider) ? activeModel.provider : 'codex-cli') as CliProviderId;
+            const isDesktop = typeof window !== 'undefined' && Boolean(window.qaxiomDesktop?.isDesktop);
+            const status = cliStatuses?.[provider];
+            const showCliWarning = !(isDesktop && status?.installed && status?.loggedIn);
+
+            return (
+              <>
+                {isDesktop && (
+                  <div className="chat-pane-tabs" role="tablist" aria-label="Chat and CLI terminal views">
+                    <div className="chat-pane-tab-group">
+                      <button
+                        type="button"
+                        role="tab"
+                        aria-selected={!isCliTerminalOpen}
+                        className={`chat-pane-tab ${!isCliTerminalOpen ? 'active' : ''}`}
+                        onClick={() => setIsCliTerminalOpen(false)}
+                      >
+                        Chat
+                      </button>
+                      <button
+                        type="button"
+                        role="tab"
+                        aria-selected={isCliTerminalOpen}
+                        className={`chat-pane-tab ${isCliTerminalOpen ? 'active' : ''}`}
+                        onClick={() => setIsCliTerminalOpen(true)}
+                      >
+                        CLI Terminal
+                        {isStreaming ? (
+                          <span className="chat-pane-tab-badge running">running</span>
+                        ) : cliLogs.length > 0 ? (
+                          <span className="chat-pane-tab-badge">{cliLogs.length}</span>
+                        ) : null}
+                      </button>
+                    </div>
+                    <div className="chat-pane-tab-actions">
+                      <button
+                        type="button"
+                        className="cli-external-btn"
+                        onClick={() => void window.qaxiomDesktop?.openCliTerminal?.(provider)}
+                        title="Open interactive CLI in system Terminal"
+                      >
+                        Open Terminal
+                      </button>
+                    </div>
                   </div>
                 )}
-              </div>
 
-              {/* Input Dock */}
-              {(() => {
-                const activeModel = AVAILABLE_MODELS.find(m => m.id === currentSession?.selectedModel);
-                if (!activeModel || !isCliProvider(activeModel.provider)) return null;
-                const provider = activeModel.provider as CliProviderId;
-                const status = cliStatuses?.[provider];
-                const isDesktop = typeof window !== 'undefined' && Boolean(window.qaxiomDesktop?.isDesktop);
-                if (isDesktop && status?.installed && status?.loggedIn) return null;
-                return (
-                  <div className="cli-status-banner" role="status">
-                    <span>
-                      {!isDesktop
-                        ? `${activeModel.name} requires the Qaxiom Electron desktop app.`
-                        : !status
-                          ? `Checking ${activeModel.name} status…`
-                          : !status.installed
-                            ? `${activeModel.name} is not installed. Install ${status.binaryName} CLI to continue.`
-                            : `${activeModel.name} login required (${status.statusMessage}).`}
-                    </span>
-                    {isDesktop && (
-                      <div className="cli-status-actions">
-                        {status?.installed && !status.loggedIn && (
+                {isDesktop && isCliTerminalOpen ? (
+                  <div className="cli-terminal-view" role="tabpanel" aria-label="CLI Terminal output">
+                    <div className="cli-terminal-subheader">
+                      <span className="cli-terminal-substatus">
+                        {status?.binaryName || 'codex'} · {isStreaming ? 'running…' : status?.loggedIn ? 'ready' : 'not ready'}
+                      </span>
+                      <div className="cli-terminal-subactions">
+                        {currentSession?.cliSessionId && (
+                          <span className="cli-session-pill" title={currentSession.cliSessionId}>
+                            session: {currentSession.cliSessionId.slice(0, 8)}
+                          </span>
+                        )}
+                        {cliLogs.length > 0 && (
                           <button
                             type="button"
-                            onClick={() => void handleCliLogin(provider)}
-                            disabled={cliLoginInFlight}
+                            className="cli-clear-btn"
+                            onClick={() => setCliLogs([])}
                           >
-                            {cliLoginInFlight ? 'Signing in…' : 'Sign in'}
+                            Clear
                           </button>
                         )}
-                        <button
-                          type="button"
-                          onClick={() => void refreshCliStatuses()}
-                          disabled={isCheckingCli}
-                        >
-                          {isCheckingCli ? 'Checking…' : 'Re-check'}
-                        </button>
+                      </div>
+                    </div>
+                    <div className="cli-terminal-panel" role="log" aria-label="CLI Terminal logs">
+                      {cliLogs.length === 0 ? (
+                        <div className="cli-terminal-empty">
+                          Waiting for CLI execution ({status?.binaryName || 'codex'})…
+                        </div>
+                      ) : (
+                        <>
+                          {cliLogs.map(entry => (
+                            <div key={entry.id} className={`cli-terminal-line cli-terminal-${entry.stream}`}>
+                              {entry.line}
+                            </div>
+                          ))}
+                          <div ref={cliTerminalEndRef} />
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="chat-scroll-area">
+                      {!currentSession || currentSession.messages.length === 0 ? (
+                        <EmptyState
+                          onSelectPrompt={handleSendMessage}
+                          currentMode={currentSession?.researchMode || 'general'}
+                        />
+                      ) : (
+                        <div className="messages-list">
+                          <React.Suspense
+                            fallback={<div className="message-renderer-loading" role="status">Loading chat renderer…</div>}
+                          >
+                            {currentSession.messages.map((message, index) => (
+                              <ChatMessage
+                                key={message.id}
+                                message={message}
+                                originalDocumentContent={documentDraft?.markdown || ''}
+                                onOpenSource={setSourceEvidence}
+                                onApplyToDocument={handleApplyToDocument}
+                                onDirectAcceptDocument={handleDirectAcceptToDocument}
+                                onAppendToDocument={handleAppendToDocument}
+                                onRejectDocumentChange={handleRejectDocumentChange}
+                                changeStatus={index === currentSession.messages.length - 1 ? activeChangeStatus : undefined}
+                                onRetry={
+                                  index === currentSession.messages.length - 1
+                                    && message.role === 'assistant'
+                                    && (message.status === 'error' || message.status === 'stopped')
+                                    ? () => handleRetryMessage(message.id)
+                                    : undefined
+                                }
+                              />
+                            ))}
+                          </React.Suspense>
+                          <div ref={messagesEndRef} />
+                        </div>
+                      )}
+                    </div>
+
+                    {showCliWarning && activeModel && isCliProvider(activeModel.provider) && (
+                      <div className="cli-status-banner" role="status">
+                        <span>
+                          {!isDesktop
+                            ? `${activeModel.name} requires the Qaxiom Electron desktop app.`
+                            : !status
+                              ? `Checking ${activeModel.name} status…`
+                              : !status.installed
+                                ? `${activeModel.name} is not installed. Install ${status.binaryName} CLI to continue.`
+                                : `${activeModel.name} login required (${status.statusMessage}).`}
+                        </span>
+                        {isDesktop && (
+                          <div className="cli-status-actions">
+                            {status?.installed && !status.loggedIn && (
+                              <button
+                                type="button"
+                                onClick={() => void handleCliLogin(provider)}
+                                disabled={cliLoginInFlight}
+                              >
+                                {cliLoginInFlight ? 'Signing in…' : 'Sign in'}
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => void refreshCliStatuses()}
+                              disabled={isCheckingCli}
+                            >
+                              {isCheckingCli ? 'Checking…' : 'Re-check'}
+                            </button>
+                          </div>
+                        )}
                       </div>
                     )}
-                  </div>
-                );
-              })()}
-              <ChatInput
-                onSendMessage={handleSendMessage}
-                isStreaming={isStreaming}
-                onStopStreaming={handleStopStreaming}
-                currentMode={currentSession?.researchMode || 'general'}
-                selectedModel={currentSession?.selectedModel}
-                onModelChange={handleModelChange}
-                apiKeys={settings.apiKeys}
-                cliStatuses={cliStatuses}
-              />
-            </>
-          )}
+
+                    <ChatInput
+                      onSendMessage={handleSendMessage}
+                      isStreaming={isStreaming}
+                      onStopStreaming={handleStopStreaming}
+                      currentMode={currentSession?.researchMode || 'general'}
+                      selectedModel={currentSession?.selectedModel}
+                      onModelChange={handleModelChange}
+                      apiKeys={settings.apiKeys}
+                      cliStatuses={cliStatuses}
+                    />
+                  </>
+                )}
+              </>
+            );
+          })()}
         </aside>
       </div>
 
@@ -1285,24 +1327,17 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
           <ReferenceLibrary
             onClose={() => setIsReferencesOpen(false)}
             embeddingApiKey={settings.apiKeys.openai}
-            canAsk={!isStreaming && (
-              Boolean(findAvailableModel(settings.apiKeys))
-              || Boolean(cliStatuses && Object.values(cliStatuses).some(s => s.installed && s.loggedIn))
-            )}
+            canAsk={!isStreaming && Boolean(cliStatuses && Object.values(cliStatuses).some(s => s.installed && s.loggedIn))}
             canDelete={!isStreaming}
             modelName={(
               AVAILABLE_MODELS.find(model =>
-                model.id === currentSession?.selectedModel && (
-                  isCliProvider(model.provider)
-                    ? Boolean(cliStatuses?.[model.provider as CliProviderId]?.installed && cliStatuses?.[model.provider as CliProviderId]?.loggedIn)
-                    : Boolean(settings.apiKeys[model.provider as keyof typeof settings.apiKeys]?.trim())
-                )
+                model.id === currentSession?.selectedModel
+                && Boolean(cliStatuses?.[model.provider as CliProviderId]?.installed && cliStatuses?.[model.provider as CliProviderId]?.loggedIn)
               )
               || AVAILABLE_MODELS.find(model =>
-                isCliProvider(model.provider) && Boolean(cliStatuses?.[model.provider as CliProviderId]?.installed && cliStatuses?.[model.provider as CliProviderId]?.loggedIn)
+                Boolean(cliStatuses?.[model.provider as CliProviderId]?.installed && cliStatuses?.[model.provider as CliProviderId]?.loggedIn)
               )
-              || findAvailableModel(settings.apiKeys)
-            )?.name || 'CLI login or API key required'}
+            )?.name || 'CLI login required'}
             onAsk={(query, bundle) => { setIsReferencesOpen(false); void handleSendMessage(query, { contextBundle: bundle }); }}
           />
         </React.Suspense>
@@ -1321,6 +1356,11 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
         onExportWorkspaceToFolder={handleExportWorkspaceToFolder}
         onExportTheoryToFolder={handleExportTheoryToFolder}
         onRestoreWorkspace={handleRestoreWorkspace}
+        cliStatuses={cliStatuses}
+        onRefreshCliStatuses={refreshCliStatuses}
+        onCliLogin={handleCliLogin}
+        isCheckingCli={isCheckingCli}
+        cliLoginInFlight={cliLoginInFlight}
       />
     </div>
   );

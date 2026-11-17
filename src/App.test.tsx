@@ -31,14 +31,14 @@ describe('onboarding flow', () => {
     expect(await screen.findByRole('heading', { name: 'Projects' })).toBeTruthy();
     await enterProject(user);
     expect(await screen.findByRole('heading', { name: 'Qaxiom Research Intelligence' })).toBeTruthy();
-    await user.click(screen.getByRole('button', { name: 'Configure Keys →' }));
-    expect(await screen.findByRole('heading', { name: 'Research AI Settings (BYOK)' })).toBeTruthy();
-    await user.type(screen.getByLabelText('Google Gemini API Key'), 'user-entered-key');
+    await user.click(screen.getByRole('button', { name: 'Settings (Local CLI)' }));
+    expect(await screen.findByRole('heading', { name: 'Qaxiom Desktop Settings' })).toBeTruthy();
+    await user.selectOptions(screen.getByLabelText('Default Reasoning Model'), 'claude-cli');
     await user.click(screen.getByRole('button', { name: 'Save Settings' }));
 
     await waitFor(() => {
       const saved = JSON.parse(localStorage.getItem('qaxiom_user_settings_v1') || '{}');
-      expect(saved.apiKeys?.gemini).toBe('user-entered-key');
+      expect(saved.defaultModel).toBe('claude-cli');
     });
   });
 
