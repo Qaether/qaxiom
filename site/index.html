@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Qaxiom Desktop — Local-First Research Workspace</title>
+    <style>
+      :root {
+        color-scheme: dark light;
+        --bg: #0b0d12;
+        --surface: #131722;
+        --border: rgba(255, 255, 255, 0.12);
+        --text: #eef1f7;
+        --muted: #9aa4b8;
+        --accent: #4f8cff;
+        --accent-hover: #3b78f0;
+      }
+
+      @media (prefers-color-scheme: light) {
+        :root {
+          --bg: #f6f8fc;
+          --surface: #ffffff;
+          --border: rgba(15, 23, 42, 0.12);
+          --text: #0f172a;
+          --muted: #475569;
+          --accent: #2563eb;
+          --accent-hover: #1d4ed8;
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        line-height: 1.6;
+      }
+
+      main {
+        max-width: 840px;
+        margin: 0 auto;
+        padding: 64px 24px 80px;
+      }
+
+      .badge {
+        display: inline-block;
+        padding: 4px 12px;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        font-size: 13px;
+        color: var(--muted);
+        background: var(--surface);
+        margin-bottom: 20px;
+      }
+
+      h1 {
+        font-size: clamp(32px, 5vw, 48px);
+        line-height: 1.15;
+        margin: 0 0 16px;
+        letter-spacing: -0.02em;
+      }
+
+      .lead {
+        font-size: 18px;
+        color: var(--muted);
+        margin: 0 0 32px;
+      }
+
+      .notice {
+        padding: 14px 18px;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: var(--surface);
+        font-size: 14px;
+        color: var(--muted);
+        margin-bottom: 32px;
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-bottom: 40px;
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 12px 20px;
+        border-radius: 10px;
+        font-weight: 600;
+        font-size: 15px;
+        text-decoration: none;
+        border: 1px solid var(--border);
+        color: var(--text);
+        background: var(--surface);
+      }
+
+      .btn.primary {
+        background: var(--accent);
+        border-color: transparent;
+        color: #ffffff;
+      }
+
+      .btn.primary:hover {
+        background: var(--accent-hover);
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 16px;
+        margin-bottom: 40px;
+      }
+
+      .card {
+        padding: 20px;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        background: var(--surface);
+      }
+
+      .card h2 {
+        font-size: 16px;
+        margin: 0 0 8px;
+      }
+
+      .card p {
+        margin: 0;
+        font-size: 14px;
+        color: var(--muted);
+      }
+
+      code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 13px;
+        padding: 2px 6px;
+        border-radius: 6px;
+        border: 1px solid var(--border);
+      }
+
+      footer {
+        font-size: 13px;
+        color: var(--muted);
+        border-top: 1px solid var(--border);
+        padding-top: 24px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <span class="badge">Qaxiom Desktop · Local-First Research</span>
+      <h1>Qaxiom Desktop</h1>
+      <p class="lead">
+        논문 참고문헌, 연구 노트, 수식(KaTeX/MathJax), Wiki를 로컬에서 관리하고
+        내 PC에 설치된 <code>codex</code> / <code>claude</code> CLI 세션으로 바로 분석·편집하는 데스크톱 앱입니다.
+      </p>
+
+      <div class="notice">
+        기존 브라우저 웹앱 서비스는 종료되었으며, 현재 Qaxiom은 로컬 CLI와 직접 연동되는
+        <strong>Electron 데스크톱 앱</strong>으로 제공됩니다.
+      </div>
+
+      <div class="actions">
+        <a class="btn primary" href="https://github.com/Qaether/qaxiom/releases/latest">
+          최신 데스크톱 버전 다운로드 (GitHub Releases)
+        </a>
+        <a class="btn" href="https://github.com/Qaether/qaxiom">
+          GitHub 저장소 보기
+        </a>
+      </div>
+
+      <section class="grid" aria-label="시작 가이드">
+        <article class="card">
+          <h2>1. CLI 설치 및 로그인</h2>
+          <p>
+            사용 전 내 PC에 <code>codex</code> 또는 <code>claude</code> CLI가 설치되고 로그인되어 있어야 합니다.
+            (예: 터미널에서 <code>codex login</code>)
+          </p>
+        </article>
+        <article class="card">
+          <h2>2. 데스크톱 앱 실행</h2>
+          <p>
+            설치한 Qaxiom Desktop 앱을 실행하면 로컬 CLI 인증 상태를 자동으로 확인하고 세션을 연결합니다.
+          </p>
+        </article>
+        <article class="card">
+          <h2>3. 논문 첨부 및 노트 편집</h2>
+          <p>
+            Research Note에서 <strong>Add reference</strong>로 PDF/Markdown을 연결하고
+            Chat 질문 결과를 Diff로 검토해 반영할 수 있습니다.
+          </p>
+        </article>
+      </section>
+
+      <footer>
+        Qaxiom · Local-first theoretical research workspace
+      </footer>
+    </main>
+  </body>
+</html>

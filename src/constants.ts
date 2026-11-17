@@ -177,8 +177,35 @@ export const AVAILABLE_MODELS: ModelOption[] = [
     supportsTemperature: true,
     verifiedAt: '2026-11-14',
     contextWindowTokens: 1000000
+  },
+  {
+    id: 'codex-cli',
+    name: 'Codex CLI (Local)',
+    provider: 'codex-cli',
+    description: 'Uses your locally installed & logged-in Codex CLI session (Electron desktop)',
+    status: 'active',
+    api: 'cli',
+    supportsTemperature: false,
+    recommended: true,
+    verifiedAt: '2026-11-17',
+    contextWindowTokens: 200000
+  },
+  {
+    id: 'claude-cli',
+    name: 'Claude Code CLI (Local)',
+    provider: 'claude-cli',
+    description: 'Uses your locally installed & logged-in Claude CLI session (Electron desktop)',
+    status: 'active',
+    api: 'cli',
+    supportsTemperature: false,
+    verifiedAt: '2026-11-17',
+    contextWindowTokens: 200000
   }
 ];
+
+export function isCliProvider(provider: string | undefined): provider is 'codex-cli' | 'claude-cli' {
+  return provider === 'codex-cli' || provider === 'claude-cli';
+}
 
 const LEGACY_MODEL_IDS: Record<string, string> = {
   'claude-opus-5-5': 'claude-opus-5',

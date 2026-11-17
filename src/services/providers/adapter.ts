@@ -1,4 +1,5 @@
 import { streamAnthropic } from './anthropic';
+import { streamCli } from './cli';
 import { streamGemini } from './gemini';
 import { streamOpenAI } from './openai';
 import type { NormalizedProviderRequest, ProviderUsage } from './types';
@@ -9,7 +10,7 @@ import type { NormalizedProviderRequest, ProviderUsage } from './types';
  * and returns normalized token/cache usage if reported by the stream.
  */
 export async function invokeProvider(request: NormalizedProviderRequest): Promise<ProviderUsage | undefined> {
-  const { model, messages, system, apiKey, temperature, callbacks, signal } = request;
+  const { model, messages, system, apiKey, temperature, cliSessionId, callbacks, signal } = request;
   let capturedUsage: ProviderUsage | undefined;
 
   const wrappedCallbacks = {
@@ -29,6 +30,10 @@ export async function invokeProvider(request: NormalizedProviderRequest): Promis
       return capturedUsage;
     case 'anthropic':
       await streamAnthropic(messages, model, system, apiKey, temperature, wrappedCallbacks, signal);
+      return capturedUsage;
+    case 'codex-cli':
+    case 'claude-cli':
+      await streamCli(messages, model, system, wrappedCallbacks, { cliSessionId, signal });
       return capturedUsage;
     default:
       throw new Error(`지원되지 않는 프로바이더입니다: ${model.provider}`);

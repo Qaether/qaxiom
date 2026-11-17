@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Square, Bot } from 'lucide-react';
 import type { ResearchMode } from '../types';
-import { AVAILABLE_MODELS } from '../constants';
+import type { CliProviderId, CliToolStatus } from '../types/desktop';
+import { AVAILABLE_MODELS, isCliProvider } from '../constants';
 
 interface ChatInputProps {
   onSendMessage: (content: string) => void;
@@ -11,6 +12,7 @@ interface ChatInputProps {
   selectedModel?: string;
   onModelChange?: (modelId: string) => void;
   apiKeys?: Record<string, string>;
+  cliStatuses?: Record<CliProviderId, CliToolStatus> | null;
 }
 
 export const ChatInput: React.FC<ChatInputProps> = ({
@@ -20,7 +22,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   currentMode,
   selectedModel,
   onModelChange,
-  apiKeys
+  apiKeys,
+  cliStatuses
 }) => {
   const [input, setInput] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -71,7 +74,22 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   };
 
   const activeModelObj = AVAILABLE_MODELS.find(m => m.id === selectedModel);
-  const hasKey = activeModelObj && apiKeys && Boolean((apiKeys[activeModelObj.provider] || '').trim());
+  const isCliModel = isCliProvider(activeModelObj?.provider);
+  const activeCliStatus = isCliModel && activeModelObj ? cliStatuses?.[activeModelObj.provider as CliProviderId] : undefined;
+  const hasKey = isCliModel
+    ? Boolean(activeCliStatus?.installed && activeCliStatus?.loggedIn)
+    : Boolean(activeModelObj && apiKeys && (apiKeys[activeModelObj.provider] || '').trim());
+  const badgeLabel = isCliModel
+    ? activeCliStatus?.installed && activeCliStatus?.loggedIn
+      ? 'CLI ready'
+      : activeCliStatus?.installed
+        ? 'CLI login required'
+        : typeof window !== 'undefined' && window.qaxiomDesktop?.isDesktop
+          ? 'CLI not installed'
+          : 'Desktop app required'
+    : hasKey
+      ? 'Key configured'
+      : 'Key required';
 
   return (
     <div className="chat-input-container">
@@ -134,17 +152,20 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 }}
               >
                 {AVAILABLE_MODELS.map(m => {
-                  const mHasKey = apiKeys && Boolean((apiKeys[m.provider] || '').trim());
+                  const mIsCli = isCliProvider(m.provider);
+                  const mCliReady = mIsCli ? Boolean(cliStatuses?.[m.provider as CliProviderId]?.installed && cliStatuses?.[m.provider as CliProviderId]?.loggedIn) : false;
+                  const mHasKey = mIsCli ? mCliReady : Boolean(apiKeys && (apiKeys[m.provider] || '').trim());
+                  const suffix = mIsCli ? (mCliReady ? '✓' : '(Desktop CLI)') : (mHasKey ? '✓' : '(Key required)');
                   return (
                     <option key={m.id} value={m.id}>
-                      {m.name} {m.status === 'preview' ? '[Preview]' : ''} {mHasKey ? '✓' : '(Key required)'}
+                      {m.name} {m.status === 'preview' ? '[Preview]' : ''} {suffix}
                     </option>
                   );
                 })}
               </select>
             </div>
             <span className={`compact-model-badge ${hasKey ? 'active' : 'need-key'}`}>
-              {hasKey ? 'Key configured' : 'Key required'}
+              {badgeLabel}
             </span>
           </div>
         )}

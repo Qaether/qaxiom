@@ -39,12 +39,14 @@ export interface TurnRequest {
   enableToolLoop?: boolean;
   maxToolHops?: number;
   toolDatabase?: QaxiomDatabase;
+  cliSessionId?: string;
 }
 
 export interface TurnCallbacks {
   onChunk?: (chunk: string, accumulated: string) => void;
   onReasoningSummary?: (chunk: string) => void;
   onUsage?: (usage: ProviderUsage) => void;
+  onSessionId?: (sessionId: string) => void;
   onToolCall?: (call: HarnessToolCall, result: HarnessToolResult) => void;
 }
 
@@ -60,6 +62,7 @@ export interface TurnResult {
   aborted: boolean;
   timedOut: boolean;
   usage?: ProviderUsage;
+  cliSessionId?: string;
   contextPreview?: ContextAssemblyPreview;
   toolHopsUsed?: number;
 }

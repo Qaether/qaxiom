@@ -14,11 +14,11 @@ export interface ResearchModeInfo {
   systemPrompt: string;
 }
 
-export type LLMProvider = 'gemini' | 'openai' | 'anthropic' | 'custom';
+export type LLMProvider = 'gemini' | 'openai' | 'anthropic' | 'codex-cli' | 'claude-cli' | 'custom';
 
 export type ModelStatus = 'active' | 'preview' | 'deprecated' | 'disabled';
 
-export type ModelApi = 'responses' | 'messages' | 'generate-content';
+export type ModelApi = 'responses' | 'messages' | 'generate-content' | 'cli';
 
 export type MessageStatus = 'streaming' | 'complete' | 'stopped' | 'error';
 
@@ -63,6 +63,7 @@ export interface DocumentChatContext {
 export interface ChatSession {
   id: string;
   documentId?: string | null;
+  cliSessionId?: string;
   title: string;
   createdAt: number;
   updatedAt: number;

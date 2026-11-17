@@ -9,8 +9,9 @@ import { EmptyState } from './components/EmptyState';
 import { SettingsModal } from './components/SettingsModal';
 import { chooseWorkspaceDirectory, writeTheoryDocumentsToDirectory, writeWorkspaceBackupToDirectory } from './services/folderExport';
 import type { ChatSession, UserSettings, ResearchMode } from './types';
+import type { CliProviderId, CliToolStatus } from './types/desktop';
 import { saveSessions, createNewSession, loadSettings, saveSettings } from './services/storage';
-import { AVAILABLE_MODELS, resolveModelId } from './constants';
+import { AVAILABLE_MODELS, isCliProvider, resolveModelId } from './constants';
 import {
   createAssistantMessage,
   createUserMessage,
@@ -116,6 +117,9 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
   const [isReferencesOpen, setIsReferencesOpen] = useState(false);
   const [sourceEvidence, setSourceEvidence] = useState<ContextEvidence | null>(null);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [cliStatuses, setCliStatuses] = useState<Record<CliProviderId, CliToolStatus> | null>(null);
+  const [isCheckingCli, setIsCheckingCli] = useState(false);
+  const [cliLoginInFlight, setCliLoginInFlight] = useState(false);
   const mobileMenuButtonRef = useRef<HTMLButtonElement>(null);
 
   const [sidebarWidth, setSidebarWidth] = useState(() => {
@@ -152,6 +156,52 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
   const [isDeletingDocument, setIsDeletingDocument] = useState(false);
   const documentDeleteCancelRef = useRef<HTMLButtonElement>(null);
   const documentDeleteTriggerRef = useRef<HTMLButtonElement | null>(null);
+
+  const refreshCliStatuses = async () => {
+    const desktop = window.qaxiomDesktop;
+    if (!desktop?.isDesktop) return null;
+    setIsCheckingCli(true);
+    try {
+      const next = await desktop.getCliStatuses();
+      setCliStatuses(next);
+      return next;
+    } finally {
+      setIsCheckingCli(false);
+    }
+  };
+
+  const handleCliLogin = async (provider: CliProviderId) => {
+    const desktop = window.qaxiomDesktop;
+    if (!desktop?.isDesktop) return;
+    setCliLoginInFlight(true);
+    try {
+      const updated = await desktop.openCliLogin(provider);
+      setCliStatuses(prev => (prev ? { ...prev, [provider]: updated } : { 'codex-cli': updated, 'claude-cli': updated }));
+    } finally {
+      setCliLoginInFlight(false);
+    }
+  };
+
+  useEffect(() => {
+    const desktop = window.qaxiomDesktop;
+    if (!desktop?.isDesktop) return;
+    void desktop.getCliStatuses().then(statuses => {
+      setCliStatuses(statuses);
+      const readyCli = (['codex-cli', 'claude-cli'] as CliProviderId[]).find(
+        id => statuses[id]?.installed && statuses[id]?.loggedIn
+      );
+      if (!readyCli) return;
+      setSessions(prev =>
+        prev.map(s => {
+          const modelObj = AVAILABLE_MODELS.find(m => m.id === s.selectedModel);
+          const hasApiKey = modelObj && !isCliProvider(modelObj.provider)
+            && Boolean((settings.apiKeys[modelObj.provider as keyof typeof settings.apiKeys] || '').trim());
+          if (hasApiKey || isCliProvider(modelObj?.provider)) return s;
+          return { ...s, selectedModel: readyCli };
+        })
+      );
+    }).catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     if (pendingDeleteSessionId) deleteDialogCancelRef.current?.focus();
@@ -526,27 +576,46 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
       : null;
     if (options?.retryAssistantMessageId && !retryContext) return;
 
-    // Check if the required API key for the selected model exists
+    // Check if the required CLI login or API key for the selected model exists
     const currentModelId = currentSession.selectedModel;
     let model = AVAILABLE_MODELS.find(m => m.id === currentModelId) || AVAILABLE_MODELS[0];
-    let providerKey = model.provider as keyof typeof settings.apiKeys;
-    let apiKey = (settings.apiKeys[providerKey] || '').trim();
 
-    if (!apiKey) {
-      if (options?.contextBundle || (options?.retryAssistantMessageId && currentSession.messages.find(message => message.id === options.retryAssistantMessageId)?.contextBundle)) { setIsSettingsOpen(true); return; }
-      // Smart Fallback: Check if user has registered a key for any other provider (e.g. OpenAI)
-      const alternativeModel = findAvailableModel(settings.apiKeys);
-
-      if (alternativeModel) {
-        // Automatically switch current session to the available model
-        handleModelChange(alternativeModel.id);
-        model = alternativeModel;
-        providerKey = alternativeModel.provider as keyof typeof settings.apiKeys;
-        apiKey = (settings.apiKeys[providerKey] || '').trim();
-      } else {
-        // No keys at all -> Open settings modal cleanly
-        setIsSettingsOpen(true);
+    if (isCliProvider(model.provider)) {
+      const desktop = window.qaxiomDesktop;
+      if (!desktop?.isDesktop) {
+        window.alert('Local CLI models require the Qaxiom Electron desktop app.');
         return;
+      }
+      const statuses = cliStatuses ?? await refreshCliStatuses();
+      const status = statuses?.[model.provider];
+      if (!status?.installed || !status?.loggedIn) {
+        window.alert(
+          !status?.installed
+            ? `${model.name} is not installed on this machine.`
+            : `${model.name} is not logged in. Please sign in first.`
+        );
+        return;
+      }
+    } else {
+      let providerKey = model.provider as keyof typeof settings.apiKeys;
+      let apiKey = (settings.apiKeys[providerKey] || '').trim();
+
+      if (!apiKey) {
+        if (options?.contextBundle || (options?.retryAssistantMessageId && currentSession.messages.find(message => message.id === options.retryAssistantMessageId)?.contextBundle)) { setIsSettingsOpen(true); return; }
+        // Smart Fallback: Check if user has registered a key for any other provider (e.g. OpenAI)
+        const alternativeModel = findAvailableModel(settings.apiKeys);
+
+        if (alternativeModel) {
+          // Automatically switch current session to the available model
+          handleModelChange(alternativeModel.id);
+          model = alternativeModel;
+          providerKey = alternativeModel.provider as keyof typeof settings.apiKeys;
+          apiKey = (settings.apiKeys[providerKey] || '').trim();
+        } else {
+          // No keys at all -> Open settings modal cleanly
+          setIsSettingsOpen(true);
+          return;
+        }
       }
     }
 
@@ -621,6 +690,9 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
       messages: route === 'light' ? [updatedMessages.at(-1)!] : updatedMessages,
       contextBundle: route === 'research' ? contextBundle : undefined,
       documentContext: route === 'research' ? documentContext : undefined,
+      cliSessionId: !options?.retryAssistantMessageId && isCliProvider(responseModel.provider)
+        ? currentSession.cliSessionId
+        : undefined,
       onProposedChange: proposedContent => {
         setActiveChangeStatus('pending');
         handleApplyToDocument(proposedContent);
@@ -1055,6 +1127,47 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
               </div>
 
               {/* Input Dock */}
+              {(() => {
+                const activeModel = AVAILABLE_MODELS.find(m => m.id === currentSession?.selectedModel);
+                if (!activeModel || !isCliProvider(activeModel.provider)) return null;
+                const provider = activeModel.provider as CliProviderId;
+                const status = cliStatuses?.[provider];
+                const isDesktop = typeof window !== 'undefined' && Boolean(window.qaxiomDesktop?.isDesktop);
+                if (isDesktop && status?.installed && status?.loggedIn) return null;
+                return (
+                  <div className="cli-status-banner" role="status">
+                    <span>
+                      {!isDesktop
+                        ? `${activeModel.name} requires the Qaxiom Electron desktop app.`
+                        : !status
+                          ? `Checking ${activeModel.name} status…`
+                          : !status.installed
+                            ? `${activeModel.name} is not installed. Install ${status.binaryName} CLI to continue.`
+                            : `${activeModel.name} login required (${status.statusMessage}).`}
+                    </span>
+                    {isDesktop && (
+                      <div className="cli-status-actions">
+                        {status?.installed && !status.loggedIn && (
+                          <button
+                            type="button"
+                            onClick={() => void handleCliLogin(provider)}
+                            disabled={cliLoginInFlight}
+                          >
+                            {cliLoginInFlight ? 'Signing in…' : 'Sign in'}
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => void refreshCliStatuses()}
+                          disabled={isCheckingCli}
+                        >
+                          {isCheckingCli ? 'Checking…' : 'Re-check'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
               <ChatInput
                 onSendMessage={handleSendMessage}
                 isStreaming={isStreaming}
@@ -1063,6 +1176,7 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
                 selectedModel={currentSession?.selectedModel}
                 onModelChange={handleModelChange}
                 apiKeys={settings.apiKeys}
+                cliStatuses={cliStatuses}
               />
             </>
           )}
@@ -1171,9 +1285,24 @@ export const App: React.FC<AppProps> = ({ initialSessions, initialStorageWarning
           <ReferenceLibrary
             onClose={() => setIsReferencesOpen(false)}
             embeddingApiKey={settings.apiKeys.openai}
-            canAsk={!isStreaming && Boolean(findAvailableModel(settings.apiKeys))}
+            canAsk={!isStreaming && (
+              Boolean(findAvailableModel(settings.apiKeys))
+              || Boolean(cliStatuses && Object.values(cliStatuses).some(s => s.installed && s.loggedIn))
+            )}
             canDelete={!isStreaming}
-            modelName={(AVAILABLE_MODELS.find(model => model.id === currentSession?.selectedModel && settings.apiKeys[model.provider as keyof typeof settings.apiKeys]?.trim()) || findAvailableModel(settings.apiKeys))?.name || 'API key required'}
+            modelName={(
+              AVAILABLE_MODELS.find(model =>
+                model.id === currentSession?.selectedModel && (
+                  isCliProvider(model.provider)
+                    ? Boolean(cliStatuses?.[model.provider as CliProviderId]?.installed && cliStatuses?.[model.provider as CliProviderId]?.loggedIn)
+                    : Boolean(settings.apiKeys[model.provider as keyof typeof settings.apiKeys]?.trim())
+                )
+              )
+              || AVAILABLE_MODELS.find(model =>
+                isCliProvider(model.provider) && Boolean(cliStatuses?.[model.provider as CliProviderId]?.installed && cliStatuses?.[model.provider as CliProviderId]?.loggedIn)
+              )
+              || findAvailableModel(settings.apiKeys)
+            )?.name || 'CLI login or API key required'}
             onAsk={(query, bundle) => { setIsReferencesOpen(false); void handleSendMessage(query, { contextBundle: bundle }); }}
           />
         </React.Suspense>

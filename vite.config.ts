@@ -6,6 +6,7 @@ const mathJaxVersion = createRequire(import.meta.url)('mathjax-full/package.json
 
 // https://vite.dev/config/
 export default defineConfig({
+  base: './',
   plugins: [react()],
   define: {
     PACKAGE_VERSION: JSON.stringify(mathJaxVersion)

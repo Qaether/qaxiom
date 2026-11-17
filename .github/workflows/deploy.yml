@@ -27,18 +27,6 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build production bundle
-        run: npm run build
-
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -46,17 +34,15 @@ jobs:
           role-session-name: qaxiom-github-actions-deploy
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Sync static site to S3
+      - name: Sync download landing site to S3
         run: |
-          # 1. Assets 동기화 (불변 장기 캐시 적용)
-          aws s3 sync dist/ "s3://${S3_BUCKET}" \
+          aws s3 sync site/ "s3://${S3_BUCKET}" \
             --delete \
             --exclude "index.html" \
             --cache-control "max-age=31536000,public,immutable" \
             --only-show-errors
 
-          # 2. index.html 업로드 (항상 최신 버전을 조회하도록 no-cache)
-          aws s3 cp dist/index.html "s3://${S3_BUCKET}/index.html" \
+          aws s3 cp site/index.html "s3://${S3_BUCKET}/index.html" \
             --cache-control "no-cache,no-store,must-revalidate" \
             --only-show-errors
 

@@ -17,6 +17,7 @@ export interface ProviderCallbacks {
   onChunk: (chunk: string) => void;
   onReasoningSummary?: (chunk: string) => void;
   onUsage?: (usage: ProviderUsage) => void;
+  onSessionId?: (sessionId: string) => void;
   onError: (error: Error) => void;
   onFinish: () => void;
 }
@@ -27,6 +28,7 @@ export interface NormalizedProviderRequest {
   system: string | SystemBlock[];
   apiKey: string;
   temperature: number;
+  cliSessionId?: string;
   callbacks: ProviderCallbacks;
   signal?: AbortSignal;
 }

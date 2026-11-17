@@ -17,6 +17,7 @@ export interface ExecuteChatTurnInput {
   messages: ChatMessage[];
   contextBundle?: ContextBundle;
   documentContext?: DocumentChatContext;
+  cliSessionId?: string;
   onProposedChange?: (proposedContent: string) => void;
 }
 
@@ -62,6 +63,7 @@ export function useHarnessSession(
       messages,
       contextBundle,
       documentContext,
+      cliSessionId,
       onProposedChange
     } = input;
 
@@ -97,11 +99,17 @@ export function useHarnessSession(
           researchMode,
           settings,
           contextBundle,
-          documentContext
+          documentContext,
+          cliSessionId
         },
         {
           signal: controller.signal,
           callbacks: {
+            onSessionId: nextCliSessionId => {
+              setSessions(prev =>
+                prev.map(s => (s.id === sessionId ? { ...s, cliSessionId: nextCliSessionId } : s))
+              );
+            },
             onChunk: (chunk: string) => {
               if (stoppedMessageIdsRef.current.has(assistantMessageId)) return;
               accumulated += chunk;

@@ -87,6 +87,9 @@ function resolveProviderApiKey(provider: string, settings: TurnRequest['settings
       if (!key) throw new Error('Anthropic Claude API 키가 설정되지 않았습니다. [설정]에서 API 키를 입력해 주세요.');
       return key;
     }
+    case 'codex-cli':
+    case 'claude-cli':
+      return '';
     default:
       throw new Error(`지원되지 않는 프로바이더입니다: ${provider}`);
   }
@@ -140,6 +143,7 @@ export async function runTurn(request: TurnRequest, options: TurnOptions = {}): 
   let text = '';
   let finished = false;
   let usage: ProviderUsage | undefined;
+  let cliSessionId = request.cliSessionId;
   const guarded = Boolean(contextBundle?.graph || contextBundle?.assembly?.research || contextBundle?.projectScope);
 
   const providerCallbacks: ProviderCallbacks = {
@@ -157,6 +161,10 @@ export async function runTurn(request: TurnRequest, options: TurnOptions = {}): 
     onUsage: reported => {
       usage = reported;
       options.callbacks?.onUsage?.(reported);
+    },
+    onSessionId: reported => {
+      cliSessionId = reported;
+      options.callbacks?.onSessionId?.(reported);
     },
     onError: error => {
       throw error;
@@ -212,6 +220,7 @@ export async function runTurn(request: TurnRequest, options: TurnOptions = {}): 
         system: effectiveSystemBlocks,
         apiKey,
         temperature: request.settings.temperature,
+        cliSessionId,
         callbacks: hopCallbacks,
         signal: turnAbort.signal
       });
@@ -264,6 +273,7 @@ export async function runTurn(request: TurnRequest, options: TurnOptions = {}): 
       aborted: turnAbort.signal.aborted,
       timedOut,
       usage,
+      cliSessionId,
       contextPreview: assembled.preview,
       toolHopsUsed
     };
